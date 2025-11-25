@@ -214,7 +214,7 @@ func (h *HTTPHandler) getGroupByID(c *gin.Context) {
 func (h *HTTPHandler) updateGroup(c *gin.Context) {
 	tenantID := "dummy-tenant-id" // Placeholder, should come from middleware/context
 	id := c.Param("id")
-	var group Group
+	var group User
 	if err := c.ShouldBindJSON(&group); err != nil {
 		h.logger.Error("Failed to bind update group request", zap.Error(err))
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
