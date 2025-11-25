@@ -3,7 +3,6 @@ package policy
 import (
 	"net/http"
 
-	"github.com/dhawalhost/velverify/pkg/logger"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 )

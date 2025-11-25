@@ -2,10 +2,10 @@ package directory
 
 import (
 	"context"
-	"database/sql" // Keep for sql.NullString in GetUserByEmail
+	"database/sql"
+	"errors"
 
-	"github.com/google/uuid"
-	"github.com/jmoiron/sqlx" // Import sqlx
+	"github.com/jmoiron/sqlx"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -29,11 +29,16 @@ type Service interface {
 	// Group membership
 	AddUserToGroup(ctx context.Context, tenantID, userID, groupID string) error
 	RemoveUserFromGroup(ctx context.Context, tenantID, userID, groupID string) error
+
+	// Credential validation
+	VerifyCredentials(ctx context.Context, tenantID, email, password string) (User, error)
 }
 
 type directoryService struct {
 	db *sqlx.DB // Use sqlx.DB
 }
+
+var ErrInvalidCredentials = errors.New("invalid credentials")
 
 // NewService creates a new directory service.
 func NewService(db *sqlx.DB) Service { // Use sqlx.DB
@@ -69,8 +74,8 @@ func (s *directoryService) CreateUser(ctx context.Context, tenantID string, user
 	}
 
 	_, err = tx.ExecContext(ctx,
-		`INSERT INTO accounts (identity_id, login, password_hash) VALUES ($1, $2, $3)`,
-		userID, user.Email, string(hashedPassword))
+		`INSERT INTO accounts (identity_id, tenant_id, login, password_hash) VALUES ($1, $2, $3, $4)`,
+		userID, tenantID, user.Email, string(hashedPassword))
 	if err != nil {
 		return "", err
 	}
@@ -88,8 +93,8 @@ func (s *directoryService) GetUserByID(ctx context.Context, tenantID, id string)
 
 func (s *directoryService) GetUserByEmail(ctx context.Context, tenantID, email string) (User, error) {
 	var user User
-	err := s.db.GetContext(ctx, &user, `SELECT i.id, i.tenant_id, a.login AS email, a.password_hash AS password, i.status, i.created_at, i.updated_at
-		 FROM identities i JOIN accounts a ON i.id = a.identity_id WHERE a.login = $1 AND i.tenant_id = $2`,
+	err := s.db.GetContext(ctx, &user, `SELECT i.id, i.tenant_id, a.login AS email, i.status, i.created_at, i.updated_at
+		 FROM identities i JOIN accounts a ON i.id = a.identity_id WHERE a.login = $1 AND a.tenant_id = $2 AND i.tenant_id = $2`,
 		email, tenantID)
 	return user, err
 }
@@ -102,7 +107,7 @@ func (s *directoryService) UpdateUser(ctx context.Context, tenantID, id string, 
 	defer tx.Rollback()
 
 	if user.Email != "" {
-		_, err := tx.ExecContext(ctx, `UPDATE accounts SET login = $1 WHERE identity_id = $2 AND EXISTS (SELECT 1 FROM identities WHERE id = $2 AND tenant_id = $3)`, user.Email, id, tenantID)
+		_, err := tx.ExecContext(ctx, `UPDATE accounts SET login = $1 WHERE identity_id = $2 AND tenant_id = $3`, user.Email, id, tenantID)
 		if err != nil {
 			return err
 		}
@@ -113,7 +118,7 @@ func (s *directoryService) UpdateUser(ctx context.Context, tenantID, id string, 
 		if err != nil {
 			return err
 		}
-		_, err = tx.ExecContext(ctx, `UPDATE accounts SET password_hash = $1 WHERE identity_id = $2 AND EXISTS (SELECT 1 FROM identities WHERE id = $2 AND tenant_id = $3)`, string(hashedPassword), id, tenantID)
+		_, err = tx.ExecContext(ctx, `UPDATE accounts SET password_hash = $1 WHERE identity_id = $2 AND tenant_id = $3`, string(hashedPassword), id, tenantID)
 		if err != nil {
 			return err
 		}
@@ -165,8 +170,8 @@ func (s *directoryService) DeleteGroup(ctx context.Context, tenantID, id string)
 }
 
 func (s *directoryService) AddUserToGroup(ctx context.Context, tenantID, userID, groupID string) error {
-	_, err := s.db.ExecContext(ctx, `INSERT INTO identity_groups (identity_id, group_id)
-	SELECT $1, $2
+	_, err := s.db.ExecContext(ctx, `INSERT INTO identity_groups (identity_id, group_id, tenant_id)
+	SELECT $1, $2, $3
 	WHERE EXISTS (SELECT 1 FROM identities WHERE id = $1 AND tenant_id = $3)
 	AND EXISTS (SELECT 1 FROM groups WHERE id = $2 AND tenant_id = $3)`, userID, groupID, tenantID)
 	return err
@@ -174,28 +179,29 @@ func (s *directoryService) AddUserToGroup(ctx context.Context, tenantID, userID,
 
 func (s *directoryService) RemoveUserFromGroup(ctx context.Context, tenantID, userID, groupID string) error {
 	_, err := s.db.ExecContext(ctx, `DELETE FROM identity_groups
-	WHERE identity_id = $1 AND group_id = $2
-	AND EXISTS (SELECT 1 FROM identities WHERE id = $1 AND tenant_id = $3)
-	AND EXISTS (SELECT 1 FROM groups WHERE id = $2 AND tenant_id = $3)`, userID, groupID, tenantID)
+	WHERE identity_id = $1 AND group_id = $2 AND tenant_id = $3`, userID, groupID, tenantID)
 	return err
 }
 
-// User represents a user in the system.
-type User struct {
-	ID        string `json:"id,omitempty"`
-	TenantID  string `json:"tenant_id,omitempty"`
-	Email     string `json:"email"`
-	Password  string `json:"password,omitempty"`
-	Status    string `json:"status,omitempty"`
-	CreatedAt string `json:"created_at,omitempty"`
-	UpdatedAt string `json:"updated_at,omitempty"`
-}
+func (s *directoryService) VerifyCredentials(ctx context.Context, tenantID, email, password string) (User, error) {
+	var record struct {
+		User
+		PasswordHash string `db:"password_hash"`
+	}
 
-// Group represents a group in the system.
-type Group struct {
-	ID        string `json:"id,omitempty"`
-	TenantID  string `json:"tenant_id,omitempty"`
-	Name      string `json:"name"`
-	CreatedAt string `json:"created_at,omitempty"`
-	UpdatedAt string `json:"updated_at,omitempty"`
+	err := s.db.GetContext(ctx, &record, `SELECT i.id, i.tenant_id, a.login AS email, i.status, i.created_at, i.updated_at, a.password_hash
+		FROM identities i JOIN accounts a ON i.id = a.identity_id
+		WHERE a.login = $1 AND a.tenant_id = $2 AND i.tenant_id = $2`, email, tenantID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return User{}, ErrInvalidCredentials
+		}
+		return User{}, err
+	}
+
+	if err := bcrypt.CompareHashAndPassword([]byte(record.PasswordHash), []byte(password)); err != nil {
+		return User{}, ErrInvalidCredentials
+	}
+
+	return record.User, nil
 }

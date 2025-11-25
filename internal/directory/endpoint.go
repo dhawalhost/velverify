@@ -2,8 +2,8 @@ package directory
 
 // User represents a user in the system.
 type User struct {
-	ID        string `json:"id,omitempty" validate:"uuid"`
-	TenantID  string `json:"tenant_id,omitempty" validate:"uuid"`
+	ID        string `json:"id,omitempty" validate:"omitempty,uuid"`
+	TenantID  string `json:"tenant_id,omitempty" validate:"omitempty,uuid"`
 	Email     string `json:"email" validate:"required,email"`
 	Password  string `json:"password,omitempty" validate:"required,min=8"`
 	Status    string `json:"status,omitempty" validate:"required,oneof=active inactive suspended"`
@@ -13,8 +13,8 @@ type User struct {
 
 // Group represents a group in the system.
 type Group struct {
-	ID        string `json:"id,omitempty" validate:"uuid"`
-	TenantID  string `json:"tenant_id,omitempty" validate:"uuid"`
+	ID        string `json:"id,omitempty" validate:"omitempty,uuid"`
+	TenantID  string `json:"tenant_id,omitempty" validate:"omitempty,uuid"`
 	Name      string `json:"name" validate:"required"`
 	CreatedAt string `json:"created_at,omitempty"`
 	UpdatedAt string `json:"updated_at,omitempty"`
@@ -27,7 +27,7 @@ type HealthCheckResponse struct {
 
 // CreateUserRequest holds the request parameters for the CreateUser endpoint.
 type CreateUserRequest struct {
-	User User `json:"user" validate:"required,dive"`
+	User User `json:"user" validate:"required"`
 }
 
 // CreateUserResponse holds the response values for the CreateUser endpoint.
@@ -58,7 +58,7 @@ type GetUserByIDResponse struct {
 // UpdateUserRequest holds the request parameters for the UpdateUser endpoint.
 type UpdateUserRequest struct {
 	ID   string `json:"id" validate:"required,uuid"`
-	User User   `json:"user" validate:"required,dive"`
+	User User   `json:"user" validate:"required"`
 }
 
 // UpdateUserResponse holds the response values for the UpdateUser endpoint.
@@ -74,7 +74,7 @@ type DeleteUserResponse struct{}
 
 // CreateGroupRequest holds the request parameters for the CreateGroup endpoint.
 type CreateGroupRequest struct {
-	Group Group `json:"group" validate:"required,dive"`
+	Group Group `json:"group" validate:"required"`
 }
 
 // CreateGroupResponse holds the response values for the CreateGroup endpoint.
@@ -95,7 +95,7 @@ type GetGroupByIDResponse struct {
 // UpdateGroupRequest holds the request parameters for the UpdateGroup endpoint.
 type UpdateGroupRequest struct {
 	ID    string `json:"id" validate:"required,uuid"`
-	Group Group  `json:"group" validate:"required,dive"`
+	Group Group  `json:"group" validate:"required"`
 }
 
 // UpdateGroupResponse holds the response values for the UpdateGroup endpoint.
@@ -126,3 +126,14 @@ type RemoveUserFromGroupRequest struct {
 
 // RemoveUserFromGroupResponse holds the response values for the RemoveUserFromGroup endpoint.
 type RemoveUserFromGroupResponse struct{}
+
+// VerifyCredentialsRequest holds the request parameters for credential verification.
+type VerifyCredentialsRequest struct {
+	Email    string `json:"email" validate:"required,email"`
+	Password string `json:"password" validate:"required,min=8"`
+}
+
+// VerifyCredentialsResponse holds the response values for credential verification.
+type VerifyCredentialsResponse struct {
+	User User `json:"user"`
+}

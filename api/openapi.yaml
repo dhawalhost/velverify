@@ -120,3 +120,258 @@ paths:
                 type: object # A more specific schema can be added here
         '500':
           description: Internal server error
+
+  /api/v1/oauth/clients:
+    get:
+      summary: List OAuth clients for a tenant
+      operationId: listOAuthClients
+      tags:
+        - Governance
+      parameters:
+        - $ref: '#/components/parameters/TenantHeader'
+      responses:
+        '200':
+          description: Clients returned successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OAuthClientListResponse'
+        '400':
+          description: Missing tenant header or invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    post:
+      summary: Register a new OAuth client
+      operationId: createOAuthClient
+      tags:
+        - Governance
+      parameters:
+        - $ref: '#/components/parameters/TenantHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOAuthClientRequest'
+      responses:
+        '201':
+          description: Client created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OAuthClient'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/oauth/clients/{clientId}:
+    parameters:
+      - $ref: '#/components/parameters/TenantHeader'
+      - name: clientId
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      summary: Fetch a specific OAuth client
+      operationId: getOAuthClient
+      tags:
+        - Governance
+      responses:
+        '200':
+          description: Client found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OAuthClient'
+        '404':
+          description: Client not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    put:
+      summary: Update an existing OAuth client
+      operationId: updateOAuthClient
+      tags:
+        - Governance
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateOAuthClientRequest'
+      responses:
+        '200':
+          description: Client updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OAuthClient'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Client not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      summary: Delete an OAuth client
+      operationId: deleteOAuthClient
+      tags:
+        - Governance
+      responses:
+        '204':
+          description: Client deleted successfully
+        '404':
+          description: Client not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  parameters:
+    TenantHeader:
+      name: X-Tenant-ID
+      in: header
+      required: true
+      schema:
+        type: string
+      description: Tenant identifier used for scoping requests
+  schemas:
+    OAuthClient:
+      type: object
+      required:
+        - client_id
+        - tenant_id
+        - client_type
+        - name
+        - redirect_uris
+        - allowed_scopes
+      properties:
+        client_id:
+          type: string
+        tenant_id:
+          type: string
+        client_type:
+          type: string
+          enum: [public, confidential]
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        redirect_uris:
+          type: array
+          items:
+            type: string
+            format: uri
+        allowed_scopes:
+          type: array
+          items:
+            type: string
+    OAuthClientListResponse:
+      type: object
+      properties:
+        clients:
+          type: array
+          items:
+            $ref: '#/components/schemas/OAuthClient'
+    CreateOAuthClientRequest:
+      type: object
+      required:
+        - client_id
+        - name
+        - client_type
+        - redirect_uris
+        - allowed_scopes
+      properties:
+        client_id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        client_type:
+          type: string
+          enum: [public, confidential]
+        redirect_uris:
+          type: array
+          items:
+            type: string
+            format: uri
+        allowed_scopes:
+          type: array
+          items:
+            type: string
+        client_secret:
+          type: string
+          description: Required for confidential clients
+    UpdateOAuthClientRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        client_type:
+          type: string
+          enum: [public, confidential]
+        redirect_uris:
+          type: array
+          items:
+            type: string
+            format: uri
+        allowed_scopes:
+          type: array
+          items:
+            type: string
+        client_secret:
+          type: string
+          description: Replaces the previous secret for confidential clients
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string

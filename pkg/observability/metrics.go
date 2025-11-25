@@ -1,6 +1,7 @@
 package observability
 
 import (
+	"net/http"
 	"strconv"
 	"time"
 

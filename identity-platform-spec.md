@@ -216,13 +216,78 @@ Key endpoints (examples):
 - Governance (certifications):
   - `POST /api/v1/tenants/{tid}/certifications`
   - `POST /api/v1/tenants/{tid}/access-requests`
+- Governance (OAuth clients – new admin API backed by govsvc):
+  - `GET /api/v1/oauth/clients`
+  - `POST /api/v1/oauth/clients`
+  - `GET /api/v1/oauth/clients/{clientId}`
+  - `PUT /api/v1/oauth/clients/{clientId}`
+  - `DELETE /api/v1/oauth/clients/{clientId}`
 
 Authentication for management APIs: OAuth2 client credentials or mTLS for internal services.
 
 Design notes:
+
 - Use resource-based RBAC and scopes.
 - Provide API pagination and filtering.
 - Provide SDKs (Go, TS, Java) generated from OpenAPI.
+- Require `X-Tenant-ID` header on governance endpoints to scope all OAuth client operations; reject missing headers with `400`.
+
+### 6.a Governance OAuth client administration (delivered)
+
+Governance service now exposes tenant-scoped CRUD endpoints for OAuth clients so platform admins no longer touch the database directly.
+
+#### Headers & auth
+
+- `X-Tenant-ID` — required on every request; identifies the tenant whose clients you are managing.
+- Authorization: bearer token issued via client credentials with the `governance.clients.*` scopes (or mTLS for internal calls).
+
+#### Schemas
+
+- Request/response bodies match the OpenAPI definitions in `api/openapi.yaml` (`OAuthClient`, `CreateOAuthClientRequest`, `UpdateOAuthClientRequest`).
+- `client_type` supports `public` and `confidential`. Confidential clients must include `client_secret` on create/update; secrets are hashed server-side and never returned.
+
+#### Sample create request
+
+```http
+POST /api/v1/oauth/clients HTTP/1.1
+Host: govsvc.internal
+Authorization: Bearer <token>
+Content-Type: application/json
+X-Tenant-ID: acme-prod
+
+{
+  "client_id": "admin-portal",
+  "name": "Admin Portal",
+  "client_type": "confidential",
+  "redirect_uris": ["https://admin.example.com/callback"],
+  "allowed_scopes": ["openid", "profile"],
+  "client_secret": "replace-me"
+}
+```
+
+#### Success response
+
+```json
+{
+  "client_id": "admin-portal",
+  "tenant_id": "acme-prod",
+  "client_type": "confidential",
+  "name": "Admin Portal",
+  "redirect_uris": ["https://admin.example.com/callback"],
+  "allowed_scopes": ["openid", "profile"]
+}
+```
+
+#### Error semantics
+
+- `400` — validation error (`{"error": "client_secret is required for confidential clients"}`)
+- `404` — tenant-scoped client not found (GET/PUT/DELETE)
+- `409` — (future) duplicate `client_id` per tenant; currently surfaced as `400`
+- `500` — unexpected server/database issues
+
+#### Tooling
+
+- `cmd/admincli` provides a lightweight CLI: `go run ./cmd/admincli list -tenant demo-tenant` or `create` with flags for redirects/scopes/secret. Use this until the Admin UI wires the same APIs.
 
 ---
 
@@ -236,6 +301,7 @@ Design notes:
 - MFA types: TOTP, SMS (fallback), Push (mobile), WebAuthn
 
 Token strategy:
+
 - Short-lived access tokens (JWT or opaque) + refresh tokens
 - Refresh token rotation and revocation
 - Introspection endpoint for resource servers
@@ -246,19 +312,23 @@ Token strategy:
 ## 8. Provisioning & connectors
 
 Connector model & lifecycle:
+
 - Connector spec: supports `sync`, `push`, `provision` operations
 - Register connector → configure → test connection → run initial sync
 
 Sync modes:
+
 - Full sync (initial) and incremental/delta sync (most common)
 - Push-based webhooks where supported
 
 Reconciliation & error handling:
+
 - Reconcile rules and mapping templates
 - Dead-letter queue for failed records; admin retry
 - Idempotent operations and change logs
 
 Suggested connectors to ship:
+
 - Active Directory / LDAP
 - Azure AD (Graph API)
 - Google Workspace
@@ -276,6 +346,7 @@ Suggested connectors to ship:
 - Automated remediation: policy-driven or manual workflow
 
 UX features:
+
 - Email-driven approvals, bulk certification UI, attestation evidence export
 - Simulation mode to preview certification impact
 
@@ -289,6 +360,7 @@ UX features:
 - Policy testing sandbox with unit tests and historical simulation
 
 Caching strategy:
+
 - Cache evaluated decisions in Redis for hot-paths; invalidate on policy change
 
 ---
@@ -320,15 +392,18 @@ This platform is architected on a Zero Trust model, which assumes no implicit tr
 ## 12. Multi-tenancy & isolation
 
 Tenancy models:
+
 - Shared schema (tenant_id) — fast to implement
 - Per-tenant schema — moderate isolation
 - Per-tenant DB — maximum isolation (higher ops cost)
 
 Recommendations:
+
 - Start with shared schema + row-level security (RLS) and strong tenant scoping.
 - Offer per-tenant schema/DB for enterprise/regulated customers.
 
 Tenant isolation features:
+
 - Per-tenant rate limiting, quotas, storage policies
 - Data residency by region (deploy tenant data in selected region)
 
@@ -337,18 +412,22 @@ Tenant isolation features:
 ## 13. Observability & SRE
 
 Metrics (Prometheus):
+
 - Auth RPS, token latencies (p50/p95/p99), DB latency, connector job durations, job queue depth
 
 Tracing (OpenTelemetry → Jaeger):
+
 - Trace auth flows, SCIM syncs, policy evaluations
 
 Logs: structured JSON with correlation IDs; ship to Loki/ELK; export to SIEM
 
 Dashboards & alerts:
+
 - Health overview, per-tenant metrics, security anomalies
 - Alerts: high error rate, latency spikes, connector failures
 
 SLOs & incident response:
+
 - Define SLOs and error budgets; prepare runbooks and on-call rotation
 
 ---
@@ -396,12 +475,15 @@ SLOs & incident response:
 ## 18. UX & Developer experience
 
 Admin UX:
+
 - Dashboard, user/group/role management, certification management
 
 Developer portal:
+
 - OpenAPI docs, client SDKs, quickstart, sample apps, and test sandbox
 
 Local dev experience:
+
 - docker-compose for local stacks, scripts to bootstrap a test tenant
 
 ---
@@ -444,6 +526,7 @@ Local dev experience:
 ## 23. Runbooks & operational checklists
 
 Create runbooks for:
+
 - Token service outage
 - Connector sync failure
 - DB failover & restore
