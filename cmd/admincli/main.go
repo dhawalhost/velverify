@@ -14,7 +14,7 @@ import (
 const (
 	tenantHeader    = "X-Tenant-ID"
 	defaultBaseURL  = "http://localhost:8082"
-	defaultTenantID = "default"
+	defaultTenantID = "11111111-1111-1111-1111-111111111111"
 )
 
 type oauthClient struct {
