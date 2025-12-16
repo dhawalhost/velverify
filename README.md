@@ -30,16 +30,67 @@ The project is organized as a monorepo containing multiple microservices. This s
 
 ## Getting Started
 
-... (To be added)
+For a complete step-by-step setup guide including database migrations and environment configuration, see [QUICKSTART.md](./QUICKSTART.md).
+
+**TL;DR:**
+
+```bash
+# Start infrastructure
+docker compose up -d postgres redis
+
+# Apply migrations
+for f in migrations/*.up.sql; do cat "$f" | docker exec -i identity_platform_postgres psql -U user -d identity_platform; done
+
+# Start services
+docker compose up -d authsvc dirsvc govsvc adminui
+
+# Verify
+curl http://localhost:8082/health
+```
+
+
+## Local development with Docker Compose
+
+Use the compose stack to spin up Postgres, Redis, the identity services, the governance API, and the Admin UI in one command. The new `adminui` container serves the Vite build through NGINX and is preconfigured to call `govsvc` inside the compose network.
+
+```bash
+docker compose up --build postgres redis dirsvc authsvc govsvc adminui
+```
+
+- Governance API: <http://localhost:8082> (requires `X-Tenant-ID` header)
+- Admin UI: <http://localhost:5173> (talks to govsvc via the internal service URL)
+
+When running the stack locally, `govsvc` now honors a `CORS_ALLOWED_ORIGINS` env var (comma separated) that defaults to `http://localhost:5173,http://127.0.0.1:5173`. Update it if you need to serve the Admin UI from a different host/port.
+
+The Admin UI JavaScript bundle reads `VITE_GOVSVC_URL` at build time (Compose now sets it to `http://localhost:8082`). You can override it by editing `docker-compose.yml`, rebuilding the `adminui` image, or by using the Base URL input inside the UI. Clearing the field reverts to the origin currently serving the UI, which is handy if you front the entire stack with a single domain.
+
+To point the UI at a different governance endpoint, override the build arg when building the image:
+
+```bash
+docker compose build --build-arg VITE_GOVSVC_URL=https://govsvc.example.com adminui
+```
+
+## Kubernetes deployment (Helm)
+
+Each service ships with a standalone Helm chart under `deploy/charts`. The new governance chart mirrors the existing auth/dir charts and exposes database settings via `.Values.env`.
+
+```bash
+helm install govsvc ./deploy/charts/govsvc \
+    --set image.repository=registry.example.com/govsvc \
+    --set env.DB_HOST=postgresql.default.svc.cluster.local \
+    --set env.DB_PASSWORD=super-secret
+```
+
+Swap the image repository/tag or env vars as needed for your cluster. Repeat with `./deploy/charts/adminui` once it exists, or continue running the UI via Docker Compose for local workflows.
 
 ## Multi-tenant requests
 
 All Directory and Auth service APIs expect the caller to include an `X-Tenant-ID` header. The tenant middleware validates the
 presence of this header and will reject the request with `400 Bad Request` when it is missing. If you are testing locally,
-remember to add the header, for example:
+remember to add the header (use your real tenant UUID), for example:
 
 ```bash
-curl -H "X-Tenant-ID: demo-tenant" ...
+curl -H "X-Tenant-ID: 11111111-1111-1111-1111-111111111111" ...
 ```
 
 ### Internal credential verification
@@ -113,7 +164,7 @@ Example request to create a confidential client:
 ```bash
 curl -X POST http://localhost:8082/api/v1/oauth/clients \
     -H "Content-Type: application/json" \
-    -H "X-Tenant-ID: demo-tenant" \
+    -H "X-Tenant-ID: 11111111-1111-1111-1111-111111111111" \
     -d '{
         "client_id": "admin-portal",
         "name": "Admin Portal",
@@ -132,10 +183,10 @@ Successful responses return the client metadata (excluding the secret hash). Val
 For quick experiments, a lightweight CLI lives in `cmd/admincli`. Run it with Go directly:
 
 ```bash
-go run ./cmd/admincli list -tenant demo-tenant
+go run ./cmd/admincli list -tenant 11111111-1111-1111-1111-111111111111
 
 go run ./cmd/admincli create \
-    -tenant demo-tenant \
+    -tenant 11111111-1111-1111-1111-111111111111 \
     -client-id admin-portal \
     -name "Admin Portal" \
     -type confidential \

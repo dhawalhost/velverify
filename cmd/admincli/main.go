@@ -14,7 +14,7 @@ import (
 const (
 	tenantHeader    = "X-Tenant-ID"
 	defaultBaseURL  = "http://localhost:8082"
-	defaultTenantID = "demo-tenant"
+	defaultTenantID = "default"
 )
 
 type oauthClient struct {
@@ -258,7 +258,7 @@ func prettyPrint(v interface{}) {
 }
 
 func usage() {
-	fmt.Println(`Usage: admincli <command> [options]
+	fmt.Print(`Usage: admincli <command> [options]
 
 Commands:
   list        List OAuth clients for a tenant
@@ -267,7 +267,7 @@ Commands:
   delete      Remove an OAuth client
 
 Global options:
-  -base-url   Governance service base URL (default http://localhost:8082)
-  -tenant     Tenant identifier header (default demo-tenant)
+	-base-url   Governance service base URL (default http://localhost:8082)
+	-tenant     Tenant identifier header (default 11111111-1111-1111-1111-111111111111)
 `)
 }
