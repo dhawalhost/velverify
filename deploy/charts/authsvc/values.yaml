@@ -13,6 +13,14 @@ service:
 env:
   DIRECTORY_SERVICE_URL: http://dirsvc:8081 # Assumes dirsvc is in the same namespace
 
+# Database configuration (optional, can be inherited from parent chart)
+database:
+  existingSecret: wardseal-db-credentials-dev
+
+# Vault AppRole configuration (optional, for Vault integration)
+vaultAppRole:
+  existingSecret: vault-approle
+
 # Resource limits and requests
 resources:
   limits:
@@ -21,3 +29,16 @@ resources:
   requests:
     cpu: 100m
     memory: 128Mi
+
+# Autoscaling configuration
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 80
+
+# Service Account
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""

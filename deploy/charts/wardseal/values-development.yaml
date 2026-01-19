@@ -1,40 +1,39 @@
-# Staging Environment Values
-# Override default values for staging deployment
+# Development Environment Values
+# For local kubernetes (minikube/kind) or dev cluster
 
 global:
   imageRegistry: ghcr.io/dhawalhost
 
-# Database - Staging
+# Database - Development (use local postgres)
 database:
-  host: postgres-staging.wardseal.svc.cluster.local
+  host: postgres
   port: 5432
-  name: identity_platform_staging
-  sslMode: require
-  existingSecret: wardseal-db-credentials-staging
+  name: identity_platform_dev
+  sslMode: disable
+  existingSecret: wardseal-db-credentials-dev
 
-# KMS Configuration - Use Vault in staging
+# KMS Configuration - Use local keys in development
 kms:
-  provider: vault
-  vaultSecretName: wardseal-vault-kms-staging
+  provider: local
+  # For Vault in dev (optional):
+  # provider: vault
+  # vaultAddr: http://vault:8200
 
-# Auth Service - Staging
+# Auth Service - Development
 authsvc:
   enabled: true
   replicaCount: 1
 
   image:
-    tag: "latest"  # Will be overridden by CI
+    tag: "latest"
+    pullPolicy: Always  # Always pull in dev
 
   env:
-    ENVIRONMENT: staging
+    ENVIRONMENT: development
     LOG_LEVEL: debug
     DIRECTORY_SERVICE_URL: http://wardseal-dirsvc:8081
-    AUTH_SERVICE_URL: https://auth-staging.wardseal.com
-    KMS_PROVIDER: vault
-
-  envFrom:
-    - secretRef:
-        name: wardseal-vault-kms-staging
+    AUTH_SERVICE_URL: http://localhost:8080
+    KMS_PROVIDER: local
 
   resources:
     limits:
@@ -44,15 +43,21 @@ authsvc:
       cpu: 50m
       memory: 64Mi
 
-# Directory Service - Staging
+  # No autoscaling in dev
+  autoscaling:
+    enabled: false
+
+# Directory Service - Development
 dirsvc:
   enabled: true
   replicaCount: 1
 
   image:
     tag: "latest"
+    pullPolicy: Always
 
   env:
+    ENVIRONMENT: development
     LOG_LEVEL: debug
 
   resources:
@@ -63,15 +68,17 @@ dirsvc:
       cpu: 50m
       memory: 64Mi
 
-# Governance Service - Staging
+# Governance Service - Development
 govsvc:
   enabled: true
   replicaCount: 1
 
   image:
     tag: "latest"
+    pullPolicy: Always
 
   env:
+    ENVIRONMENT: development
     LOG_LEVEL: debug
     DIRECTORY_SERVICE_URL: http://wardseal-dirsvc:8081
 
@@ -83,22 +90,18 @@ govsvc:
       cpu: 50m
       memory: 64Mi
 
-# Ingress - Staging
+# Ingress - Development (no TLS)
 ingress:
   enabled: true
   className: nginx
-  annotations:
-    nginx.ingress.kubernetes.io/ssl-redirect: "true"
-    cert-manager.io/cluster-issuer: letsencrypt-staging
+  annotations: {}
   hosts:
-    - host: auth-staging.wardseal.com
+    - host: wardseal.local
       paths:
         - path: /
           pathType: Prefix
           service: authsvc
           port: 8080
-    - host: api-staging.wardseal.com
-      paths:
         - path: /api/v1/users
           pathType: Prefix
           service: dirsvc
@@ -111,12 +114,4 @@ ingress:
           pathType: Prefix
           service: govsvc
           port: 8082
-        - path: /api/v1/governance
-          pathType: Prefix
-          service: govsvc
-          port: 8082
-  tls:
-    - secretName: wardseal-tls-staging
-      hosts:
-        - auth-staging.wardseal.com
-        - api-staging.wardseal.com
+  tls: []  # No TLS in dev

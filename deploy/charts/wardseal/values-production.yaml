@@ -12,6 +12,11 @@ database:
   sslMode: verify-full
   existingSecret: wardseal-db-credentials-production
 
+# KMS Configuration - Use Vault with strict settings
+kms:
+  provider: vault
+  vaultSecretName: wardseal-vault-kms-production
+
 # Auth Service - Production
 authsvc:
   enabled: true
@@ -21,10 +26,16 @@ authsvc:
     tag: ""  # Set by CI during deployment
 
   env:
+    ENVIRONMENT: production
     LOG_LEVEL: info
     DIRECTORY_SERVICE_URL: http://wardseal-dirsvc:8081
     AUTH_SERVICE_URL: https://auth.wardseal.com
     REQUIRE_LICENSE: "true"
+    KMS_PROVIDER: vault
+
+  envFrom:
+    - secretRef:
+        name: wardseal-vault-kms-production
 
   resources:
     limits:

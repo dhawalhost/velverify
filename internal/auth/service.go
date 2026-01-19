@@ -23,6 +23,7 @@ import (
 
 	"github.com/dhawalhost/wardseal/internal/oauthclient"
 	"github.com/dhawalhost/wardseal/internal/saml"
+	"github.com/dhawalhost/wardseal/pkg/kms"
 	"github.com/dhawalhost/wardseal/pkg/middleware"
 	"github.com/go-webauthn/webauthn/protocol"
 	"github.com/go-webauthn/webauthn/webauthn"
@@ -73,7 +74,7 @@ type LookupResult struct {
 type authService struct {
 	directoryServiceURL string
 	httpClient          *http.Client
-	privateKey          *rsa.PrivateKey
+	signer              kms.Signer
 	serviceAuthHeader   string
 	serviceAuthToken    string
 	codeStore           AuthorizationCodeStore
@@ -91,7 +92,6 @@ type authService struct {
 	federationStore     FederationStore
 	totpStore           TOTPStore
 	ssoProviderStore    SSOProviderStore
-	keyID               string
 }
 
 // AuthorizationCodeStore defines the interface for storing authorization codes.
@@ -134,6 +134,8 @@ type Config struct {
 	RevocationStore  RevocationStore
 	TOTPStore        TOTPStore
 	SSOProviderStore SSOProviderStore
+	// KMS Signer (optional, defaults to ephemeral local signer)
+	Signer kms.Signer
 }
 
 // NewService creates a new auth service.
@@ -222,16 +224,20 @@ func NewService(cfg Config) (Service, error) {
 		revocationStore = cfg.RevocationStore
 	}
 
-	// Generate Key ID
-	keyID := uuid.New().String()
-	// In a real system, we might derive this from the key material (JWK Thumbprint)
-	// or persist it to rotate keys gracefully.
+	// Initialize KMS Signer - use provided signer or create ephemeral local signer
+	signer := cfg.Signer
+	if signer == nil {
+		var err error
+		signer, err = kms.NewLocalSigner("", "")
+		if err != nil {
+			return nil, fmt.Errorf("failed to create ephemeral signer: %w", err)
+		}
+	}
 
 	return &authService{
 		directoryServiceURL: cfg.DirectoryServiceURL,
 		httpClient:          &http.Client{Timeout: 5 * time.Second},
-		privateKey:          privateKey,
-		keyID:               keyID,
+		signer:              signer,
 		serviceAuthHeader:   header,
 		serviceAuthToken:    cfg.ServiceAuthToken,
 		codeStore:           codeStore,
@@ -347,10 +353,7 @@ func (s *authService) Login(ctx context.Context, username, password, deviceID, u
 		"tenant": tenantID,
 	}
 
-	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
-	token.Header["kid"] = s.keyID
-
-	signedToken, err := token.SignedString(s.privateKey)
+	signedToken, err := s.signer.Sign(claims)
 	if err != nil {
 		return "", err
 	}
@@ -502,9 +505,9 @@ func (s *authService) JWKS() jose.JSONWebKeySet {
 	return jose.JSONWebKeySet{
 		Keys: []jose.JSONWebKey{
 			{
-				Key:       &s.privateKey.PublicKey,
-				KeyID:     s.keyID,
-				Algorithm: "RS256",
+				Key:       s.signer.PublicKey(),
+				KeyID:     s.signer.KeyID(),
+				Algorithm: s.signer.Algorithm(),
 				Use:       "sig",
 			},
 		},
@@ -737,10 +740,7 @@ func (s *authService) generateAccessToken(tenantID, clientID, scope, subjectType
 		"subject_type": subjectType,
 	}
 
-	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
-	token.Header["kid"] = s.keyID
-
-	return token.SignedString(s.privateKey)
+	return s.signer.Sign(claims)
 }
 
 func (s *authService) generateRefreshToken(ctx context.Context, tenantID, clientID, scope, subjectType string) (string, error) {
@@ -781,7 +781,7 @@ func (s *authService) Introspect(ctx context.Context, req IntrospectRequest) (In
 		if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 		}
-		return &s.privateKey.PublicKey, nil
+		return s.signer.PublicKey(), nil
 	})
 
 	if err != nil || !token.Valid {
@@ -1269,10 +1269,7 @@ func (s *authService) SignUp(ctx context.Context, email, password, companyName s
 		"tenant": tenantID,
 	}
 
-	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
-	token.Header["kid"] = s.keyID
-
-	signedToken, err := token.SignedString(s.privateKey)
+	signedToken, err := s.signer.Sign(claims)
 	if err != nil {
 		return "", "", err
 	}

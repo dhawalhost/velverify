@@ -1,0 +1,12 @@
+dependencies:
+- name: authsvc
+  repository: file://../authsvc
+  version: 0.1.0
+- name: dirsvc
+  repository: file://../dirsvc
+  version: 0.1.0
+- name: govsvc
+  repository: file://../govsvc
+  version: 0.1.0
+digest: sha256:f012422ba98a972bef929a3f6f2fa436c921be6a8255206be06b457392b23661
+generated: "2026-01-15T15:12:59.358337+05:30"

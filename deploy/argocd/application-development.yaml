@@ -1,0 +1,39 @@
+# WardSeal Development ArgoCD Application
+# For local/dev cluster testing
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: wardseal-development
+  namespace: argocd
+  labels:
+    environment: development
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  source:
+    repoURL: https://github.com/dhawalhost/wardseal.git
+    targetRevision: develop  # Development branch
+    path: deploy/charts/wardseal
+
+    helm:
+      valueFiles:
+        - values.yaml
+        - values-development.yaml
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: wardseal-dev
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+    syncOptions:
+      - CreateNamespace=true
+      - PruneLast=true
+
+  # Don't auto-sync in dev, allow manual testing
+  # Remove 'automated' above if you want full manual control

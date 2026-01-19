@@ -109,6 +109,7 @@ jobs:
           name: Run unit tests
           command: |
             mkdir -p /tmp/test-results
+            export CGO_ENABLED=1
             go test -v -race -coverprofile=coverage.out -covermode=atomic ./... 2>&1 | tee /tmp/test-results/go-test.out
             go tool cover -html=coverage.out -o /tmp/test-results/coverage.html
       - store_test_results:

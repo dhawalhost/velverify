@@ -11,13 +11,11 @@ service:
   port: 8082
 
 env:
-  DB_HOST: postgres
-  DB_PORT: "5432"
-  DB_USER: user
-  DB_PASSWORD: password
-  DB_NAME: identity_platform
-  DB_SSLMODE: disable
   CORS_ALLOWED_ORIGINS: http://localhost:5173,http://127.0.0.1:5173
+
+# Database configuration (optional, can be inherited from parent chart)
+database:
+  existingSecret: wardseal-db-credentials-dev
 
 # Resource limits and requests
 resources:
@@ -27,3 +25,16 @@ resources:
   requests:
     cpu: 100m
     memory: 128Mi
+
+# Autoscaling configuration
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 80
+
+# Service Account
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""

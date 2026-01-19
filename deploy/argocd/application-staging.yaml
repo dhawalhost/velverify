@@ -1,0 +1,58 @@
+# WardSeal Staging ArgoCD Application
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: wardseal-staging
+  namespace: argocd
+  labels:
+    environment: staging
+  annotations:
+    notifications.argoproj.io/subscribe.on-sync-succeeded.slack: wardseal-deployments
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  source:
+    repoURL: https://github.com/dhawalhost/wardseal.git
+    targetRevision: main
+    path: deploy/charts/wardseal
+
+    helm:
+      valueFiles:
+        - values.yaml
+        - values-staging.yaml
+      # Override image tags from CI
+      parameters:
+        - name: authsvc.image.tag
+          value: $ARGOCD_APP_REVISION
+        - name: dirsvc.image.tag
+          value: $ARGOCD_APP_REVISION
+        - name: govsvc.image.tag
+          value: $ARGOCD_APP_REVISION
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: wardseal-staging
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+    syncOptions:
+      - CreateNamespace=true
+      - PruneLast=true
+      - ApplyOutOfSyncOnly=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      jsonPointers:
+        - /spec/replicas

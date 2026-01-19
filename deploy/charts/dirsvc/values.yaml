@@ -10,8 +10,12 @@ service:
   type: ClusterIP
   port: 8081
 
-env:
-  DB_HOST: postgres # Assumes postgres is accessible as 'postgres'
+env: {}
+  # Environment variables can be set here or inherited from parent chart
+
+# Database configuration (optional, can be inherited from parent chart)
+database:
+  existingSecret: wardseal-db-credentials-dev
 
 # Resource limits and requests
 resources:
@@ -21,3 +25,16 @@ resources:
   requests:
     cpu: 100m
     memory: 128Mi
+
+# Autoscaling configuration
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 80
+
+# Service Account
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
