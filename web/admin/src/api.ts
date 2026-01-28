@@ -6,7 +6,7 @@ const GOVSVC_URL = (import.meta as any).env?.VITE_GOVSVC_URL || 'http://localhos
 
 console.log('API Strings:', { AUTHSVC_URL, DIRSVC_URL, GOVSVC_URL });
 
-const api = axios.create({
+export const api = axios.create({
     baseURL: AUTHSVC_URL,
     headers: {
         'Content-Type': 'application/json',
