@@ -1,5 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { getOrganizations, createOrganization, deleteOrganization } from '../api';
+import {
+    getOrganizations,
+    createOrganization,
+    deleteOrganization,
+    generateDomainToken,
+    getOrganizationDomains,
+    verifyDomain
+} from '../api';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,7 +24,7 @@ interface Organization {
     created_at: string;
 }
 
-// Domain verification interfaces (kept inline for now as we might move to api.ts later or reuse)
+// Domain verification interfaces
 interface VerificationDetails {
     domain: string;
     token: string;
@@ -31,7 +38,7 @@ const Organizations: React.FC = () => {
     const [creating, setCreating] = useState(false);
     const [newOrg, setNewOrg] = useState({ name: '', display_name: '', domain: '' });
 
-    // Domain Verification State (Simplified for basic port, can fully modernize logic later)
+    // Domain Verification State
     const [verifyModal, setVerifyModal] = useState<string | null>(null);
     const [verifyDetails, setVerifyDetails] = useState<VerificationDetails | null>(null);
     const [verifyLoading, setVerifyLoading] = useState(false);
@@ -81,33 +88,20 @@ const Organizations: React.FC = () => {
         }
     };
 
-    // Keep legacy fetch for verification logic since we didn't add it to api.ts yet
-    // But we should use the same token logic. 
-    // Ideally we should move verification to api.ts too, but let's stick to fixing creation first.
-    const headers = () => ({
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        'X-Tenant-ID': localStorage.getItem('tenantID') || '',
-    });
-
     const openVerifyModal = async (orgId: string) => {
         setVerifyModal(orgId);
         setVerifyDetails(null);
         setVerifyResult('');
         setVerifyLoading(true);
         try {
-            // First generate a new token
-            const genRes = await fetch(`/api/v1/organizations/${orgId}/domain-verification/generate`, {
-                method: 'POST',
-                headers: headers()
-            });
-            if (genRes.ok) {
-                const data = await genRes.json();
+            // Try to generate a new token
+            try {
+                const data = await generateDomainToken(orgId);
                 setVerifyDetails(data);
-            } else {
-                const getRes = await fetch(`/api/v1/organizations/${orgId}/domain-verification`, { headers: headers() });
-                if (getRes.ok) {
-                    setVerifyDetails(await getRes.json());
-                }
+            } catch (err) {
+                // If generation fails (e.g. already verified or exists), try fetching existing
+                const data = await getOrganizationDomains(orgId);
+                setVerifyDetails(data);
             }
         } catch (err) {
             console.error(err);
@@ -121,11 +115,7 @@ const Organizations: React.FC = () => {
         setVerifyLoading(true);
         setVerifyResult('');
         try {
-            const response = await fetch(`/api/v1/organizations/${verifyModal}/domain-verification/verify`, {
-                method: 'POST',
-                headers: headers()
-            });
-            const data = await response.json();
+            const data = await verifyDomain(verifyModal);
             if (data.verified) {
                 setVerifyResult('✅ Domain verified successfully!');
                 fetchOrgs();
@@ -252,7 +242,7 @@ const Organizations: React.FC = () => {
                 </div>
             </div>
 
-            {/* Verification Modal - Basic implementation retained but styled */}
+            {/* Verification Modal */}
             {verifyModal && (
                 <div className="fixed inset-0 bg-background/80 backdrop-blur-sm flex justify-center items-center z-50">
                     <Card className="w-full max-w-md shadow-lg">

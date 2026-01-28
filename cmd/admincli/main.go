@@ -9,14 +9,17 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 )
 
 const (
-	tenantHeader    = "X-Tenant-ID"
-	defaultBaseURL  = "http://localhost:8082"
-	defaultTenantID = "11111111-1111-1111-1111-111111111111"
+	tenantHeader         = "X-Tenant-ID"
+	defaultBaseURL       = "http://localhost:8082" // Governance Service
+	defaultDirServiceURL = "http://localhost:8081" // Directory Service
+	defaultTenantID      = "11111111-1111-1111-1111-111111111111"
 )
 
+// OAuth Client structs
 type oauthClient struct {
 	ClientID      string   `json:"client_id"`
 	TenantID      string   `json:"tenant_id"`
@@ -29,6 +32,25 @@ type oauthClient struct {
 
 type listClientsResponse struct {
 	Clients []oauthClient `json:"clients"`
+}
+
+// User structs (mirroring internal/directory/endpoint.go)
+type User struct {
+	ID        string    `json:"id,omitempty"`
+	TenantID  string    `json:"tenant_id,omitempty"`
+	Email     string    `json:"email"`
+	Password  string    `json:"password,omitempty"`
+	Status    string    `json:"status,omitempty"`
+	CreatedAt time.Time `json:"created_at,omitempty"`
+	UpdatedAt time.Time `json:"updated_at,omitempty"`
+}
+
+type CreateUserRequest struct {
+	User User `json:"user"`
+}
+
+type CreateUserResponse struct {
+	UserID string `json:"user_id"`
 }
 
 func main() {
@@ -47,6 +69,8 @@ func main() {
 		err = runCreate(os.Args[2:])
 	case "delete":
 		err = runDelete(os.Args[2:])
+	case "user":
+		err = runUser(os.Args[2:])
 	case "help", "-h", "--help":
 		usage()
 		return
@@ -61,9 +85,114 @@ func main() {
 	}
 }
 
+func runUser(args []string) error {
+	if len(args) < 1 {
+		return fmt.Errorf("user subcommand required: list, create, delete")
+	}
+	switch args[0] {
+	case "list":
+		return runUserList(args[1:])
+	case "create":
+		return runUserCreate(args[1:])
+	case "delete":
+		return runUserDelete(args[1:])
+	default:
+		return fmt.Errorf("unknown user subcommand: %s", args[0])
+	}
+}
+
+func runUserList(args []string) error {
+	fs := flag.NewFlagSet("user list", flag.ExitOnError)
+	baseURL, tenant := addCommonFlags(fs, defaultDirServiceURL)
+	email := fs.String("email", "", "Email to search for")
+
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+
+	if *email != "" {
+		path := fmt.Sprintf("/users?email=%s", *email)
+		body, _, err := doRequest(http.MethodGet, *baseURL, path, *tenant, nil)
+		if err != nil {
+			return err
+		}
+		var resp struct {
+			User User `json:"user"`
+		}
+		if err := json.Unmarshal(body, &resp); err != nil {
+			return fmt.Errorf("failed to parse response: %w", err)
+		}
+		if resp.User.Email == "" {
+			fmt.Println("User not found")
+			return nil
+		}
+		prettyPrint(resp.User)
+		return nil
+	}
+
+	return fmt.Errorf("list all users not supported by API yet; use -email to find specific user")
+}
+
+func runUserCreate(args []string) error {
+	fs := flag.NewFlagSet("user create", flag.ExitOnError)
+	baseURL, tenant := addCommonFlags(fs, defaultDirServiceURL)
+	email := fs.String("email", "", "User email")
+	password := fs.String("password", "", "User password")
+	status := fs.String("status", "active", "User status (active, inactive)")
+
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if *email == "" || *password == "" {
+		return fmt.Errorf("email and password are required")
+	}
+
+	req := CreateUserRequest{
+		User: User{
+			Email:    *email,
+			Password: *password,
+			Status:   *status,
+		},
+	}
+
+	body, _, err := doRequest(http.MethodPost, *baseURL, "/users", *tenant, req)
+	if err != nil {
+		return err
+	}
+
+	var resp CreateUserResponse
+	if err := json.Unmarshal(body, &resp); err != nil {
+		return fmt.Errorf("failed to parse response: %w", err)
+	}
+	fmt.Printf("User created with ID: %s\n", resp.UserID)
+	return nil
+}
+
+func runUserDelete(args []string) error {
+	fs := flag.NewFlagSet("user delete", flag.ExitOnError)
+	baseURL, tenant := addCommonFlags(fs, defaultDirServiceURL)
+	userID := fs.String("id", "", "User ID")
+
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if *userID == "" {
+		return fmt.Errorf("user id is required")
+	}
+
+	path := fmt.Sprintf("/users/%s", *userID)
+	_, _, err := doRequest(http.MethodDelete, *baseURL, path, *tenant, nil)
+	if err != nil {
+		return err
+	}
+	fmt.Println("User deleted")
+	return nil
+}
+
+// Existing client functions
 func runList(args []string) error {
 	fs := flag.NewFlagSet("list", flag.ExitOnError)
-	baseURL, tenant := addCommonFlags(fs)
+	baseURL, tenant := addCommonFlags(fs, defaultBaseURL)
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -94,7 +223,7 @@ func runList(args []string) error {
 
 func runGet(args []string) error {
 	fs := flag.NewFlagSet("get", flag.ExitOnError)
-	baseURL, tenant := addCommonFlags(fs)
+	baseURL, tenant := addCommonFlags(fs, defaultBaseURL)
 	clientID := fs.String("client-id", "", "Client identifier")
 	if err := fs.Parse(args); err != nil {
 		return err
@@ -118,7 +247,7 @@ func runGet(args []string) error {
 
 func runCreate(args []string) error {
 	fs := flag.NewFlagSet("create", flag.ExitOnError)
-	baseURL, tenant := addCommonFlags(fs)
+	baseURL, tenant := addCommonFlags(fs, defaultBaseURL)
 	clientID := fs.String("client-id", "", "Client identifier")
 	name := fs.String("name", "", "Display name")
 	clientType := fs.String("type", "public", "Client type: public or confidential")
@@ -173,7 +302,7 @@ func runCreate(args []string) error {
 
 func runDelete(args []string) error {
 	fs := flag.NewFlagSet("delete", flag.ExitOnError)
-	baseURL, tenant := addCommonFlags(fs)
+	baseURL, tenant := addCommonFlags(fs, defaultBaseURL)
 	clientID := fs.String("client-id", "", "Client identifier")
 	if err := fs.Parse(args); err != nil {
 		return err
@@ -191,8 +320,8 @@ func runDelete(args []string) error {
 	return nil
 }
 
-func addCommonFlags(fs *flag.FlagSet) (*string, *string) {
-	baseURL := fs.String("base-url", defaultBaseURL, "Governance service base URL")
+func addCommonFlags(fs *flag.FlagSet, defaultURL string) (*string, *string) {
+	baseURL := fs.String("base-url", defaultURL, "Service base URL")
 	tenant := fs.String("tenant", defaultTenantID, "Tenant identifier")
 	return baseURL, tenant
 }
@@ -265,9 +394,15 @@ Commands:
   get         Fetch a single OAuth client
   create      Register a new OAuth client
   delete      Remove an OAuth client
+  user        Manage users (create, list, delete)
+
+User Subcommands:
+  user create -email <email> -password <pass>
+  user list -email <email>
+  user delete -id <id>
 
 Global options:
-	-base-url   Governance service base URL (default http://localhost:8082)
+	-base-url   Service base URL (defaults to :8082 for clients, :8081 for users)
 	-tenant     Tenant identifier header (default 11111111-1111-1111-1111-111111111111)
 `)
 }

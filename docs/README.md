@@ -1,84 +1,25 @@
 # WardSeal Documentation
 
-Welcome to the WardSeal Identity & Access Management Platform documentation.
+Welcome to the technical documentation for the **WardSeal Identity Platform**.
 
-## Quick Links
+## Architecture
+*   [System Architecture Diagram](architecture/diagram.md) - High-level overview of services and interactions.
 
-| Guide | Description |
-|-------|-------------|
-| [Getting Started](./getting-started.md) | Set up and run WardSeal locally |
-| [Authentication](./authentication.md) | Login, MFA, SSO, and OAuth2/OIDC |
-| [Developer Portal](./developer-portal.md) | Register apps, API keys, and widgets |
-| [Organizations](./organizations.md) | Multi-tenant B2B features |
-| [Admin Console](./admin-console.md) | User management and policies |
-| [API Reference](./api-reference.md) | Complete API documentation |
-| [Security](./security.md) | Security features and best practices |
-| [Deployment](./deployment.md) | Production deployment guide |
+## Core Microservices
+WardSeal is built as a microservices architecture. Below are the detailed documentation for each core service:
 
-## Architecture Overview
+| Service | Description | Links |
+|---|---|---|
+| **Auth Service** | Authentication, SSO, MFA, and User Portal API. | [Docs](services/authsvc.md) |
+| **Directory Service** | Identity store for Users and Groups. | [Docs](services/dirsvc.md) |
+| **Governance Service** | Access Reviews, Campaigns, and Requests. | [Docs](services/govsvc.md) |
+| **Policy Service** | PBAC/RBAC policy evaluation engine. | [Docs](services/policysvc.md) |
+| **Provisioning Service** | SCIM and downstream application provisioning. | [Docs](services/provsvc.md) |
 
-WardSeal is a microservices-based identity platform with three core services:
+## Guides
+*   [Getting Started](../GETTING_STARTED.md)
+*   [Quickstart Guide](../QUICKSTART.md)
+*   [Developer Tasks](../TASKS.md)
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                     Client Applications                      │
-└─────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│                    API Gateway / Nginx                       │
-└─────────────────────────────────────────────────────────────┘
-         │                    │                    │
-         ▼                    ▼                    ▼
-┌─────────────┐      ┌─────────────┐      ┌─────────────┐
-│   authsvc   │      │   dirsvc    │      │   govsvc    │
-│   :8080     │      │   :8081     │      │   :8082     │
-│             │      │             │      │             │
-│ • OAuth2    │      │ • Identities│      │ • Policies  │
-│ • OIDC      │      │ • SCIM 2.0  │      │ • Audit     │
-│ • SAML SSO  │      │ • Groups    │      │ • Orgs      │
-│ • MFA       │      │             │      │ • Roles     │
-└─────────────┘      └─────────────┘      └─────────────┘
-         │                    │                    │
-         └────────────────────┼────────────────────┘
-                              ▼
-                    ┌─────────────────┐
-                    │   PostgreSQL    │
-                    │   :5432         │
-                    └─────────────────┘
-```
-
-## Features
-
-### Authentication
-- Username/Password login
-- Multi-Factor Authentication (TOTP, WebAuthn)
-- Social Login (Google, GitHub, etc.)
-- SAML 2.0 SSO
-- OAuth 2.0 / OpenID Connect
-
-### Developer Experience
-- Self-service app registration
-- API key management
-- Embeddable login widget
-- Comprehensive API docs
-
-### Enterprise
-- Multi-tenant architecture
-- Organizations (for B2B)
-- Domain verification
-- SCIM 2.0 provisioning
-- Audit logging
-
-### Security
-- Brute-force protection
-- Rate limiting
-- httpOnly secure cookies
-- PKCE for OAuth flows
-- Refresh token rotation
-
-## Support
-
-- **GitHub Issues**: Report bugs and feature requests
-- **Documentation**: This docs folder
-- **API Explorer**: `/developer` in Admin UI
+## API Reference
+*   See `api/` directory for Protocol Buffer definitions (if applicable).

@@ -12,16 +12,18 @@ import (
 
 // Organization represents an enterprise customer of a tenant.
 type Organization struct {
-	ID             string          `db:"id" json:"id"`
-	TenantID       string          `db:"tenant_id" json:"tenant_id"`
-	Name           string          `db:"name" json:"name"`
-	DisplayName    *string         `db:"display_name" json:"display_name,omitempty"`
-	Domain         *string         `db:"domain" json:"domain,omitempty"`
-	DomainVerified bool            `db:"domain_verified" json:"domain_verified"`
-	Metadata       json.RawMessage `db:"metadata" json:"metadata"`
-	Settings       json.RawMessage `db:"settings" json:"settings"`
-	CreatedAt      time.Time       `db:"created_at" json:"created_at"`
-	UpdatedAt      time.Time       `db:"updated_at" json:"updated_at"`
+	ID                          string          `db:"id" json:"id"`
+	TenantID                    string          `db:"tenant_id" json:"tenant_id"`
+	Name                        string          `db:"name" json:"name"`
+	DisplayName                 *string         `db:"display_name" json:"display_name,omitempty"`
+	Domain                      *string         `db:"domain" json:"domain,omitempty"`
+	DomainVerified              bool            `db:"domain_verified" json:"domain_verified"`
+	DomainVerificationToken     *string         `db:"domain_verification_token" json:"-"`
+	DomainVerificationExpiresAt *time.Time      `db:"domain_verification_expires_at" json:"-"`
+	Metadata                    json.RawMessage `db:"metadata" json:"metadata"`
+	Settings                    json.RawMessage `db:"settings" json:"settings"`
+	CreatedAt                   time.Time       `db:"created_at" json:"created_at"`
+	UpdatedAt                   time.Time       `db:"updated_at" json:"updated_at"`
 }
 
 // OrganizationStore defines the interface for organization storage.

@@ -79,6 +79,10 @@ func (h *HTTPHandler) RegisterRoutes(router *gin.Engine) {
 	router.POST("/api/v1/signup", h.signup)
 	router.POST("/login/lookup", h.lookupUser) // Public lookup for tenant discovery
 
+	// System Setup Routes (Public, no auth required to check status)
+	router.GET("/api/v1/setup/status", h.getSetupStatus)
+	router.POST("/api/v1/setup", h.performSetup)
+
 	tenantProtected.POST("/login", h.login)
 	tenantProtected.POST("/login/mfa", h.completeMFALogin)
 	tenantProtected.POST("/logout", h.logout)
@@ -118,6 +122,55 @@ func (h *HTTPHandler) RegisterRoutes(router *gin.Engine) {
 		router.POST("/saml/sso", samlHandler)
 		router.GET("/saml/idp-init", samlHandler) // IdP Initiated endpoint
 	}
+
+	// User Portal API (Protected)
+	userAPI := tenantProtected.Group("/api/v1/user")
+	userAPI.GET("/apps", h.getUserApps)
+	userAPI.GET("/profile", h.getUserProfile)
+	userAPI.POST("/profile", h.updateUserProfile)
+}
+
+func (h *HTTPHandler) getSetupStatus(c *gin.Context) {
+	required, err := h.svc.GetSystemSetupStatus(c.Request.Context())
+	if err != nil {
+		h.logger.Error("Failed to check setup status", zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"setup_required": required})
+}
+
+// SetupRequest holds credentials for system owner setup.
+type SetupRequest struct {
+	Email    string `json:"email" binding:"required,email"`
+	Password string `json:"password" binding:"required,min=8"`
+}
+
+func (h *HTTPHandler) performSetup(c *gin.Context) {
+	var req SetupRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	token, err := h.svc.PerformSystemSetup(c.Request.Context(), req.Email, req.Password)
+	if err != nil {
+		h.logger.Error("Setup failed", zap.Error(err))
+		if strings.Contains(err.Error(), "not required") {
+			c.JSON(http.StatusForbidden, gin.H{"error": "System setup is not available"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Setup failed"})
+		return
+	}
+
+	// Set auth cookies for immediate login
+	setAuthCookies(c, token, "")
+
+	c.JSON(http.StatusOK, gin.H{
+		"token":   token,
+		"message": "System owner created successfully",
+	})
 }
 
 func (h *HTTPHandler) login(c *gin.Context) {
@@ -403,6 +456,7 @@ type SignupRequest struct {
 	Email       string `json:"email" binding:"required,email"`
 	Password    string `json:"password" binding:"required,min=8"`
 	CompanyName string `json:"company_name" binding:"required"`
+	Plan        string `json:"plan"` // Optional, defaults to "free" in service
 }
 
 func (h *HTTPHandler) signup(c *gin.Context) {
@@ -413,7 +467,7 @@ func (h *HTTPHandler) signup(c *gin.Context) {
 	}
 
 	// Call Service Signup
-	token, tenantID, err := h.svc.SignUp(c.Request.Context(), req.Email, req.Password, req.CompanyName)
+	token, tenantID, err := h.svc.SignUp(c.Request.Context(), req.Email, req.Password, req.CompanyName, req.Plan)
 	if err != nil {
 		h.logger.Error("Signup failed", zap.Error(err))
 		if strings.Contains(err.Error(), "conflict") || strings.Contains(err.Error(), "exists") {

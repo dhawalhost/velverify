@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"os"
+	"strings"
 
 	"github.com/dhawalhost/wardseal/internal/auth"
 	"github.com/dhawalhost/wardseal/internal/license"
@@ -130,6 +131,29 @@ func main() {
 	}
 
 	router := gin.Default()
+
+	// CORS configuration
+	corsOrigins := os.Getenv("CORS_ALLOWED_ORIGINS")
+	if corsOrigins != "" {
+		origins := strings.Split(corsOrigins, ",")
+		router.Use(func(c *gin.Context) {
+			origin := c.Request.Header.Get("Origin")
+			for _, allowed := range origins {
+				if strings.TrimSpace(allowed) == origin {
+					c.Header("Access-Control-Allow-Origin", origin)
+					c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+					c.Header("Access-Control-Allow-Headers", "Origin, Content-Type, Authorization, X-Tenant-ID, X-Device-ID, X-OS-Version")
+					c.Header("Access-Control-Allow-Credentials", "true")
+					break
+				}
+			}
+			if c.Request.Method == "OPTIONS" {
+				c.AbortWithStatus(204)
+				return
+			}
+			c.Next()
+		})
+	}
 
 	// Initialize OpenTelemetry tracing
 	shutdownTracer, err := observability.InitTracer(context.Background(), observability.TracerConfig{

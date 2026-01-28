@@ -1,10 +1,65 @@
 import axios from 'axios';
 
+export const AUTHSVC_URL = (import.meta as any).env?.VITE_AUTHSVC_URL || 'http://localhost:8080';
+const DIRSVC_URL = (import.meta as any).env?.VITE_DIRSVC_URL || 'http://localhost:8081';
+const GOVSVC_URL = (import.meta as any).env?.VITE_GOVSVC_URL || 'http://localhost:8082';
+
+console.log('API Strings:', { AUTHSVC_URL, DIRSVC_URL, GOVSVC_URL });
+
 const api = axios.create({
+    baseURL: AUTHSVC_URL,
     headers: {
         'Content-Type': 'application/json',
     },
 });
+
+// Directory service API (hosts SCIM, user management)
+const dirApi = axios.create({
+    baseURL: DIRSVC_URL,
+    headers: {
+        'Content-Type': 'application/json',
+    },
+});
+
+// Governance service API (hosts requests, sso, audit, etc)
+const govApi = axios.create({
+    baseURL: GOVSVC_URL,
+    headers: {
+        'Content-Type': 'application/json',
+    },
+});
+
+// Add interceptor to directory API as well
+dirApi.interceptors.request.use(
+    (config) => {
+        const token = localStorage.getItem('token');
+        const tenantID = localStorage.getItem('tenantID');
+        if (token) {
+            config.headers.Authorization = `Bearer ${token}`;
+        }
+        if (tenantID) {
+            config.headers['X-Tenant-ID'] = tenantID;
+        }
+        return config;
+    },
+    (error) => Promise.reject(error)
+);
+
+// Add interceptor to governance API
+govApi.interceptors.request.use(
+    (config) => {
+        const token = localStorage.getItem('token');
+        const tenantID = localStorage.getItem('tenantID');
+        if (token) {
+            config.headers.Authorization = `Bearer ${token}`;
+        }
+        if (tenantID) {
+            config.headers['X-Tenant-ID'] = tenantID;
+        }
+        return config;
+    },
+    (error) => Promise.reject(error)
+);
 
 // Add a request interceptor to inject the token
 api.interceptors.request.use(
@@ -34,8 +89,19 @@ export const login = async (username: string, password: string, deviceID?: strin
     return response.data;
 };
 
-export const signup = async (email: string, password: string, companyName: string) => {
-    const response = await api.post('/api/v1/signup', { email, password, company_name: companyName });
+export const signup = async (email: string, password: string, companyName: string, plan: string = 'free') => {
+    const response = await api.post('/api/v1/signup', { email, password, company_name: companyName, plan });
+    return response.data;
+};
+
+// System Setup
+export const getSetupStatus = async () => {
+    const response = await api.get('/api/v1/setup/status');
+    return response.data;
+};
+
+export const performSetup = async (email: string, password: string) => {
+    const response = await api.post('/api/v1/setup', { email, password });
     return response.data;
 };
 
@@ -82,12 +148,20 @@ export const finishLogin = async (userID: string, data: any) => {
 };
 
 export const getSCIMUsers = async () => {
-    const response = await api.get('/scim/v2/Users');
+    const response = await dirApi.get('/scim/v2/Users');
+    return response.data;
+};
+
+export const createUser = async (userData: any) => {
+    const response = await dirApi.post('/scim/v2/Users', {
+        schemas: ["urn:ietf:params:scim:schemas:core:2.0:User"],
+        ...userData
+    });
     return response.data;
 };
 
 export const createAccessRequest = async (resourceType: string, resourceID: string, reason: string) => {
-    const response = await api.post('/api/v1/governance/requests', {
+    const response = await govApi.post('/api/v1/governance/requests', {
         resource_type: resourceType,
         resource_id: resourceID,
         reason: reason
@@ -97,70 +171,72 @@ export const createAccessRequest = async (resourceType: string, resourceID: stri
 
 export const getAccessRequests = async (status?: string) => {
     const params = status ? { status } : {};
-    const response = await api.get('/api/v1/governance/requests', { params });
+    const response = await govApi.get('/api/v1/governance/requests', { params });
     return response.data;
 };
 
 export const approveAccessRequest = async (id: string, comment: string) => {
-    const response = await api.post(`/api/v1/governance/requests/${id}/approve`, { comment });
+    const response = await govApi.post(`/api/v1/governance/requests/${id}/approve`, { comment });
     return response.data;
 };
 
 export const rejectAccessRequest = async (id: string, comment: string) => {
-    const response = await api.post(`/api/v1/governance/requests/${id}/reject`, { comment });
+    const response = await govApi.post(`/api/v1/governance/requests/${id}/reject`, { comment });
     return response.data;
 };
 
 // RBAC - Roles
 export const getRoles = async () => {
-    const response = await api.get('/api/v1/roles');
+    const response = await govApi.get('/api/v1/roles');
     return response.data;
 };
 
 export const createRole = async (name: string, description: string) => {
-    const response = await api.post('/api/v1/roles', { name, description });
+    const response = await govApi.post('/api/v1/roles', { name, description });
     return response.data;
 };
 
 export const deleteRole = async (id: string) => {
-    const response = await api.delete(`/api/v1/roles/${id}`);
+    const response = await govApi.delete(`/api/v1/roles/${id}`);
     return response.data;
 };
 
 export const getRolePermissions = async (roleId: string) => {
-    const response = await api.get(`/api/v1/roles/${roleId}/permissions`);
+    const response = await govApi.get(`/api/v1/roles/${roleId}/permissions`);
     return response.data;
 };
 
 export const assignPermissionToRole = async (roleId: string, permissionId: string) => {
-    const response = await api.post(`/api/v1/roles/${roleId}/permissions/${permissionId}`);
+    // RBAC permissions assignment is on gov/rbac handlers
+    const response = await govApi.post(`/api/v1/roles/${roleId}/permissions/${permissionId}`);
     return response.data;
 };
 
 // RBAC - Permissions
 export const getPermissions = async () => {
-    const response = await api.get('/api/v1/permissions');
+    // RBAC permissions list is on gov/rbac handlers
+    const response = await govApi.get('/api/v1/permissions');
     return response.data;
 };
 
 export const createPermission = async (resource: string, action: string, description: string) => {
-    const response = await api.post('/api/v1/permissions', { resource, action, description });
+    const response = await govApi.post('/api/v1/permissions', { resource, action, description });
     return response.data;
 };
 
 // RBAC - User Roles
 export const getUserRoles = async (userId: string) => {
-    const response = await api.get(`/api/v1/users/${userId}/roles`);
+    const response = await govApi.get(`/api/v1/users/${userId}/roles`);
     return response.data;
 };
 
 export const assignRoleToUser = async (userId: string, roleId: string) => {
-    const response = await api.post(`/api/v1/users/${userId}/roles/${roleId}`);
+    const response = await govApi.post(`/api/v1/users/${userId}/roles/${roleId}`);
     return response.data;
 };
 
 export const removeRoleFromUser = async (userId: string, roleId: string) => {
-    const response = await api.delete(`/api/v1/users/${userId}/roles/${roleId}`);
+    const response = await govApi.delete(`/api/v1/users/${userId}/roles/${roleId}`);
     return response.data;
 };
 
@@ -173,12 +249,12 @@ export const getAuditLogs = async (params?: {
     limit?: number;
     offset?: number;
 }) => {
-    const response = await api.get('/api/v1/audit', { params });
+    const response = await govApi.get('/api/v1/audit', { params });
     return response.data;
 };
 
 export const exportAuditLogs = async (params?: Record<string, unknown>) => {
-    const response = await api.get('/api/v1/audit/export', {
+    const response = await govApi.get('/api/v1/audit/export', {
         params,
         responseType: 'blob'
     });
@@ -188,12 +264,12 @@ export const exportAuditLogs = async (params?: Record<string, unknown>) => {
 // Campaigns
 export const getCampaigns = async (status?: string) => {
     const params = status ? { status } : {};
-    const response = await api.get('/api/v1/campaigns', { params });
+    const response = await govApi.get('/api/v1/campaigns', { params });
     return response.data;
 };
 
 export const createCampaign = async (name: string, description: string, reviewerId: string) => {
-    const response = await api.post('/api/v1/campaigns', {
+    const response = await govApi.post('/api/v1/campaigns', {
         name,
         description,
         reviewer_id: reviewerId
@@ -202,86 +278,86 @@ export const createCampaign = async (name: string, description: string, reviewer
 };
 
 export const startCampaign = async (id: string) => {
-    const response = await api.post(`/api/v1/campaigns/${id}/start`);
+    const response = await govApi.post(`/api/v1/campaigns/${id}/start`);
     return response.data;
 };
 
 export const getCampaignItems = async (campaignId: string) => {
-    const response = await api.get(`/api/v1/campaigns/${campaignId}/items`);
+    const response = await govApi.get(`/api/v1/campaigns/${campaignId}/items`);
     return response.data;
 };
 
 export const getReviewItems = async (reviewerId: string) => {
-    const response = await api.get('/api/v1/campaigns/items', { params: { reviewer_id: reviewerId } });
+    const response = await govApi.get('/api/v1/campaigns/items', { params: { reviewer_id: reviewerId } });
     return response.data;
 };
 
 export const approveItem = async (campaignId: string, itemId: string, comment: string) => {
-    const response = await api.post(`/api/v1/campaigns/${campaignId}/items/${itemId}/approve`, { comment });
+    const response = await govApi.post(`/api/v1/campaigns/${campaignId}/items/${itemId}/approve`, { comment });
     return response.data;
 };
 
 export const revokeItem = async (campaignId: string, itemId: string, comment: string) => {
-    const response = await api.post(`/api/v1/campaigns/${campaignId}/items/${itemId}/revoke`, { comment });
+    const response = await govApi.post(`/api/v1/campaigns/${campaignId}/items/${itemId}/revoke`, { comment });
     return response.data;
 };
 
 // SSO Providers
 export const getSSOProviders = async () => {
-    const response = await api.get('/api/v1/sso/providers');
+    const response = await govApi.get('/api/v1/sso/providers');
     return response.data;
 };
 
 export const createSSOProvider = async (provider: Record<string, any>) => {
-    const response = await api.post('/api/v1/sso/providers', provider);
+    const response = await govApi.post('/api/v1/sso/providers', provider);
     return response.data;
 };
 
 export const updateSSOProvider = async (id: string, provider: Record<string, any>) => {
-    const response = await api.put(`/api/v1/sso/providers/${id}`, provider);
+    const response = await govApi.put(`/api/v1/sso/providers/${id}`, provider);
     return response.data;
 };
 
 export const deleteSSOProvider = async (id: string) => {
-    await api.delete(`/api/v1/sso/providers/${id}`);
+    await govApi.delete(`/api/v1/sso/providers/${id}`);
 };
 
 export const toggleSSOProvider = async (id: string, enabled: boolean) => {
-    const response = await api.post(`/api/v1/sso/providers/${id}/toggle`, { enabled });
+    const response = await govApi.post(`/api/v1/sso/providers/${id}/toggle`, { enabled });
     return response.data;
 };
 
 // Connectors
 export const getConnectors = async () => {
-    const response = await api.get('/api/v1/connectors');
+    const response = await govApi.get('/api/v1/connectors');
     return response.data;
 };
 
 export const createConnector = async (config: Record<string, any>) => {
-    const response = await api.post('/api/v1/connectors', config);
+    const response = await govApi.post('/api/v1/connectors', config);
     return response.data;
 };
 
 export const updateConnector = async (id: string, config: Record<string, any>) => {
-    const response = await api.put(`/api/v1/connectors/${id}`, config);
+    const response = await govApi.put(`/api/v1/connectors/${id}`, config);
     return response.data;
 };
 
 export const deleteConnector = async (id: string) => {
-    await api.delete(`/api/v1/connectors/${id}`);
+    await govApi.delete(`/api/v1/connectors/${id}`);
 };
 
 export const toggleConnector = async (id: string, enabled: boolean) => {
-    const response = await api.post(`/api/v1/connectors/${id}/toggle`, { enabled });
+    const response = await govApi.post(`/api/v1/connectors/${id}/toggle`, { enabled });
     return response.data;
 };
 
 export const testConnector = async (config: Record<string, any>) => {
-    const response = await api.post('/api/v1/connectors/test', config);
+    const response = await govApi.post('/api/v1/connectors/test', config);
     return response.data;
 };
 
-// Branding
+// Branding - Auth Service
 export interface BrandingConfig {
     tenant_id: string;
     logo_url: string;
@@ -302,7 +378,7 @@ export const updateBranding = async (config: BrandingConfig) => {
     return response.data;
 };
 
-// Social Login
+// Social Login - Auth Service
 export const socialLogin = async (provider: string, email?: string, external_id?: string) => {
     const response = await api.post('/social/login', {
         provider,
@@ -314,20 +390,20 @@ export const socialLogin = async (provider: string, email?: string, external_id?
 
 // Webhooks
 export const getWebhooks = async () => {
-    const response = await api.get('/webhooks');
+    const response = await govApi.get('/webhooks');
     return response.data;
 };
 
 export const createWebhook = async (url: string, events: string[]) => {
-    const response = await api.post('/webhooks', { url, events });
+    const response = await govApi.post('/webhooks', { url, events });
     return response.data;
 };
 
 export const deleteWebhook = async (id: string) => {
-    await api.delete(`/webhooks/${id}`);
+    await govApi.delete(`/webhooks/${id}`);
 };
 
-// Device Management
+// Device Management - Auth Service
 export const getDevices = async () => {
     const response = await api.get('/api/v1/devices');
     return response.data;
@@ -337,20 +413,35 @@ export const deleteDevice = async (id: string) => {
     await api.delete(`/api/v1/devices/${id}`);
 };
 
-// Organizations
+// Organizations - Governance Service
 export const getOrganizations = async () => {
-    const response = await api.get('/api/v1/organizations');
+    const response = await govApi.get('/api/v1/organizations');
     return response.data;
 };
 
 export const createOrganization = async (org: { name: string; display_name?: string; domain?: string }) => {
-    const response = await api.post('/api/v1/organizations', org);
+    const response = await govApi.post('/api/v1/organizations', org);
     return response.data;
 };
 
 export const deleteOrganization = async (id: string) => {
-    await api.delete(`/api/v1/organizations/${id}`);
+    await govApi.delete(`/api/v1/organizations/${id}`);
     return;
+};
+
+export const getOrganizationDomains = async (orgId: string) => {
+    const response = await govApi.get(`/api/v1/organizations/${orgId}/domain-verification`);
+    return response.data;
+};
+
+export const generateDomainToken = async (orgId: string) => {
+    const response = await govApi.post(`/api/v1/organizations/${orgId}/domain-verification/generate`);
+    return response.data;
+};
+
+export const verifyDomain = async (orgId: string) => {
+    const response = await govApi.post(`/api/v1/organizations/${orgId}/domain-verification/verify`);
+    return response.data;
 };
 
 export default api;
