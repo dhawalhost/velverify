@@ -1,42 +1,20 @@
-# Production Environment Values
-# Override default values for production deployment
+# Wardseal Production Environment Values
+# This file contains production-specific configuration with ALL best practices enabled
 
 global:
   imageRegistry: ghcr.io/dhawalhost
 
-# Database - Production
-database:
-  host: postgres-production.wardseal.svc.cluster.local
-  port: 5432
-  name: identity_platform
-  sslMode: verify-full
-  existingSecret: wardseal-db-credentials-production
-
-# KMS Configuration - Use Vault with strict settings
-kms:
-  provider: vault
-  vaultSecretName: wardseal-vault-kms-production
-
+# ====================
 # Auth Service - Production
+# ====================
 authsvc:
   enabled: true
   replicaCount: 3
-
+  
   image:
-    tag: ""  # Set by CI during deployment
-
-  env:
-    ENVIRONMENT: production
-    LOG_LEVEL: info
-    DIRECTORY_SERVICE_URL: http://wardseal-dirsvc:8081
-    AUTH_SERVICE_URL: https://auth.wardseal.com
-    REQUIRE_LICENSE: "true"
-    KMS_PROVIDER: vault
-
-  envFrom:
-    - secretRef:
-        name: wardseal-vault-kms-production
-
+    tag: ""  # Set by CI/CD pipeline
+    pullPolicy: IfNotPresent
+  
   resources:
     limits:
       cpu: 1000m
@@ -44,24 +22,97 @@ authsvc:
     requests:
       cpu: 200m
       memory: 256Mi
-
+  
+  env:
+    DIRECTORY_SERVICE_URL: http://wardseal-dirsvc:8081
+    LOG_LEVEL: warn
+  
+  # Security contexts
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    fsGroup: 1000
+    seccompProfile:
+      type: RuntimeDefault
+  
+  securityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+    readOnlyRootFilesystem: false
+  
+  # Health probes
+  livenessProbe:
+    httpGet:
+      path: /health/live
+      port: http
+    initialDelaySeconds: 30
+    periodSeconds: 10
+  
+  readinessProbe:
+    httpGet:
+      path: /health/ready
+      port: http
+    initialDelaySeconds: 10
+    periodSeconds: 5
+  
+  startupProbe:
+    httpGet:
+      path: /health/startup
+      port: http
+    initialDelaySeconds: 0
+    periodSeconds: 5
+    failureThreshold: 30
+  
+  database:
+    existingSecret: wardseal-db-credentials-production
+  
+  # Autoscaling
   autoscaling:
     enabled: true
     minReplicas: 3
-    maxReplicas: 20
+    maxReplicas: 10
     targetCPUUtilizationPercentage: 70
+  
+  # High availability
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 2
+  
+  # Security
+  networkPolicy:
+    enabled: true
+  
+  # Monitoring
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+      interval: 30s
+  
+  # Pod anti-affinity for better distribution
+  affinity:
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            labelSelector:
+              matchLabels:
+                app.kubernetes.io/name: authsvc
+            topologyKey: kubernetes.io/hostname
 
+# ====================
 # Directory Service - Production
+# ====================
 dirsvc:
   enabled: true
   replicaCount: 3
-
+  
   image:
-    tag: ""
-
-  env:
-    LOG_LEVEL: info
-
+    tag: ""  # Set by CI/CD pipeline
+    pullPolicy: IfNotPresent
+  
   resources:
     limits:
       cpu: 1000m
@@ -69,25 +120,89 @@ dirsvc:
     requests:
       cpu: 200m
       memory: 256Mi
-
+  
+  env:
+    LOG_LEVEL: warn
+  
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    fsGroup: 1000
+    seccompProfile:
+      type: RuntimeDefault
+  
+  securityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+    readOnlyRootFilesystem: false
+  
+  livenessProbe:
+    httpGet:
+      path: /health/live
+      port: http
+    initialDelaySeconds: 30
+    periodSeconds: 10
+  
+  readinessProbe:
+    httpGet:
+      path: /health/ready
+      port: http
+    initialDelaySeconds: 10
+    periodSeconds: 5
+  
+  startupProbe:
+    httpGet:
+      path: /health/startup
+      port: http
+    initialDelaySeconds: 0
+    periodSeconds: 5
+    failureThreshold: 30
+  
+  database:
+    existingSecret: wardseal-db-credentials-production
+  
   autoscaling:
     enabled: true
     minReplicas: 3
-    maxReplicas: 15
+    maxReplicas: 10
     targetCPUUtilizationPercentage: 70
+  
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 2
+  
+  networkPolicy:
+    enabled: true
+  
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+      interval: 30s
+  
+  affinity:
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            labelSelector:
+              matchLabels:
+                app.kubernetes.io/name: dirsvc
+            topologyKey: kubernetes.io/hostname
 
+# ====================
 # Governance Service - Production
+# ====================
 govsvc:
   enabled: true
   replicaCount: 3
-
+  
   image:
-    tag: ""
-
-  env:
-    LOG_LEVEL: info
-    DIRECTORY_SERVICE_URL: http://wardseal-dirsvc:8081
-
+    tag: ""  # Set by CI/CD pipeline
+    pullPolicy: IfNotPresent
+  
   resources:
     limits:
       cpu: 1000m
@@ -95,23 +210,93 @@ govsvc:
     requests:
       cpu: 200m
       memory: 256Mi
-
+  
+  env:
+    DIRECTORY_SERVICE_URL: http://wardseal-dirsvc:8081
+    LOG_LEVEL: warn
+  
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    fsGroup: 1000
+    seccompProfile:
+      type: RuntimeDefault
+  
+  securityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+    readOnlyRootFilesystem: false
+  
+  livenessProbe:
+    httpGet:
+      path: /health/live
+      port: http
+    initialDelaySeconds: 30
+    periodSeconds: 10
+  
+  readinessProbe:
+    httpGet:
+      path: /health/ready
+      port: http
+    initialDelaySeconds: 10
+    periodSeconds: 5
+  
+  startupProbe:
+    httpGet:
+      path: /health/startup
+      port: http
+    initialDelaySeconds: 0
+    periodSeconds: 5
+    failureThreshold: 30
+  
+  database:
+    existingSecret: wardseal-db-credentials-production
+  
   autoscaling:
     enabled: true
     minReplicas: 3
-    maxReplicas: 15
+    maxReplicas: 10
     targetCPUUtilizationPercentage: 70
+  
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 2
+  
+  networkPolicy:
+    enabled: true
+  
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+      interval: 30s
+  
+  affinity:
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            labelSelector:
+              matchLabels:
+                app.kubernetes.io/name: govsvc
+            topologyKey: kubernetes.io/hostname
 
+# ====================
 # Ingress - Production
+# ====================
 ingress:
   enabled: true
   className: nginx
   annotations:
     nginx.ingress.kubernetes.io/ssl-redirect: "true"
-    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
-    nginx.ingress.kubernetes.io/rate-limit: "100"
-    nginx.ingress.kubernetes.io/rate-limit-window: "1m"
     cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/rate-limit: "100"
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      more_set_headers "X-Frame-Options: DENY";
+      more_set_headers "X-Content-Type-Options: nosniff";
+      more_set_headers "X-XSS-Protection: 1; mode=block";
   hosts:
     - host: auth.wardseal.com
       paths:
@@ -138,12 +323,7 @@ ingress:
           service: govsvc
           port: 8082
   tls:
-    - secretName: wardseal-tls-production
+    - secretName: wardseal-tls
       hosts:
         - auth.wardseal.com
         - api.wardseal.com
-
-# Pod Disruption Budget
-podDisruptionBudget:
-  enabled: true
-  minAvailable: 2

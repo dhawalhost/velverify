@@ -61,3 +61,25 @@ Create the name of the service account to use
 {{- default "default" .Values.serviceAccount.name -}}
 {{- end -}}
 {{- end -}}
+
+{{/*
+Container image reference
+*/}}
+{{- define "dirsvc.image" -}}
+{{- $registry := .Values.global.imageRegistry | default .Values.image.registry -}}
+{{- $repository := .Values.image.repository -}}
+{{- $tag := .Values.image.tag | default .Chart.AppVersion -}}
+{{- if $registry }}
+{{- /* Extract just the image name if repository contains a registry */ -}}
+{{- $imageName := $repository -}}
+{{- if contains "/" $repository -}}
+{{- $parts := splitList "/" $repository -}}
+{{- $imageName = last $parts -}}
+{{- end -}}
+{{- printf "%s/%s:%s" $registry $imageName $tag }}
+{{- else }}
+{{- printf "%s:%s" $repository $tag }}
+{{- end }}
+{{- end -}}
+
+
