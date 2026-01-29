@@ -12,7 +12,7 @@ orbs:
 executors:
   go-executor:
     docker:
-      - image: cimg/go:1.22
+      - image: golang:1.25-alpine
     working_directory: ~/project
     environment:
       GO111MODULE: "on"
@@ -20,7 +20,7 @@ executors:
 
   go-with-postgres:
     docker:
-      - image: cimg/go:1.22
+      - image: golang:1.25-alpine
       - image: cimg/postgres:15.0
         environment:
           POSTGRES_USER: user
@@ -46,6 +46,7 @@ commands:
       - run:
           name: Install golangci-lint
           command: |
+            apk add --no-cache curl
             curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v2.7.2
 
   wait-for-postgres:
@@ -106,11 +107,15 @@ jobs:
           command: go mod download
       - save-go-cache
       - run:
+          name: Install gcc for race detection
+          command: apk add --no-cache build-base
+      - run:
           name: Run unit tests
           command: |
             set -o pipefail
             mkdir -p /tmp/test-results
             export CGO_ENABLED=1
+            export GOEXPERIMENT=nocoverageredesign
             go test -v -race -cover ./... 2>&1 | tee /tmp/test-results/go-test.out
       - store_test_results:
           path: /tmp/test-results
@@ -125,8 +130,8 @@ jobs:
       - checkout
       - restore-go-cache
       - run:
-          name: Install PostgreSQL client
-          command: sudo apt-get update && sudo apt-get install -y postgresql-client
+          name: Install dependencies
+          command: apk add --no-cache postgresql-client curl
       - wait-for-postgres
       - run:
           name: Download dependencies
