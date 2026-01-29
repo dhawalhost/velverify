@@ -115,7 +115,6 @@ jobs:
             set -o pipefail
             mkdir -p /tmp/test-results
             export CGO_ENABLED=1
-            export GOEXPERIMENT=nocoverageredesign
             go test -v -race -cover ./... 2>&1 | tee /tmp/test-results/go-test.out
       - store_test_results:
           path: /tmp/test-results
