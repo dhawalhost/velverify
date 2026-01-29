@@ -282,8 +282,23 @@ export const startCampaign = async (id: string) => {
     return response.data;
 };
 
+export const completeCampaign = async (id: string) => {
+    const response = await govApi.post(`/api/v1/campaigns/${id}/complete`);
+    return response.data;
+};
+
 export const getCampaignItems = async (campaignId: string) => {
     const response = await govApi.get(`/api/v1/campaigns/${campaignId}/items`);
+    return response.data;
+};
+
+export const addCampaignItem = async (campaignId: string, item: {
+    user_id: string;
+    resource_type: string;
+    resource_id: string;
+    resource_name?: string;
+}) => {
+    const response = await govApi.post(`/api/v1/campaigns/${campaignId}/items`, item);
     return response.data;
 };
 
