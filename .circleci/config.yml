@@ -37,7 +37,7 @@ executors:
   node-executor:
     docker:
       - image: cimg/node:20.11
-    working_directory: ~/project/web/admin
+    working_directory: ~/project
 
 # Commands for reusable steps
 commands:
@@ -108,10 +108,13 @@ jobs:
       - run:
           name: Run unit tests
           command: |
+            set -o pipefail
             mkdir -p /tmp/test-results
             export CGO_ENABLED=1
             go test -v -race -coverprofile=coverage.out -covermode=atomic ./... 2>&1 | tee /tmp/test-results/go-test.out
-            go tool cover -html=coverage.out -o /tmp/test-results/coverage.html
+            if [ -f coverage.out ]; then
+              go tool cover -html=coverage.out -o /tmp/test-results/coverage.html
+            fi
       - store_test_results:
           path: /tmp/test-results
       - store_artifacts:
@@ -179,11 +182,11 @@ jobs:
       - checkout
       - node/install-packages:
           pkg-manager: npm
-          app-dir: ~/project/web/admin
+          app-dir: web/admin
       - run:
           name: Build frontend
           command: npm run build
-          working_directory: ~/project/web/admin
+          working_directory: web/admin
       - persist_to_workspace:
           root: ~/project
           paths:
