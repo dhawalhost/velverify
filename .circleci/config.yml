@@ -111,10 +111,7 @@ jobs:
             set -o pipefail
             mkdir -p /tmp/test-results
             export CGO_ENABLED=1
-            go test -v -race -coverprofile=coverage.out -covermode=atomic ./... 2>&1 | tee /tmp/test-results/go-test.out
-            if [ -f coverage.out ]; then
-              go tool cover -html=coverage.out -o /tmp/test-results/coverage.html
-            fi
+            go test -v -race -cover ./... 2>&1 | tee /tmp/test-results/go-test.out
       - store_test_results:
           path: /tmp/test-results
       - store_artifacts:
