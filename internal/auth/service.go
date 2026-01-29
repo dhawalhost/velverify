@@ -1242,7 +1242,7 @@ func (s *authService) SignUp(ctx context.Context, email, password, companyName, 
 	if err != nil {
 		return "", "", fmt.Errorf("failed to create tenant: %w", err)
 	}
-	defer respTenant.Body.Close()
+	defer func() { _ = respTenant.Body.Close() }()
 	if respTenant.StatusCode != http.StatusCreated {
 		return "", "", fmt.Errorf("directory service create tenant failed: status %d", respTenant.StatusCode)
 	}

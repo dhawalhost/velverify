@@ -224,7 +224,7 @@ func (v *VaultSigner) Sign(claims jwt.Claims) (string, error) {
 		"key_version":         v.keyVersion,
 	})
 	if err != nil {
-		return "", fmt.Errorf("Vault signing failed: %w", err)
+		return "", fmt.Errorf("vault signing failed: %w", err)
 	}
 
 	if secret == nil || secret.Data == nil {

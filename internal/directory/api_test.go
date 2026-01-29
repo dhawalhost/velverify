@@ -253,3 +253,7 @@ func (m *mockDirectoryService) VerifyCredentials(ctx context.Context, tenantID, 
 func (m *mockDirectoryService) GetTenantByEmail(context.Context, string) (string, error) {
 	return "22222222-2222-2222-2222-222222222222", nil
 }
+
+func (m *mockDirectoryService) CreateTenant(context.Context, string, string, string) error {
+	return nil
+}

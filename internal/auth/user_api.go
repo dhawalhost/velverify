@@ -33,7 +33,7 @@ func (h *HTTPHandler) getUserApps(c *gin.Context) {
 		return
 	}
 
-	var apps []UserAppResponse
+	apps := make([]UserAppResponse, 0, len(clients))
 	for _, client := range clients {
 		// Filter out internal clients or infrastructure clients if needed.
 		// For now, show everything except maybe the admin console itself if it were registered as a client?
