@@ -1,0 +1,74 @@
+# WardSeal Production ArgoCD Application
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: wardseal-production
+  namespace: argocd
+  labels:
+    environment: production
+  annotations:
+    notifications.argoproj.io/subscribe.on-sync-succeeded.slack: wardseal-production
+    notifications.argoproj.io/subscribe.on-sync-failed.pagerduty: wardseal-oncall
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: production  # Use a separate ArgoCD project with stricter policies
+
+  source:
+    repoURL: https://github.com/dhawalhost/wardseal.git
+    targetRevision: main  # Or use tags like v1.2.3
+    path: deploy/charts/wardseal
+
+    helm:
+      valueFiles:
+        - values.yaml
+        - values-production.yaml
+      # Image tags set via CI pipeline
+      parameters:
+        - name: authsvc.image.tag
+          value: ""  # Set by CI
+        - name: dirsvc.image.tag
+          value: ""
+        - name: govsvc.image.tag
+          value: ""
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: wardseal-production
+
+  syncPolicy:
+    # IMPORTANT: Manual sync for production
+    # Uncomment 'automated' only after proper approval workflow is in place
+    # automated:
+    #   prune: true
+    #   selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - PruneLast=true
+      - ApplyOutOfSyncOnly=true
+      - RespectIgnoreDifferences=true
+    retry:
+      limit: 3
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 5m
+
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      jsonPointers:
+        - /spec/replicas
+    - group: autoscaling
+      kind: HorizontalPodAutoscaler
+      jsonPointers:
+        - /spec/minReplicas
+        - /spec/maxReplicas
+
+  # Require manual sync window for production
+  # syncWindows:
+  #   - kind: allow
+  #     schedule: "0 9-17 * * 1-5"  # Mon-Fri 9am-5pm
+  #     duration: 8h
+  #     applications:
+  #       - "*"

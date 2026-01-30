@@ -1,23 +1,220 @@
+# ====================
+# Auth Service Configuration
+# ====================
+
 replicaCount: 1
 
-image:
-  repository: your-docker-repo/authsvc
-  pullPolicy: IfNotPresent
-  # Overrides the image tag whose default is the chart appVersion.
-  tag: "0.1.0"
+nameOverride: ""
+fullnameOverride: ""
 
+# ====================
+# Image Configuration
+# ====================
+image:
+  registry: ""  # Optional: specify registry, defaults to global.imageRegistry
+  repository: ghcr.io/dhawalhost/wardseal-authsvc
+  pullPolicy: IfNotPresent
+  tag: ""  # Overrides the image tag whose default is the chart appVersion
+  pullSecrets: []
+
+# ====================
+# Service Configuration
+# ====================
 service:
   type: ClusterIP
   port: 8080
+  annotations: {}
 
+# ====================
+# Ingress Configuration
+# ====================
+ingress:
+  enabled: false
+  className: nginx
+  annotations: {}
+    # cert-manager.io/cluster-issuer: "letsencrypt-prod"
+  hosts: []
+    # - host: auth.example.com
+    #   paths:
+    #     - path: /
+    #       pathType: Prefix
+  tls: []
+    # - secretName: auth-tls
+    #   hosts:
+    #     - auth.example.com
+
+
+# ====================
+# Application Environment
+# ====================
 env:
-  DIRECTORY_SERVICE_URL: http://dirsvc:8081 # Assumes dirsvc is in the same namespace
+  DIRECTORY_SERVICE_URL: http://dirsvc:8081  # Assumes dirsvc is in the same namespace
+  LOG_LEVEL: info
 
-# Resource limits and requests
+# ====================
+# Database Configuration
+# ====================
+database:
+  existingSecret: wardseal-db-credentials-dev  # Can be overridden per environment
+  # Secret should contain: host, port, username, password, database
+
+# ====================
+# Vault AppRole Configuration
+# ====================
+vaultAppRole:
+  existingSecret: vault-approle  # Optional, for Vault integration
+  # Secret should contain: role-id, secret-id
+
+# ====================
+# Security Contexts
+# ====================
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+  readOnlyRootFilesystem: false  # Set to true if app doesn't write to disk
+
+# ====================
+# Health Checks
+# ====================
+livenessProbe:
+  httpGet:
+    path: /health/live
+    port: http
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /health/ready
+    port: http
+  initialDelaySeconds: 10
+  periodSeconds: 5
+  timeoutSeconds: 3
+  failureThreshold: 3
+
+startupProbe:
+  httpGet:
+    path: /health/startup
+    port: http
+  initialDelaySeconds: 0
+  periodSeconds: 5
+  timeoutSeconds: 3
+  failureThreshold: 30  # 150s max startup time
+
+# ====================
+# Resource Management
+# ====================
 resources:
   limits:
-    cpu: 200m
-    memory: 256Mi
+    cpu: 500m
+    memory: 512Mi
   requests:
     cpu: 100m
     memory: 128Mi
+
+# ====================
+# Autoscaling
+# ====================
+autoscaling:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 80
+  # targetMemoryUtilizationPercentage: 80
+
+# ====================
+# Pod Disruption Budget
+# ====================
+podDisruptionBudget:
+  enabled: false
+  minAvailable: 1
+  # maxUnavailable: 1
+
+# ====================
+# Network Policy
+# ====================
+networkPolicy:
+  enabled: false  # Enable in production for network segmentation
+
+# ====================
+# ServiceAccount
+# ====================
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""  # Defaults to release name
+  automountServiceAccountToken: true
+
+# ====================
+# Monitoring & Metrics
+# ====================
+metrics:
+  enabled: true
+  port: 9090
+  path: /metrics
+  
+  serviceMonitor:
+    enabled: false  # Enable if using Prometheus Operator
+    interval: 30s
+    scrapeTimeout: 10s
+    labels: {}
+
+# ====================
+# Pod Annotations & Labels
+# ====================
+podAnnotations: {}
+  # Custom annotations for pods
+
+podLabels: {}
+  # Custom labels for pods
+
+# ====================
+# Scheduling
+# ====================
+nodeSelector: {}
+  # kubernetes.io/arch: amd64
+
+tolerations: []
+  # - key: "dedicated"
+  #   operator: "Equal"
+  #   value: "application"
+  #   effect: "NoSchedule"
+
+affinity: {}
+  # podAntiAffinity:
+  #   preferredDuringSchedulingIgnoredDuringExecution:
+  #     - weight: 100
+  #       podAffinityTerm:
+  #         labelSelector:
+  #           matchLabels:
+  #             app.kubernetes.io/name: authsvc
+  #         topologyKey: kubernetes.io/hostname
+
+# ====================
+# Additional Volumes
+# ====================
+volumes: []
+  # - name: tmp
+  #   emptyDir: {}
+
+volumeMounts: []
+  # - name: tmp
+  #   mountPath: /tmp
+
+# ====================
+# Global Values (from parent chart)
+# ====================
+global:
+  imageRegistry: ""  # Can be set at umbrella chart level
+  imagePullSecrets: []

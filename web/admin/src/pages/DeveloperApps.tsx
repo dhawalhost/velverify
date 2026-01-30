@@ -198,6 +198,14 @@ const DeveloperApps: React.FC = () => {
                 >
                     <Key className="mr-2 h-4 w-4" /> API Keys
                 </Button>
+                <Button
+                    variant={activeTab === 'idp' ? 'default' : 'ghost'}
+                    size="sm"
+                    onClick={() => setActiveTab('idp')}
+                    className="rounded-md"
+                >
+                    <Smartphone className="mr-2 h-4 w-4" /> IdP Settings
+                </Button>
             </div>
 
             {/* OAuth Apps Section */}
@@ -338,6 +346,88 @@ const DeveloperApps: React.FC = () => {
                                         ))}
                                     </div>
                                 )}
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
+            )}
+            {/* IdP Settings Section */}
+            {activeTab === 'idp' && (
+                <div className="space-y-6">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Identity Provider Configuration</CardTitle>
+                            <CardDescription>Use these endpoints to configure Wardseal as an IdP in external applications (Okta, Azure AD, Auth0).</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-6">
+                            <div className="space-y-4">
+                                <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">OpenID Connect (OIDC)</h3>
+                                <div className="grid gap-4 md:grid-cols-2">
+                                    <div className="space-y-2">
+                                        <Label>Issuer URL</Label>
+                                        <div className="flex gap-2">
+                                            <Input readOnly value={window.location.origin} className="bg-muted font-mono text-xs" />
+                                            <Button variant="outline" size="icon" onClick={() => navigator.clipboard.writeText(window.location.origin)}>
+                                                <RefreshCw className="h-4 w-4" />
+                                            </Button>
+                                        </div>
+                                        <p className="text-xs text-muted-foreground">The root URL for OIDC discovery.</p>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label>Authorization Endpoint</Label>
+                                        <div className="flex gap-2">
+                                            <Input readOnly value={`${window.location.origin}/oauth2/authorize`} className="bg-muted font-mono text-xs" />
+                                            <Button variant="outline" size="icon" onClick={() => navigator.clipboard.writeText(`${window.location.origin}/oauth2/authorize`)}>
+                                                <RefreshCw className="h-4 w-4" />
+                                            </Button>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label>Token Endpoint</Label>
+                                        <div className="flex gap-2">
+                                            <Input readOnly value={`${window.location.origin}/oauth2/token`} className="bg-muted font-mono text-xs" />
+                                            <Button variant="outline" size="icon" onClick={() => navigator.clipboard.writeText(`${window.location.origin}/oauth2/token`)}>
+                                                <RefreshCw className="h-4 w-4" />
+                                            </Button>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label>JWKS URI</Label>
+                                        <div className="flex gap-2">
+                                            <Input readOnly value={`${window.location.origin}/.well-known/jwks.json`} className="bg-muted font-mono text-xs" />
+                                            <Button variant="outline" size="icon" onClick={() => navigator.clipboard.writeText(`${window.location.origin}/.well-known/jwks.json`)}>
+                                                <RefreshCw className="h-4 w-4" />
+                                            </Button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <Separator />
+
+                            <div className="space-y-4">
+                                <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">SAML 2.0</h3>
+                                <div className="grid gap-4 md:grid-cols-2">
+                                    <div className="space-y-2">
+                                        <Label>Metadata URL</Label>
+                                        <div className="flex gap-2">
+                                            <Input readOnly value={`${window.location.origin}/saml/metadata`} className="bg-muted font-mono text-xs" />
+                                            <Button variant="outline" size="icon" onClick={() => navigator.clipboard.writeText(`${window.location.origin}/saml/metadata`)}>
+                                                <RefreshCw className="h-4 w-4" />
+                                            </Button>
+                                        </div>
+                                        <p className="text-xs text-muted-foreground">Upload this URL or file to your Service Provider.</p>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label>SSO URL (ACS)</Label>
+                                        <div className="flex gap-2">
+                                            <Input readOnly value={`${window.location.origin}/saml/sso`} className="bg-muted font-mono text-xs" />
+                                            <Button variant="outline" size="icon" onClick={() => navigator.clipboard.writeText(`${window.location.origin}/saml/sso`)}>
+                                                <RefreshCw className="h-4 w-4" />
+                                            </Button>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </CardContent>
                     </Card>

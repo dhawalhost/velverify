@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "{{ include "govsvc.fullname" . }}-test-connection"
+  labels:
+    {{- include "govsvc.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": test
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  containers:
+    - name: wget
+      image: busybox:1.35
+      command: ['sh', '-c']
+      args:
+        - |
+          echo "Testing connection to {{ include "govsvc.fullname" . }}:{{ .Values.service.port }}"
+          wget -q -O- {{ include "govsvc.fullname" . }}:{{ .Values.service.port }}/health || exit 1
+  restartPolicy: Never

@@ -37,6 +37,9 @@ type Service interface {
 
 	// Discovery
 	GetTenantByEmail(ctx context.Context, email string) (string, error)
+
+	// Tenant Management
+	CreateTenant(ctx context.Context, id, name, plan string) error
 }
 
 type directoryService struct {
@@ -261,4 +264,11 @@ func (s *directoryService) GetTenantByEmail(ctx context.Context, email string) (
 		return "", err
 	}
 	return tenantID, nil
+}
+
+func (s *directoryService) CreateTenant(ctx context.Context, id, name, plan string) error {
+	_, err := s.db.ExecContext(ctx,
+		`INSERT INTO tenants (id, name, plan, created_at, updated_at) VALUES ($1, $2, $3, NOW(), NOW()) ON CONFLICT (id) DO NOTHING`,
+		id, name, plan)
+	return err
 }

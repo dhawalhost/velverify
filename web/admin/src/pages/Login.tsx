@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { login, getBranding, completeMfaLogin, lookupUser, beginLogin, finishLogin } from '../api';
+import { login, getBranding, completeMfaLogin, lookupUser, beginLogin, finishLogin, getSetupStatus } from '../api';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -63,6 +63,22 @@ const Login: React.FC = () => {
             setBranding({});
         }
     };
+
+    useEffect(() => {
+        // Check if system needs initial setup
+        const checkSetupStatus = async () => {
+            try {
+                const status = await getSetupStatus();
+                if (status.setup_required) {
+                    navigate('/setup');
+                }
+            } catch (err) {
+                // If check fails, assume no setup needed (might be network issue)
+                console.error("Failed to check setup status", err);
+            }
+        };
+        checkSetupStatus();
+    }, [navigate]);
 
     useEffect(() => {
         if (tenantID) {

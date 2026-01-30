@@ -12,6 +12,11 @@ database:
   sslMode: require
   existingSecret: wardseal-db-credentials-staging
 
+# KMS Configuration - Use Vault in staging
+kms:
+  provider: vault
+  vaultSecretName: wardseal-vault-kms-staging
+
 # Auth Service - Staging
 authsvc:
   enabled: true
@@ -21,9 +26,15 @@ authsvc:
     tag: "latest"  # Will be overridden by CI
 
   env:
+    ENVIRONMENT: staging
     LOG_LEVEL: debug
     DIRECTORY_SERVICE_URL: http://wardseal-dirsvc:8081
     AUTH_SERVICE_URL: https://auth-staging.wardseal.com
+    KMS_PROVIDER: vault
+
+  envFrom:
+    - secretRef:
+        name: wardseal-vault-kms-staging
 
   resources:
     limits:

@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"os"
+	"strings"
 
 	"github.com/dhawalhost/wardseal/internal/directory"
 	"github.com/dhawalhost/wardseal/internal/scim"
@@ -51,6 +52,29 @@ func main() {
 	serviceHeader := os.Getenv("SERVICE_AUTH_HEADER")
 
 	router := gin.Default()
+
+	// CORS configuration
+	corsOrigins := os.Getenv("CORS_ALLOWED_ORIGINS")
+	if corsOrigins != "" {
+		origins := strings.Split(corsOrigins, ",")
+		router.Use(func(c *gin.Context) {
+			origin := c.Request.Header.Get("Origin")
+			for _, allowed := range origins {
+				if strings.TrimSpace(allowed) == origin {
+					c.Header("Access-Control-Allow-Origin", origin)
+					c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
+					c.Header("Access-Control-Allow-Headers", "Origin, Content-Type, Authorization, X-Tenant-ID")
+					c.Header("Access-Control-Allow-Credentials", "true")
+					break
+				}
+			}
+			if c.Request.Method == "OPTIONS" {
+				c.AbortWithStatus(204)
+				return
+			}
+			c.Next()
+		})
+	}
 
 	// Initialize OpenTelemetry tracing
 	shutdownTracer, err := observability.InitTracer(context.Background(), observability.TracerConfig{

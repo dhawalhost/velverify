@@ -1,10 +1,13 @@
-# ArgoCD Application for Wardseal Identity Platform
-# Apply this to your ArgoCD namespace: kubectl apply -f application.yaml -n argocd
+# WardSeal Staging ArgoCD Application
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: wardseal
+  name: wardseal-staging
   namespace: argocd
+  labels:
+    environment: staging
+  annotations:
+    notifications.argoproj.io/subscribe.on-sync-succeeded.slack: wardseal-deployments
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
@@ -12,17 +15,25 @@ spec:
 
   source:
     repoURL: https://github.com/dhawalhost/wardseal.git
-    targetRevision: HEAD
+    targetRevision: main
     path: deploy/charts/wardseal
 
     helm:
       valueFiles:
         - values.yaml
-        - values-staging.yaml  # Change to values-production.yaml for prod
+        - values-staging.yaml
+      # Override image tags from CI
+      parameters:
+        - name: authsvc.image.tag
+          value: $ARGOCD_APP_REVISION
+        - name: dirsvc.image.tag
+          value: $ARGOCD_APP_REVISION
+        - name: govsvc.image.tag
+          value: $ARGOCD_APP_REVISION
 
   destination:
     server: https://kubernetes.default.svc
-    namespace: wardseal
+    namespace: wardseal-staging
 
   syncPolicy:
     automated:
@@ -40,9 +51,8 @@ spec:
         factor: 2
         maxDuration: 3m
 
-  # Health checks
   ignoreDifferences:
     - group: apps
       kind: Deployment
       jsonPointers:
-        - /spec/replicas  # Ignore replica count differences when HPA is enabled
+        - /spec/replicas

@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
-import { getCampaigns, createCampaign, startCampaign, getCampaignItems, approveItem, revokeItem, getReviewItems } from '../api';
+import { getCampaigns, createCampaign, startCampaign, completeCampaign, getCampaignItems, addCampaignItem, approveItem, revokeItem, getReviewItems } from '../api';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@/components/ui/table';
-import { Loader2, Plus, Play, CheckCircle, XCircle, Search, Target, Layout } from 'lucide-react';
+import { Loader2, Plus, Play, CheckCircle, XCircle, Search, Target, Layout, Square } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 
 interface Campaign {
@@ -40,6 +40,10 @@ export default function Campaigns() {
     const [reviewerId, setReviewerId] = useState('');
     const [myReviewItems, setMyReviewItems] = useState<CertificationItem[]>([]);
     const [selectedItem, setSelectedItem] = useState<CertificationItem | null>(null);
+
+    // Add Review Item State
+    const [showAddItem, setShowAddItem] = useState(false);
+    const [newItem, setNewItem] = useState({ user_id: '', resource_type: 'role', resource_id: '', resource_name: '' });
 
     useEffect(() => {
         loadCampaigns();
@@ -91,6 +95,18 @@ export default function Campaigns() {
         }
     };
 
+    const handleCompleteCampaign = async (id: string) => {
+        try {
+            await completeCampaign(id);
+            loadCampaigns();
+            if (selectedCampaign?.id === id) {
+                setSelectedCampaign(null);
+            }
+        } catch (error) {
+            console.error('Failed to complete campaign:', error);
+        }
+    };
+
     const handleApprove = async (itemId: string) => {
         if (!selectedCampaign) return;
         try {
@@ -108,6 +124,19 @@ export default function Campaigns() {
             loadItems(selectedCampaign.id);
         } catch (error) {
             console.error('Failed to revoke:', error);
+        }
+    };
+
+    const handleAddItem = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!selectedCampaign) return;
+        try {
+            await addCampaignItem(selectedCampaign.id, newItem);
+            setNewItem({ user_id: '', resource_type: 'role', resource_id: '', resource_name: '' });
+            setShowAddItem(false);
+            loadItems(selectedCampaign.id);
+        } catch (error) {
+            console.error('Failed to add item:', error);
         }
     };
 
@@ -267,6 +296,17 @@ export default function Campaigns() {
                                                     <Play className="h-4 w-4" />
                                                 </Button>
                                             )}
+                                            {campaign.status === 'active' && (
+                                                <Button
+                                                    size="icon"
+                                                    variant="ghost"
+                                                    className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                                                    onClick={(e) => { e.stopPropagation(); handleCompleteCampaign(campaign.id); }}
+                                                    title="Complete Campaign"
+                                                >
+                                                    <Square className="h-4 w-4" />
+                                                </Button>
+                                            )}
                                         </div>
                                     ))}
                                 </div>
@@ -286,8 +326,59 @@ export default function Campaigns() {
                                             <Badge variant={getStatusVariant(selectedCampaign.status) as any}>
                                                 {selectedCampaign.status}
                                             </Badge>
+                                            {selectedCampaign.status === 'draft' && (
+                                                <Button size="sm" variant="outline" onClick={() => setShowAddItem(!showAddItem)}>
+                                                    <Plus className="h-4 w-4 mr-1" /> Add Item
+                                                </Button>
+                                            )}
                                         </div>
                                     </CardHeader>
+                                    {showAddItem && selectedCampaign.status === 'draft' && (
+                                        <div className="border-b p-4 bg-muted/30">
+                                            <form onSubmit={handleAddItem} className="grid grid-cols-1 md:grid-cols-5 gap-3 items-end">
+                                                <div className="space-y-1">
+                                                    <label className="text-xs font-medium text-muted-foreground">User ID</label>
+                                                    <Input
+                                                        placeholder="user-uuid"
+                                                        value={newItem.user_id}
+                                                        onChange={(e) => setNewItem({ ...newItem, user_id: e.target.value })}
+                                                        required
+                                                    />
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <label className="text-xs font-medium text-muted-foreground">Resource Type</label>
+                                                    <select
+                                                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                                                        value={newItem.resource_type}
+                                                        onChange={(e) => setNewItem({ ...newItem, resource_type: e.target.value })}
+                                                    >
+                                                        <option value="role">Role</option>
+                                                        <option value="group">Group</option>
+                                                        <option value="application">Application</option>
+                                                        <option value="permission">Permission</option>
+                                                    </select>
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <label className="text-xs font-medium text-muted-foreground">Resource ID</label>
+                                                    <Input
+                                                        placeholder="resource-uuid"
+                                                        value={newItem.resource_id}
+                                                        onChange={(e) => setNewItem({ ...newItem, resource_id: e.target.value })}
+                                                        required
+                                                    />
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <label className="text-xs font-medium text-muted-foreground">Display Name</label>
+                                                    <Input
+                                                        placeholder="Optional name"
+                                                        value={newItem.resource_name}
+                                                        onChange={(e) => setNewItem({ ...newItem, resource_name: e.target.value })}
+                                                    />
+                                                </div>
+                                                <Button type="submit">Add</Button>
+                                            </form>
+                                        </div>
+                                    )}
                                     <CardContent className="p-0">
                                         {items.length === 0 ? (
                                             <div className="p-12 text-center text-muted-foreground">

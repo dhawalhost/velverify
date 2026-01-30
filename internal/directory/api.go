@@ -51,12 +51,15 @@ func (h *HTTPHandler) RegisterRoutes(router *gin.Engine) {
 	globalInternalRoutes.Use(middleware.ServiceAuthenticator(h.serviceAuth))
 	globalInternalRoutes.GET("/discover", h.discoverTenant)
 
+	// Tenant Management
+	router.POST("/tenants", h.createTenant)
+
 	// User routes
 	users := tenantProtected.Group("/users")
 	{
 		users.POST("", h.createUser)
 		users.GET("/:id", h.getUserByID)
-		users.GET("", h.getUserByEmail) // /users?email=...
+		users.GET("", h.listUsers) // Handles both List and GetByEmail
 		users.PUT("/:id", h.updateUser)
 		users.DELETE("/:id", h.deleteUser)
 	}
@@ -137,25 +140,53 @@ func (h *HTTPHandler) getUserByID(c *gin.Context) {
 	c.JSON(http.StatusOK, GetUserByIDResponse{User: user})
 }
 
-func (h *HTTPHandler) getUserByEmail(c *gin.Context) {
+func (h *HTTPHandler) listUsers(c *gin.Context) {
 	tenantID, ok := h.tenantID(c)
 	if !ok {
 		return
 	}
-	req := GetUserByEmailRequest{Email: c.Query("email")} // Extract email from query
-	if err := h.validate.Struct(req); err != nil {
-		h.logger.Error("Get user by email request validation failed", zap.Error(err))
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+
+	// Check if this is a GetByEmail request
+	email := c.Query("email")
+	if email != "" {
+		req := GetUserByEmailRequest{Email: email}
+		if err := h.validate.Struct(req); err != nil {
+			h.logger.Error("Get user by email request validation failed", zap.Error(err))
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		user, err := h.svc.GetUserByEmail(c.Request.Context(), tenantID, req.Email)
+		if err != nil {
+			h.logger.Error("Get user by email failed", zap.Error(err))
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, GetUserByEmailResponse{User: user})
 		return
 	}
 
-	user, err := h.svc.GetUserByEmail(c.Request.Context(), tenantID, req.Email)
+	// Otherwise, it's a List request
+	var req ListUsersRequest
+	if err := c.ShouldBindQuery(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if req.Limit <= 0 {
+		req.Limit = 10
+	}
+	if req.Offset < 0 {
+		req.Offset = 0
+	}
+
+	users, total, err := h.svc.ListUsers(c.Request.Context(), tenantID, req.Limit, req.Offset)
 	if err != nil {
-		h.logger.Error("Get user by email failed", zap.Error(err))
+		h.logger.Error("List users failed", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, GetUserByEmailResponse{User: user})
+
+	c.JSON(http.StatusOK, ListUsersResponse{Users: users, Total: total})
 }
 
 func (h *HTTPHandler) updateUser(c *gin.Context) {
@@ -419,4 +450,31 @@ func (h *HTTPHandler) tenantID(c *gin.Context) (string, bool) {
 		return "", false
 	}
 	return tenantID, true
+}
+
+type CreateTenantRequest struct {
+	ID   string `json:"id" binding:"required,uuid"`
+	Name string `json:"name" binding:"required"`
+	Plan string `json:"plan"`
+}
+
+func (h *HTTPHandler) createTenant(c *gin.Context) {
+	var req CreateTenantRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	plan := req.Plan
+	if plan == "" {
+		plan = "default" // or "free"
+	}
+
+	if err := h.svc.CreateTenant(c.Request.Context(), req.ID, req.Name, plan); err != nil {
+		h.logger.Error("Failed to create tenant", zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create tenant"})
+		return
+	}
+
+	c.JSON(http.StatusCreated, gin.H{"message": "tenant created"})
 }

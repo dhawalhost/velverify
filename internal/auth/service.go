@@ -13,6 +13,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"math/big"
 	"net/http"
 	"net/url"
@@ -23,6 +24,7 @@ import (
 
 	"github.com/dhawalhost/wardseal/internal/oauthclient"
 	"github.com/dhawalhost/wardseal/internal/saml"
+	"github.com/dhawalhost/wardseal/pkg/kms"
 	"github.com/dhawalhost/wardseal/pkg/middleware"
 	"github.com/go-webauthn/webauthn/protocol"
 	"github.com/go-webauthn/webauthn/webauthn"
@@ -55,13 +57,24 @@ type Service interface {
 	// Branding
 	GetBranding(ctx context.Context, tenantID string) (BrandingConfig, error)
 	UpdateBranding(ctx context.Context, config BrandingConfig) error
+
+	// Client Management for Portal
+	ListClients(ctx context.Context, tenantID string) ([]oauthclient.Client, error)
+
+	// User Self-Update
+	UpdateUserSelf(ctx context.Context, tenantID, userID string, updates map[string]interface{}) error
+
 	// TOTP MFA
 	TOTP() TOTPStore
 
 	// User Lookup
 	LookupUser(ctx context.Context, tenantID, email string) (LookupResult, error)
 	// SignUp
-	SignUp(ctx context.Context, email, password, companyName string) (string, string, error)
+	SignUp(ctx context.Context, email, password, companyName, plan string) (string, string, error)
+
+	// System Setup
+	GetSystemSetupStatus(ctx context.Context) (bool, error)
+	PerformSystemSetup(ctx context.Context, email, password string) (string, error)
 }
 
 type LookupResult struct {
@@ -73,7 +86,7 @@ type LookupResult struct {
 type authService struct {
 	directoryServiceURL string
 	httpClient          *http.Client
-	privateKey          *rsa.PrivateKey
+	signer              kms.Signer
 	serviceAuthHeader   string
 	serviceAuthToken    string
 	codeStore           AuthorizationCodeStore
@@ -91,7 +104,7 @@ type authService struct {
 	federationStore     FederationStore
 	totpStore           TOTPStore
 	ssoProviderStore    SSOProviderStore
-	keyID               string
+	deploymentMode      string
 }
 
 // AuthorizationCodeStore defines the interface for storing authorization codes.
@@ -134,6 +147,10 @@ type Config struct {
 	RevocationStore  RevocationStore
 	TOTPStore        TOTPStore
 	SSOProviderStore SSOProviderStore
+	// KMS Signer (optional, defaults to ephemeral local signer)
+	Signer kms.Signer
+	// Deployment Mode: "saas" or "selfhost" (default)
+	DeploymentMode string
 }
 
 // NewService creates a new auth service.
@@ -222,16 +239,25 @@ func NewService(cfg Config) (Service, error) {
 		revocationStore = cfg.RevocationStore
 	}
 
-	// Generate Key ID
-	keyID := uuid.New().String()
-	// In a real system, we might derive this from the key material (JWK Thumbprint)
-	// or persist it to rotate keys gracefully.
+	// Initialize KMS Signer - use provided signer or create ephemeral local signer
+	signer := cfg.Signer
+	if signer == nil {
+		var err error
+		signer, err = kms.NewLocalSigner("", "")
+		if err != nil {
+			return nil, fmt.Errorf("failed to create ephemeral signer: %w", err)
+		}
+	}
+
+	deploymentMode := cfg.DeploymentMode
+	if deploymentMode == "" {
+		deploymentMode = "selfhost"
+	}
 
 	return &authService{
 		directoryServiceURL: cfg.DirectoryServiceURL,
 		httpClient:          &http.Client{Timeout: 5 * time.Second},
-		privateKey:          privateKey,
-		keyID:               keyID,
+		signer:              signer,
 		serviceAuthHeader:   header,
 		serviceAuthToken:    cfg.ServiceAuthToken,
 		codeStore:           codeStore,
@@ -249,6 +275,7 @@ func NewService(cfg Config) (Service, error) {
 		totpStore:           cfg.TOTPStore,
 		brandingStore:       cfg.BrandingStore,
 		ssoProviderStore:    cfg.SSOProviderStore,
+		deploymentMode:      deploymentMode,
 	}, nil
 }
 
@@ -347,10 +374,7 @@ func (s *authService) Login(ctx context.Context, username, password, deviceID, u
 		"tenant": tenantID,
 	}
 
-	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
-	token.Header["kid"] = s.keyID
-
-	signedToken, err := token.SignedString(s.privateKey)
+	signedToken, err := s.signer.Sign(claims)
 	if err != nil {
 		return "", err
 	}
@@ -502,9 +526,9 @@ func (s *authService) JWKS() jose.JSONWebKeySet {
 	return jose.JSONWebKeySet{
 		Keys: []jose.JSONWebKey{
 			{
-				Key:       &s.privateKey.PublicKey,
-				KeyID:     s.keyID,
-				Algorithm: "RS256",
+				Key:       s.signer.PublicKey(),
+				KeyID:     s.signer.KeyID(),
+				Algorithm: s.signer.Algorithm(),
 				Use:       "sig",
 			},
 		},
@@ -737,10 +761,7 @@ func (s *authService) generateAccessToken(tenantID, clientID, scope, subjectType
 		"subject_type": subjectType,
 	}
 
-	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
-	token.Header["kid"] = s.keyID
-
-	return token.SignedString(s.privateKey)
+	return s.signer.Sign(claims)
 }
 
 func (s *authService) generateRefreshToken(ctx context.Context, tenantID, clientID, scope, subjectType string) (string, error) {
@@ -781,7 +802,7 @@ func (s *authService) Introspect(ctx context.Context, req IntrospectRequest) (In
 		if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 		}
-		return &s.privateKey.PublicKey, nil
+		return s.signer.PublicKey(), nil
 	})
 
 	if err != nil || !token.Valid {
@@ -1187,11 +1208,46 @@ func (s *authService) FinishWebAuthnLogin(ctx context.Context, userID string, se
 func (s *authService) WebAuthn() *webauthn.WebAuthn {
 	return s.webAuthn
 }
-func (s *authService) SignUp(ctx context.Context, email, password, companyName string) (string, string, error) {
+func (s *authService) SignUp(ctx context.Context, email, password, companyName, plan string) (string, string, error) {
+	// 0. Check if Public Signup is allowed
+	if s.deploymentMode != "saas" {
+		return "", "", errors.New("public signup is disabled in this deployment mode")
+	}
+
 	// 1. Generate new Tenant ID
 	tenantID := uuid.New().String()
 
-	// 2. Create User in Directory Service
+	// 2. Create Tenant in Directory Service
+	if plan == "" {
+		plan = "free"
+	}
+	tenantPayload := map[string]interface{}{
+		"id":   tenantID,
+		"name": companyName,
+		"plan": plan,
+	}
+	tenantBody, err := json.Marshal(tenantPayload)
+	if err != nil {
+		return "", "", err
+	}
+	reqTenant, err := http.NewRequestWithContext(ctx, "POST", fmt.Sprintf("%s/tenants", s.directoryServiceURL), bytes.NewReader(tenantBody))
+	if err != nil {
+		return "", "", err
+	}
+	reqTenant.Header.Set("Content-Type", "application/json")
+	if s.serviceAuthToken != "" {
+		reqTenant.Header.Set(s.serviceAuthHeader, s.serviceAuthToken)
+	}
+	respTenant, err := s.httpClient.Do(reqTenant)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to create tenant: %w", err)
+	}
+	defer func() { _ = respTenant.Body.Close() }()
+	if respTenant.StatusCode != http.StatusCreated {
+		return "", "", fmt.Errorf("directory service create tenant failed: status %d", respTenant.StatusCode)
+	}
+
+	// 3. Create User in Directory Service
 	// We call POST /users directly on directory service URL, injecting the new Tenant ID header.
 	// Payload must match CreateUserRequest: { "user": { ... } }
 	userPayload := map[string]interface{}{
@@ -1269,13 +1325,184 @@ func (s *authService) SignUp(ctx context.Context, email, password, companyName s
 		"tenant": tenantID,
 	}
 
-	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
-	token.Header["kid"] = s.keyID
-
-	signedToken, err := token.SignedString(s.privateKey)
+	signedToken, err := s.signer.Sign(claims)
 	if err != nil {
 		return "", "", err
 	}
 
 	return signedToken, tenantID, nil
+}
+
+func (s *authService) GetSystemSetupStatus(ctx context.Context) (bool, error) {
+	// Check if any users exist in the system tenant
+	// We use the magic system tenant ID
+	systemTenantID := "11111111-1111-1111-1111-111111111111"
+
+	req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("%s/users", s.directoryServiceURL), nil)
+	if err != nil {
+		return false, err
+	}
+
+	q := req.URL.Query()
+	q.Add("limit", "1")
+	req.URL.RawQuery = q.Encode()
+
+	req.Header.Set("Content-Type", "application/json")
+	// Use system tenant ID to check THAT tenant
+	req.Header.Set(middleware.DefaultTenantHeader, systemTenantID)
+	if s.serviceAuthToken != "" {
+		req.Header.Set(s.serviceAuthHeader, s.serviceAuthToken)
+	}
+
+	resp, err := s.httpClient.Do(req)
+	if err != nil {
+		return false, err
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		return false, fmt.Errorf("directory service returned status %d", resp.StatusCode)
+	}
+
+	var listResp struct {
+		Total int `json:"total"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&listResp); err != nil {
+		return false, err
+	}
+
+	// Setup is required if total users == 0
+	return listResp.Total == 0, nil
+}
+
+func (s *authService) PerformSystemSetup(ctx context.Context, email, password string) (string, error) {
+	// Double check that setup is allowed
+	required, err := s.GetSystemSetupStatus(ctx)
+	if err != nil {
+		return "", err
+	}
+	if !required {
+		return "", errors.New("system setup not required (or already completed)")
+	}
+
+	systemTenantID := "11111111-1111-1111-1111-111111111111"
+
+	// Create the User in Directory Service
+	userPayload := struct {
+		User struct {
+			Email    string `json:"email"`
+			Password string `json:"password"`
+			Status   string `json:"status"`
+		} `json:"user"`
+	}{
+		User: struct {
+			Email    string `json:"email"`
+			Password string `json:"password"`
+			Status   string `json:"status"`
+		}{
+			Email:    email,
+			Password: password,
+			Status:   "active",
+		},
+	}
+
+	body, err := json.Marshal(userPayload)
+	if err != nil {
+		return "", err
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "POST", fmt.Sprintf("%s/users", s.directoryServiceURL), bytes.NewReader(body))
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set(middleware.DefaultTenantHeader, systemTenantID)
+	if s.serviceAuthToken != "" {
+		req.Header.Set(s.serviceAuthHeader, s.serviceAuthToken)
+	}
+
+	resp, err := s.httpClient.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusCreated {
+		respBody, _ := io.ReadAll(resp.Body)
+		return "", fmt.Errorf("failed to create system owner: %s", string(respBody))
+	}
+
+	var createResp struct {
+		UserID string `json:"user_id"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&createResp); err != nil {
+		return "", err
+	}
+
+	// Sign a token for the new user
+	claims := jwt.MapClaims{
+		"sub":    createResp.UserID,
+		"iss":    "identity-platform",
+		"aud":    "admin-console",
+		"exp":    time.Now().Add(time.Hour * 1).Unix(),
+		"iat":    time.Now().Unix(),
+		"scope":  "openid profile email",
+		"tenant": systemTenantID,
+		"role":   "owner",
+	}
+
+	return s.signer.Sign(claims)
+}
+
+func (s *authService) ListClients(ctx context.Context, tenantID string) ([]oauthclient.Client, error) {
+	if s.clientStore == nil {
+		return nil, errors.New("client store not configured")
+	}
+	return s.clientStore.ListClientsByTenant(ctx, tenantID)
+}
+
+func (s *authService) UpdateUserSelf(ctx context.Context, tenantID, userID string, updates map[string]interface{}) error {
+	// Construct the payload for directory service
+	type User struct {
+		Password string `json:"password,omitempty"`
+	}
+
+	userPayload := User{}
+	if pw, ok := updates["password"].(string); ok && pw != "" {
+		userPayload.Password = pw
+	}
+
+	reqBody := struct {
+		User User `json:"user"`
+	}{
+		User: userPayload,
+	}
+
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		return err
+	}
+
+	url := fmt.Sprintf("%s/users/%s", s.directoryServiceURL, userID)
+	req, err := http.NewRequestWithContext(ctx, "PUT", url, bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set(middleware.DefaultTenantHeader, tenantID)
+	if s.serviceAuthToken != "" {
+		req.Header.Set(s.serviceAuthHeader, s.serviceAuthToken)
+	}
+
+	resp, err := s.httpClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("directory service update failed with status %d", resp.StatusCode)
+	}
+
+	return nil
 }

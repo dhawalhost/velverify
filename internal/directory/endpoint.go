@@ -50,6 +50,18 @@ type GetUserByEmailResponse struct {
 	User User `json:"user"`
 }
 
+// ListUsersRequest holds the request parameters for listing users.
+type ListUsersRequest struct {
+	Limit  int `form:"limit"`
+	Offset int `form:"offset"`
+}
+
+// ListUsersResponse holds the response values for listing users.
+type ListUsersResponse struct {
+	Users []User `json:"users"`
+	Total int    `json:"total"`
+}
+
 // GetUserByIDRequest holds the request parameters for the GetUserByID endpoint.
 type GetUserByIDRequest struct {
 	ID string `json:"id" validate:"required,uuid"`

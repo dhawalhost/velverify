@@ -1,5 +1,5 @@
 import React from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate, Outlet } from 'react-router-dom';
 import {
     LayoutDashboard,
     ClipboardList,
@@ -29,7 +29,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
 import { ModeToggle } from '@/components/mode-toggle';
 
-const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+const Layout: React.FC = () => {
     const location = useLocation();
     const navigate = useNavigate();
 
@@ -44,7 +44,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         { path: '/mfa', label: 'MFA Setup', icon: ShieldAlert },
         { path: '/devices', label: 'Devices', icon: Smartphone },
         { path: '/passkeys', label: 'Passkeys', icon: Fingerprint },
-        { path: '/apps', label: 'My Apps', icon: Code2 },
+        { path: '/apps', label: 'Applications', icon: Code2 },
         { path: '/webhooks', label: 'Webhooks', icon: Webhook },
         { path: '/branding', label: 'Branding', icon: Palette },
         { path: '/audit', label: 'Audit Logs', icon: FileText },
@@ -174,7 +174,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                     </div>
                 </header>
                 <div className="flex-1 p-8 max-w-[1600px] mx-auto w-full animate-in fade-in duration-500">
-                    {children}
+                    <Outlet />
                 </div>
             </main>
         </div>

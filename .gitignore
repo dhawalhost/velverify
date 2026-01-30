@@ -18,10 +18,15 @@
 # Go workspace file
 go.work
 
-# Environment variables
+# Environment variables (local .env files)
 .env
-*.env
-
+.env.local
+.env.*.local
+# Allow config/ env files except development secrets
+!config/.env.defaults
+!config/.env.staging
+!config/.env.production
+config/.env.development
 # Build outputs
 /build
 /bin

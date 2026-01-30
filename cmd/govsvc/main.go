@@ -85,10 +85,11 @@ func main() {
 
 	corsOrigins := parseCSV(envOr("CORS_ALLOWED_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173"))
 	corsConfig := cors.Config{
-		AllowMethods:  []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowHeaders:  []string{"Origin", "Content-Type", "X-Tenant-ID"},
-		ExposeHeaders: []string{"Content-Length"},
-		MaxAge:        12 * time.Hour,
+		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "X-Tenant-ID", "Authorization"},
+		ExposeHeaders:    []string{"Content-Length"},
+		AllowCredentials: true,
+		MaxAge:           12 * time.Hour,
 	}
 	if allowsAllOrigins(corsOrigins) {
 		corsConfig.AllowAllOrigins = true
