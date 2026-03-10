@@ -119,7 +119,7 @@ upstream govsvc {
 
 server {
     listen 443 ssl http2;
-    server_name auth.yourdomain.com;
+    server_name auth.wardseal.com;
     
     ssl_certificate /etc/ssl/cert.pem;
     ssl_certificate_key /etc/ssl/key.pem;

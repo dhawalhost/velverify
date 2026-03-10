@@ -44,6 +44,9 @@ type Config struct {
 	// Observability configuration
 	Observability ObservabilityConfig
 
+	// KMS configuration
+	KMS KMSConfig
+
 	// License configuration (Enterprise)
 	License LicenseConfig
 }
@@ -100,6 +103,20 @@ type LicenseConfig struct {
 	Required      bool
 	Key           string // From Vault
 	PublicKeyPath string
+}
+
+// KMSConfig holds settings for Key Management Service (Vault or Local).
+type KMSConfig struct {
+	Provider       string
+	PrivateKeyPath string
+	PublicKeyPath  string
+	VaultAddr      string
+	VaultToken     string
+	VaultKeyName   string
+	VaultKeyPath   string
+	VaultNamespace string
+	VaultRoleID    string
+	VaultSecretID  string
 }
 
 // Loader handles configuration loading from multiple sources.
@@ -201,6 +218,9 @@ func (l *Loader) loadDefaults() {
 		"DIRECTORY_SERVICE_URL": "http://localhost:8081",
 		"SERVICE_AUTH_HEADER":   "X-Service-Auth",
 		"LOG_LEVEL":             "info",
+		"KMS_PROVIDER":          "local",
+		"VAULT_KEY_NAME":        "wardseal-signing-key",
+		"VAULT_KEY_PATH":        "transit",
 	}
 
 	for k, v := range defaults {
@@ -282,6 +302,8 @@ func (l *Loader) loadOSEnv() {
 		"LOG_LEVEL",
 		"REQUIRE_LICENSE", "LICENSE_KEY", "LICENSE_PUBLIC_KEY_PATH",
 		"CORS_ALLOWED_ORIGINS",
+		"KMS_PROVIDER", "VAULT_ADDR", "VAULT_TOKEN", "VAULT_KEY_NAME",
+		"VAULT_KEY_PATH", "VAULT_NAMESPACE", "VAULT_ROLE_ID", "VAULT_SECRET_ID",
 	}
 
 	for _, key := range envVars {
@@ -338,6 +360,19 @@ func (l *Loader) buildConfig() (*Config, error) {
 			Required:      l.get("REQUIRE_LICENSE", "false") == "true",
 			Key:           l.get("LICENSE_KEY", ""),
 			PublicKeyPath: l.get("LICENSE_PUBLIC_KEY_PATH", "/etc/wardseal/license_public.pem"),
+		},
+
+		KMS: KMSConfig{
+			Provider:       l.get("KMS_PROVIDER", "local"),
+			PrivateKeyPath: l.get("JWT_PRIVATE_KEY_PATH", ""),
+			PublicKeyPath:  l.get("JWT_PUBLIC_KEY_PATH", ""),
+			VaultAddr:      l.get("VAULT_ADDR", ""),
+			VaultToken:     l.get("VAULT_TOKEN", ""),
+			VaultKeyName:   l.get("VAULT_KEY_NAME", "wardseal-signing-key"),
+			VaultKeyPath:   l.get("VAULT_KEY_PATH", "transit"),
+			VaultNamespace: l.get("VAULT_NAMESPACE", ""),
+			VaultRoleID:    l.get("VAULT_ROLE_ID", ""),
+			VaultSecretID:  l.get("VAULT_SECRET_ID", ""),
 		},
 	}
 

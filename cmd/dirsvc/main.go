@@ -7,6 +7,7 @@ import (
 
 	"github.com/dhawalhost/wardseal/internal/directory"
 	"github.com/dhawalhost/wardseal/internal/scim"
+	"github.com/dhawalhost/wardseal/pkg/config"
 	"github.com/dhawalhost/wardseal/pkg/database"
 	"github.com/dhawalhost/wardseal/pkg/logger"
 	"github.com/dhawalhost/wardseal/pkg/middleware"
@@ -21,19 +22,17 @@ func main() {
 	log := logger.NewFromEnv()
 	defer func() { _ = log.Sync() }()
 
-	dbHost := os.Getenv("DB_HOST")
-	if dbHost == "" {
-		dbHost = "localhost"
-	}
+	// Load centralized configuration
+	cfg := config.MustLoad()
 
 	// Database connection
 	dbConfig := database.Config{
-		Host:     dbHost,
-		Port:     5432,
-		User:     "user",
-		Password: "password",
-		DBName:   "identity_platform",
-		SSLMode:  "disable",
+		Host:     cfg.Database.Host,
+		Port:     cfg.Database.Port,
+		User:     cfg.Database.User,
+		Password: cfg.Database.Password, // Securely injected by Vault if configured
+		DBName:   cfg.Database.Name,
+		SSLMode:  cfg.Database.SSLMode,
 	}
 
 	db, err := database.NewConnection(dbConfig)
@@ -44,19 +43,18 @@ func main() {
 
 	svc := directory.NewService(db)
 
-	serviceToken := os.Getenv("SERVICE_AUTH_TOKEN")
+	serviceToken := cfg.Directory.ServiceAuthToken
 	if serviceToken == "" {
 		serviceToken = "dev-internal-token" //nolint:gosec // G101: dev-only fallback, not production credentials
 		log.Warn("SERVICE_AUTH_TOKEN not set, using development default")
 	}
-	serviceHeader := os.Getenv("SERVICE_AUTH_HEADER")
+	serviceHeader := cfg.Directory.ServiceAuthHeader
 
 	router := gin.Default()
 
 	// CORS configuration
-	corsOrigins := os.Getenv("CORS_ALLOWED_ORIGINS")
-	if corsOrigins != "" {
-		origins := strings.Split(corsOrigins, ",")
+	if len(cfg.Governance.CORSAllowedOrigins) > 0 {
+		origins := cfg.Governance.CORSAllowedOrigins
 		router.Use(func(c *gin.Context) {
 			origin := c.Request.Header.Get("Origin")
 			for _, allowed := range origins {
@@ -78,9 +76,9 @@ func main() {
 
 	// Initialize OpenTelemetry tracing
 	shutdownTracer, err := observability.InitTracer(context.Background(), observability.TracerConfig{
-		ServiceName:    "dirsvc",
-		ServiceVersion: "1.0.0",
-		Environment:    envOr("ENVIRONMENT", "development"),
+		ServiceName:    cfg.Observability.ServiceName,
+		ServiceVersion: cfg.Observability.ServiceVersion,
+		Environment:    string(cfg.Environment),
 	}, log)
 	if err != nil {
 		log.Error("Failed to initialize tracer", zap.Error(err))
@@ -124,11 +122,4 @@ func main() {
 		log.Error("HTTP server failed", zap.Error(err))
 		os.Exit(1)
 	}
-}
-
-func envOr(key, fallback string) string {
-	if value := os.Getenv(key); value != "" {
-		return value
-	}
-	return fallback
 }

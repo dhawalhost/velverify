@@ -208,8 +208,8 @@ kubectl logs -f deployment/wardseal-authsvc -n wardseal
 ### Step 5: Configure DNS
 
 Point your domains to the Ingress controller:
-- `auth.yourdomain.com` → Auth Service
-- `api.yourdomain.com` → API Services
+- `auth.wardseal.com` → Auth Service
+- `api.wardseal.com` → API Services
 
 ### Step 6: Upgrade or Rollback
 
@@ -358,8 +358,8 @@ ingress:
   tls:
     - secretName: wardseal-tls
       hosts:
-        - auth.yourdomain.com
-        - api.yourdomain.com
+        - auth.wardseal.com
+        - api.wardseal.com
 ```
 
 ---

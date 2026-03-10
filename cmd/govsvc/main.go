@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/dhawalhost/wardseal/internal/audit"
@@ -18,6 +17,7 @@ import (
 	"github.com/dhawalhost/wardseal/internal/rbac"
 	"github.com/dhawalhost/wardseal/internal/sso"
 	"github.com/dhawalhost/wardseal/internal/webhook"
+	"github.com/dhawalhost/wardseal/pkg/config"
 	"github.com/dhawalhost/wardseal/pkg/database"
 	"github.com/dhawalhost/wardseal/pkg/logger"
 	"github.com/dhawalhost/wardseal/pkg/middleware"
@@ -33,14 +33,16 @@ func main() {
 	log := logger.NewFromEnv()
 	defer func() { _ = log.Sync() }()
 
-	dbHost := envOr("DB_HOST", "localhost")
+	// Load centralized configuration
+	cfg := config.MustLoad()
+
 	dbConfig := database.Config{
-		Host:     dbHost,
-		Port:     5432,
-		User:     envOr("DB_USER", "user"),
-		Password: envOr("DB_PASSWORD", "password"),
-		DBName:   envOr("DB_NAME", "identity_platform"),
-		SSLMode:  envOr("DB_SSLMODE", "disable"),
+		Host:     cfg.Database.Host,
+		Port:     cfg.Database.Port,
+		User:     cfg.Database.User,
+		Password: cfg.Database.Password, // Securely injected by Vault if configured
+		DBName:   cfg.Database.Name,
+		SSLMode:  cfg.Database.SSLMode,
 	}
 
 	db, err := database.NewConnection(dbConfig)
@@ -51,7 +53,7 @@ func main() {
 	clientRepo := oauthclient.NewRepository(db)
 	reqStore := governance.NewStore(db)
 
-	dirSvcURL := envOr("DIRSVC_URL", "http://localhost:8081")
+	dirSvcURL := cfg.Governance.DirectoryServiceURL
 	dirClient := governance.NewDirectoryClient(dirSvcURL)
 
 	policyEngine := policy.NewSimpleEngine()
@@ -64,9 +66,9 @@ func main() {
 
 	// Initialize OpenTelemetry tracing
 	shutdownTracer, err := observability.InitTracer(context.Background(), observability.TracerConfig{
-		ServiceName:    "govsvc",
-		ServiceVersion: "1.0.0",
-		Environment:    envOr("ENVIRONMENT", "development"),
+		ServiceName:    cfg.Observability.ServiceName,
+		ServiceVersion: cfg.Observability.ServiceVersion,
+		Environment:    string(cfg.Environment),
 	}, log)
 	if err != nil {
 		log.Error("Failed to initialize tracer", zap.Error(err))
@@ -83,7 +85,6 @@ func main() {
 	// Rate limit: 20 req/s, burst 40
 	router.Use(middleware.RateLimitMiddleware(rate.Limit(20), 40))
 
-	corsOrigins := parseCSV(envOr("CORS_ALLOWED_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173"))
 	corsConfig := cors.Config{
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "X-Tenant-ID", "Authorization"},
@@ -91,10 +92,16 @@ func main() {
 		AllowCredentials: true,
 		MaxAge:           12 * time.Hour,
 	}
-	if allowsAllOrigins(corsOrigins) {
+
+	origins := cfg.Governance.CORSAllowedOrigins
+	if len(origins) == 0 {
+		origins = []string{"http://localhost:5173", "http://127.0.0.1:5173"}
+	}
+
+	if allowsAllOrigins(origins) {
 		corsConfig.AllowAllOrigins = true
 	} else {
-		corsConfig.AllowOrigins = corsOrigins
+		corsConfig.AllowOrigins = origins
 	}
 	router.Use(cors.New(corsConfig))
 
@@ -169,25 +176,6 @@ func main() {
 		log.Error("Governance service failed", zap.Error(err))
 		os.Exit(1)
 	}
-}
-
-func envOr(key, fallback string) string {
-	if value := os.Getenv(key); value != "" {
-		return value
-	}
-	return fallback
-}
-
-func parseCSV(value string) []string {
-	parts := strings.Split(value, ",")
-	result := make([]string, 0, len(parts))
-	for _, part := range parts {
-		trimmed := strings.TrimSpace(part)
-		if trimmed != "" {
-			result = append(result, trimmed)
-		}
-	}
-	return result
 }
 
 func allowsAllOrigins(origins []string) bool {

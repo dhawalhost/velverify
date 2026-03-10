@@ -9,7 +9,9 @@ import (
 	"github.com/dhawalhost/wardseal/internal/license"
 	"github.com/dhawalhost/wardseal/internal/oauthclient"
 	"github.com/dhawalhost/wardseal/internal/saml"
+	"github.com/dhawalhost/wardseal/pkg/config"
 	"github.com/dhawalhost/wardseal/pkg/database"
+	"github.com/dhawalhost/wardseal/pkg/kms"
 	"github.com/dhawalhost/wardseal/pkg/logger"
 	"github.com/dhawalhost/wardseal/pkg/middleware"
 	"github.com/dhawalhost/wardseal/pkg/observability"
@@ -23,16 +25,14 @@ func main() {
 	log := logger.NewFromEnv()
 	defer func() { _ = log.Sync() }()
 
+	// Load centralized configuration (handles defaults, .env, OS env, and Vault)
+	cfg := config.MustLoad()
+
 	// Enterprise License Verification
-	if os.Getenv("REQUIRE_LICENSE") == "true" {
+	if cfg.License.Required {
 		log.Info("Checking Enterprise License...")
 
-		pubKeyPath := os.Getenv("LICENSE_PUBLIC_KEY_PATH")
-		if pubKeyPath == "" {
-			pubKeyPath = "/etc/wardseal/license_public.pem"
-		}
-
-		pubKey, err := os.ReadFile(pubKeyPath) //nolint:gosec // G304: path is from trusted env var
+		pubKey, err := os.ReadFile(cfg.License.PublicKeyPath) //nolint:gosec // G304: path is from trusted config
 		if err != nil {
 			log.Fatal("Failed to read license public key", zap.Error(err))
 		}
@@ -42,12 +42,11 @@ func main() {
 			log.Fatal("Failed to initialize license manager", zap.Error(err))
 		}
 
-		licenseKey := os.Getenv("LICENSE_KEY")
-		if licenseKey == "" {
-			log.Fatal("LICENSE_KEY environment variable is required for enterprise edition")
+		if cfg.License.Key == "" {
+			log.Fatal("LICENSE_KEY environment variable/vault secret is required for enterprise edition")
 		}
 
-		lic, err := mgr.Verify(licenseKey)
+		lic, err := mgr.Verify(cfg.License.Key)
 		if err != nil {
 			log.Fatal("Invalid license key", zap.Error(err))
 		}
@@ -58,29 +57,21 @@ func main() {
 			zap.String("plan", lic.Plan))
 	}
 
-	directoryServiceURL := os.Getenv("DIRECTORY_SERVICE_URL")
-	if directoryServiceURL == "" {
-		directoryServiceURL = "http://dirsvc:8081" // Use service name in docker-compose
-	}
-
-	serviceToken := os.Getenv("SERVICE_AUTH_TOKEN")
+	directoryServiceURL := cfg.Auth.DirectoryServiceURL
+	serviceToken := cfg.Auth.ServiceAuthToken
 	if serviceToken == "" {
 		serviceToken = "dev-internal-token" //nolint:gosec // G101: dev-only fallback, not production credentials
 		log.Warn("SERVICE_AUTH_TOKEN not set, using development default")
 	}
-	serviceHeader := os.Getenv("SERVICE_AUTH_HEADER")
+	serviceHeader := cfg.Auth.ServiceAuthHeader
 
-	dbHost := os.Getenv("DB_HOST")
-	if dbHost == "" {
-		dbHost = "localhost"
-	}
 	dbConfig := database.Config{
-		Host:     dbHost,
-		Port:     5432,
-		User:     envOr("DB_USER", "user"),
-		Password: envOr("DB_PASSWORD", "password"),
-		DBName:   envOr("DB_NAME", "identity_platform"),
-		SSLMode:  envOr("DB_SSLMODE", "disable"),
+		Host:     cfg.Database.Host,
+		Port:     cfg.Database.Port,
+		User:     cfg.Database.User,
+		Password: cfg.Database.Password, // Securely injected by Vault if configured
+		DBName:   cfg.Database.Name,
+		SSLMode:  cfg.Database.SSLMode,
 	}
 
 	db, err := database.NewConnection(dbConfig)
@@ -96,16 +87,34 @@ func main() {
 	brandingStore := auth.NewBrandingStore(db)
 	ssoProviderStore := auth.NewSQLSSOProviderStore(db)
 
-	authServiceURL := os.Getenv("AUTH_SERVICE_URL")
-	if authServiceURL == "" {
-		authServiceURL = "http://localhost:8080"
-	}
+	authServiceURL := cfg.Auth.BaseURL
 
 	// Initialize persistent stores for production durability
 	codeStore := auth.NewSQLAuthorizationCodeStore(db)
 	refreshStore := auth.NewSQLRefreshTokenStore(db)
 	revocationStore := auth.NewSQLRevocationStore(db)
 	totpStore := auth.NewTOTPStore(db)
+
+	// Initialize Key Management Service
+	kmsConfig := kms.Config{
+		Provider:       cfg.KMS.Provider,
+		PrivateKeyPath: cfg.KMS.PrivateKeyPath,
+		PublicKeyPath:  cfg.KMS.PublicKeyPath,
+		VaultAddr:      cfg.KMS.VaultAddr,
+		VaultToken:     cfg.KMS.VaultToken,
+		VaultKeyName:   cfg.KMS.VaultKeyName,
+		VaultKeyPath:   cfg.KMS.VaultKeyPath,
+		VaultNamespace: cfg.KMS.VaultNamespace,
+		VaultRoleID:    cfg.KMS.VaultRoleID,
+		VaultSecretID:  cfg.KMS.VaultSecretID,
+	}
+
+	signer, err := kms.NewSigner(kmsConfig)
+	if err != nil {
+		log.Error("Failed to initialize KMS signer", zap.Error(err))
+		os.Exit(1)
+	}
+	defer signer.Close()
 
 	svc, err := auth.NewService(auth.Config{
 		DirectoryServiceURL: directoryServiceURL,
@@ -118,6 +127,7 @@ func main() {
 		WebAuthnStore:       webauthnStore,
 		BrandingStore:       brandingStore,
 		BaseURL:             authServiceURL,
+		Signer:              signer,
 		// Use SQL stores for persistence
 		CodeStore:        codeStore,
 		RefreshStore:     refreshStore,
@@ -133,9 +143,8 @@ func main() {
 	router := gin.Default()
 
 	// CORS configuration
-	corsOrigins := os.Getenv("CORS_ALLOWED_ORIGINS")
-	if corsOrigins != "" {
-		origins := strings.Split(corsOrigins, ",")
+	if len(cfg.Governance.CORSAllowedOrigins) > 0 {
+		origins := cfg.Governance.CORSAllowedOrigins
 		router.Use(func(c *gin.Context) {
 			origin := c.Request.Header.Get("Origin")
 			for _, allowed := range origins {
@@ -157,9 +166,9 @@ func main() {
 
 	// Initialize OpenTelemetry tracing
 	shutdownTracer, err := observability.InitTracer(context.Background(), observability.TracerConfig{
-		ServiceName:    "authsvc",
-		ServiceVersion: "1.0.0",
-		Environment:    envOr("ENVIRONMENT", "development"),
+		ServiceName:    cfg.Observability.ServiceName,
+		ServiceVersion: cfg.Observability.ServiceVersion,
+		Environment:    string(cfg.Environment),
 	}, log)
 	if err != nil {
 		log.Error("Failed to initialize tracer", zap.Error(err))
@@ -204,11 +213,4 @@ func main() {
 		log.Error("Auth service failed", zap.Error(err))
 		os.Exit(1)
 	}
-}
-
-func envOr(key, fallback string) string {
-	if value := os.Getenv(key); value != "" {
-		return value
-	}
-	return fallback
 }
