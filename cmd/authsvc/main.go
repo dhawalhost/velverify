@@ -114,7 +114,7 @@ func main() {
 		log.Error("Failed to initialize KMS signer", zap.Error(err))
 		os.Exit(1)
 	}
-	defer signer.Close()
+	defer func() { _ = signer.Close() }()
 
 	svc, err := auth.NewService(auth.Config{
 		DirectoryServiceURL: directoryServiceURL,
