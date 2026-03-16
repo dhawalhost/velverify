@@ -358,6 +358,8 @@ deploy_wardseal() {
             --set govsvc.image.tag="$IMAGE_TAG" \
             --set policysvc.image.tag="$IMAGE_TAG" \
             --set provsvc.image.tag="$IMAGE_TAG" \
+            --set adminui.image.tag="$IMAGE_TAG" \
+            --set landingui.image.tag="$IMAGE_TAG" \
             --wait \
             --timeout 5m
     else
@@ -371,6 +373,8 @@ deploy_wardseal() {
             --set govsvc.image.tag="$IMAGE_TAG" \
             --set policysvc.image.tag="$IMAGE_TAG" \
             --set provsvc.image.tag="$IMAGE_TAG" \
+            --set adminui.image.tag="$IMAGE_TAG" \
+            --set landingui.image.tag="$IMAGE_TAG" \
             --wait \
             --timeout 5m
     fi

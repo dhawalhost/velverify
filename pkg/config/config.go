@@ -75,6 +75,26 @@ type AuthConfig struct {
 	ServiceAuthHeader   string
 	JWTPrivateKeyPath   string
 	JWTPublicKeyPath    string
+	DeploymentMode      string
+	UIURL               string
+	RedisAddr           string
+	RedisPassword       string
+	RedisDB             int
+	WebAuthnSessionTTL  time.Duration
+	RateLimitUseTenant  bool
+	RateLimitKeyPrefix  string
+	RateLimitDefault    RateLimitProfile
+	RateLimitLogin      RateLimitProfile
+	RateLimitToken      RateLimitProfile
+	RateLimitSetup      RateLimitProfile
+	RateLimitWebhook    RateLimitProfile
+	RateLimitDegraded   RateLimitProfile
+}
+
+// RateLimitProfile configures a request budget for a time window.
+type RateLimitProfile struct {
+	Requests int
+	Window   time.Duration
 }
 
 // DirectoryConfig holds directory service settings.
@@ -207,20 +227,35 @@ func (l *Loader) Load() (*Config, error) {
 // loadDefaults sets built-in default values.
 func (l *Loader) loadDefaults() {
 	defaults := map[string]string{
-		"ENVIRONMENT":           "development",
-		"DB_HOST":               "localhost",
-		"DB_PORT":               "5432",
-		"DB_USER":               "user",
-		"DB_PASSWORD":           "password",
-		"DB_NAME":               "identity_platform",
-		"DB_SSLMODE":            "disable",
-		"AUTH_SERVICE_URL":      "http://localhost:8080",
-		"DIRECTORY_SERVICE_URL": "http://localhost:8081",
-		"SERVICE_AUTH_HEADER":   "X-Service-Auth",
-		"LOG_LEVEL":             "info",
-		"KMS_PROVIDER":          "local",
-		"VAULT_KEY_NAME":        "wardseal-signing-key",
-		"VAULT_KEY_PATH":        "transit",
+		"ENVIRONMENT":                        "development",
+		"DB_HOST":                            "localhost",
+		"DB_PORT":                            "5432",
+		"DB_USER":                            "user",
+		"DB_PASSWORD":                        "password",
+		"DB_NAME":                            "identity_platform",
+		"DB_SSLMODE":                         "disable",
+		"AUTH_SERVICE_URL":                   "http://localhost:8080",
+		"DIRECTORY_SERVICE_URL":              "http://localhost:8081",
+		"SERVICE_AUTH_HEADER":                "X-Service-Auth",
+		"LOG_LEVEL":                          "info",
+		"KMS_PROVIDER":                       "local",
+		"VAULT_KEY_NAME":                     "wardseal-signing-key",
+		"VAULT_KEY_PATH":                     "transit",
+		"UI_URL":                             "http://localhost:5173",
+		"RATE_LIMIT_USE_TENANT":              "true",
+		"RATE_LIMIT_KEY_PREFIX":              "authsvc:ratelimit",
+		"RATE_LIMIT_DEFAULT_REQUESTS":        "1200",
+		"RATE_LIMIT_DEFAULT_WINDOW_SECONDS":  "60",
+		"RATE_LIMIT_LOGIN_REQUESTS":          "60",
+		"RATE_LIMIT_LOGIN_WINDOW_SECONDS":    "60",
+		"RATE_LIMIT_TOKEN_REQUESTS":          "240",
+		"RATE_LIMIT_TOKEN_WINDOW_SECONDS":    "60",
+		"RATE_LIMIT_SETUP_REQUESTS":          "30",
+		"RATE_LIMIT_SETUP_WINDOW_SECONDS":    "60",
+		"RATE_LIMIT_WEBHOOK_REQUESTS":        "600",
+		"RATE_LIMIT_WEBHOOK_WINDOW_SECONDS":  "60",
+		"RATE_LIMIT_DEGRADED_REQUESTS":       "30",
+		"RATE_LIMIT_DEGRADED_WINDOW_SECONDS": "60",
 	}
 
 	for k, v := range defaults {
@@ -296,6 +331,14 @@ func (l *Loader) loadOSEnv() {
 		"DB_HOST", "DB_PORT", "DB_USER", "DB_PASSWORD", "DB_NAME", "DB_SSLMODE",
 		"AUTH_SERVICE_URL", "DIRECTORY_SERVICE_URL",
 		"SERVICE_AUTH_TOKEN", "SERVICE_AUTH_HEADER",
+		"REDIS_ADDR", "REDIS_PASSWORD", "REDIS_DB", "WEBAUTHN_SESSION_TTL_SECONDS",
+		"RATE_LIMIT_USE_TENANT", "RATE_LIMIT_KEY_PREFIX",
+		"RATE_LIMIT_DEFAULT_REQUESTS", "RATE_LIMIT_DEFAULT_WINDOW_SECONDS",
+		"RATE_LIMIT_LOGIN_REQUESTS", "RATE_LIMIT_LOGIN_WINDOW_SECONDS",
+		"RATE_LIMIT_TOKEN_REQUESTS", "RATE_LIMIT_TOKEN_WINDOW_SECONDS",
+		"RATE_LIMIT_SETUP_REQUESTS", "RATE_LIMIT_SETUP_WINDOW_SECONDS",
+		"RATE_LIMIT_WEBHOOK_REQUESTS", "RATE_LIMIT_WEBHOOK_WINDOW_SECONDS",
+		"RATE_LIMIT_DEGRADED_REQUESTS", "RATE_LIMIT_DEGRADED_WINDOW_SECONDS",
 		"JWT_PRIVATE_KEY_PATH", "JWT_PUBLIC_KEY_PATH",
 		"WEBHOOK_SECRET",
 		"OTEL_EXPORTER_OTLP_ENDPOINT", "OTEL_SERVICE_NAME",
@@ -304,6 +347,8 @@ func (l *Loader) loadOSEnv() {
 		"CORS_ALLOWED_ORIGINS",
 		"KMS_PROVIDER", "VAULT_ADDR", "VAULT_TOKEN", "VAULT_KEY_NAME",
 		"VAULT_KEY_PATH", "VAULT_NAMESPACE", "VAULT_ROLE_ID", "VAULT_SECRET_ID",
+		"DEPLOYMENT_MODE",
+		"UI_URL",
 	}
 
 	for _, key := range envVars {
@@ -316,6 +361,20 @@ func (l *Loader) loadOSEnv() {
 // buildConfig constructs the Config struct from loaded values.
 func (l *Loader) buildConfig() (*Config, error) {
 	dbPort, _ := strconv.Atoi(l.get("DB_PORT", "5432"))
+	redisDB, _ := strconv.Atoi(l.get("REDIS_DB", "0"))
+	webAuthnSessionTTLSeconds, _ := strconv.Atoi(l.get("WEBAUTHN_SESSION_TTL_SECONDS", "600"))
+	rateLimitDefaultRequests, _ := strconv.Atoi(l.get("RATE_LIMIT_DEFAULT_REQUESTS", "1200"))
+	rateLimitDefaultWindowSeconds, _ := strconv.Atoi(l.get("RATE_LIMIT_DEFAULT_WINDOW_SECONDS", "60"))
+	rateLimitLoginRequests, _ := strconv.Atoi(l.get("RATE_LIMIT_LOGIN_REQUESTS", "60"))
+	rateLimitLoginWindowSeconds, _ := strconv.Atoi(l.get("RATE_LIMIT_LOGIN_WINDOW_SECONDS", "60"))
+	rateLimitTokenRequests, _ := strconv.Atoi(l.get("RATE_LIMIT_TOKEN_REQUESTS", "240"))
+	rateLimitTokenWindowSeconds, _ := strconv.Atoi(l.get("RATE_LIMIT_TOKEN_WINDOW_SECONDS", "60"))
+	rateLimitSetupRequests, _ := strconv.Atoi(l.get("RATE_LIMIT_SETUP_REQUESTS", "30"))
+	rateLimitSetupWindowSeconds, _ := strconv.Atoi(l.get("RATE_LIMIT_SETUP_WINDOW_SECONDS", "60"))
+	rateLimitWebhookRequests, _ := strconv.Atoi(l.get("RATE_LIMIT_WEBHOOK_REQUESTS", "600"))
+	rateLimitWebhookWindowSeconds, _ := strconv.Atoi(l.get("RATE_LIMIT_WEBHOOK_WINDOW_SECONDS", "60"))
+	rateLimitDegradedRequests, _ := strconv.Atoi(l.get("RATE_LIMIT_DEGRADED_REQUESTS", "30"))
+	rateLimitDegradedWindowSeconds, _ := strconv.Atoi(l.get("RATE_LIMIT_DEGRADED_WINDOW_SECONDS", "60"))
 
 	cfg := &Config{
 		Environment: Environment(l.get("ENVIRONMENT", "development")),
@@ -336,6 +395,38 @@ func (l *Loader) buildConfig() (*Config, error) {
 			ServiceAuthHeader:   l.get("SERVICE_AUTH_HEADER", "X-Service-Auth"),
 			JWTPrivateKeyPath:   l.get("JWT_PRIVATE_KEY_PATH", ""),
 			JWTPublicKeyPath:    l.get("JWT_PUBLIC_KEY_PATH", ""),
+			DeploymentMode:      l.get("DEPLOYMENT_MODE", "selfhost"),
+			UIURL:               l.get("UI_URL", "http://localhost:5173"),
+			RedisAddr:           l.get("REDIS_ADDR", ""),
+			RedisPassword:       l.get("REDIS_PASSWORD", ""),
+			RedisDB:             redisDB,
+			WebAuthnSessionTTL:  time.Duration(webAuthnSessionTTLSeconds) * time.Second,
+			RateLimitUseTenant:  strings.EqualFold(l.get("RATE_LIMIT_USE_TENANT", "true"), "true"),
+			RateLimitKeyPrefix:  l.get("RATE_LIMIT_KEY_PREFIX", "authsvc:ratelimit"),
+			RateLimitDefault: RateLimitProfile{
+				Requests: rateLimitDefaultRequests,
+				Window:   time.Duration(rateLimitDefaultWindowSeconds) * time.Second,
+			},
+			RateLimitLogin: RateLimitProfile{
+				Requests: rateLimitLoginRequests,
+				Window:   time.Duration(rateLimitLoginWindowSeconds) * time.Second,
+			},
+			RateLimitToken: RateLimitProfile{
+				Requests: rateLimitTokenRequests,
+				Window:   time.Duration(rateLimitTokenWindowSeconds) * time.Second,
+			},
+			RateLimitSetup: RateLimitProfile{
+				Requests: rateLimitSetupRequests,
+				Window:   time.Duration(rateLimitSetupWindowSeconds) * time.Second,
+			},
+			RateLimitWebhook: RateLimitProfile{
+				Requests: rateLimitWebhookRequests,
+				Window:   time.Duration(rateLimitWebhookWindowSeconds) * time.Second,
+			},
+			RateLimitDegraded: RateLimitProfile{
+				Requests: rateLimitDegradedRequests,
+				Window:   time.Duration(rateLimitDegradedWindowSeconds) * time.Second,
+			},
 		},
 
 		Directory: DirectoryConfig{

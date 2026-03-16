@@ -13,9 +13,9 @@ import (
 	"github.com/dhawalhost/wardseal/pkg/middleware"
 	"github.com/dhawalhost/wardseal/pkg/observability"
 	"github.com/gin-gonic/gin"
+	"github.com/go-redis/redis/v8"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 	"go.uber.org/zap"
-	"golang.org/x/time/rate"
 )
 
 func main() {
@@ -61,7 +61,7 @@ func main() {
 				if strings.TrimSpace(allowed) == origin {
 					c.Header("Access-Control-Allow-Origin", origin)
 					c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
-					c.Header("Access-Control-Allow-Headers", "Origin, Content-Type, Authorization, X-Tenant-ID")
+					c.Header("Access-Control-Allow-Headers", "Origin, Content-Type, Authorization, X-Tenant-ID, X-User-ID, X-Device-ID, X-OS-Version")
 					c.Header("Access-Control-Allow-Credentials", "true")
 					break
 				}
@@ -94,13 +94,56 @@ func main() {
 
 	// Security Middleware
 	router.Use(middleware.SecurityHeadersMiddleware())
-	// Rate limit: 20 req/s, burst 40
-	router.Use(middleware.RateLimitMiddleware(rate.Limit(20), 40))
 
-	// Security Middleware
-	router.Use(middleware.SecurityHeadersMiddleware())
-	// Rate limit: 20 req/s, burst 40 (adjust as needed for bulk SCIM ops)
-	router.Use(middleware.RateLimitMiddleware(rate.Limit(20), 40))
+	var rateLimitRedisClient *redis.Client
+	if cfg.Auth.RedisAddr != "" {
+		rateLimitRedisClient = redis.NewClient(&redis.Options{
+			Addr:     cfg.Auth.RedisAddr,
+			Password: cfg.Auth.RedisPassword,
+			DB:       cfg.Auth.RedisDB,
+		})
+		if err := rateLimitRedisClient.Ping(context.Background()).Err(); err != nil {
+			log.Warn("Distributed limiter Redis unavailable; will use strict degraded fallback",
+				zap.Error(err),
+				zap.String("redis_addr", cfg.Auth.RedisAddr))
+			rateLimitRedisClient = nil
+		}
+	}
+
+	router.Use(middleware.DistributedRateLimitMiddleware(middleware.DistributedRateLimitConfig{
+		RedisClient: rateLimitRedisClient,
+		KeyPrefix:   cfg.Auth.RateLimitKeyPrefix + ":dirsvc",
+		UseTenant:   cfg.Auth.RateLimitUseTenant,
+		DefaultProfile: middleware.RateLimitWindowProfile{
+			Requests: cfg.Auth.RateLimitDefault.Requests,
+			Window:   cfg.Auth.RateLimitDefault.Window,
+		},
+		EndpointProfiles: map[string]middleware.RateLimitWindowProfile{
+			"login": {
+				Requests: cfg.Auth.RateLimitLogin.Requests,
+				Window:   cfg.Auth.RateLimitLogin.Window,
+			},
+			"token": {
+				Requests: cfg.Auth.RateLimitToken.Requests,
+				Window:   cfg.Auth.RateLimitToken.Window,
+			},
+			"setup": {
+				Requests: cfg.Auth.RateLimitSetup.Requests,
+				Window:   cfg.Auth.RateLimitSetup.Window,
+			},
+			"webhook": {
+				Requests: cfg.Auth.RateLimitWebhook.Requests,
+				Window:   cfg.Auth.RateLimitWebhook.Window,
+			},
+		},
+		DegradedProfile: middleware.RateLimitWindowProfile{
+			Requests: cfg.Auth.RateLimitDegraded.Requests,
+			Window:   cfg.Auth.RateLimitDegraded.Window,
+		},
+	}))
+
+	// API Logger Middleware
+	router.Use(middleware.APILogger(db, log))
 
 	// Register Prometheus metrics handler
 	router.GET("/metrics", gin.WrapH(observability.PrometheusHandler()))
@@ -114,7 +157,7 @@ func main() {
 
 	// Register SCIM routes
 	scimSvc := scim.NewService(svc)
-	scimHandlers := scim.NewHTTPHandler(scimSvc, log)
+	scimHandlers := scim.NewHTTPHandler(scimSvc, db, serviceToken, log)
 	scimHandlers.RegisterRoutes(router)
 
 	log.Info("HTTP server starting", zap.String("addr", ":8081"))

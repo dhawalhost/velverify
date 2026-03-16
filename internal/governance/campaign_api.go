@@ -2,6 +2,7 @@ package governance
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/dhawalhost/wardseal/pkg/middleware"
 	"github.com/gin-gonic/gin"
@@ -204,7 +205,9 @@ func (h *CampaignHTTPHandler) listReviewItems(c *gin.Context) {
 
 	reviewerID := c.Query("reviewer_id")
 	if reviewerID == "" {
-		// TODO: extracting from context if not provided?
+		reviewerID = campaignActorIDFromRequest(c)
+	}
+	if reviewerID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "reviewer_id is required"})
 		return
 	}
@@ -246,4 +249,14 @@ func (h *CampaignHTTPHandler) revokeItem(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"decision": "revoke"})
+}
+
+func campaignActorIDFromRequest(c *gin.Context) string {
+	if userID := strings.TrimSpace(c.GetString("user_id")); userID != "" {
+		return userID
+	}
+	if userID := strings.TrimSpace(c.GetHeader("X-User-ID")); userID != "" {
+		return userID
+	}
+	return ""
 }

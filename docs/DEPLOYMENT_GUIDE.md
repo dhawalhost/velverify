@@ -171,6 +171,36 @@ This creates:
 
 ### Step 3: Install with Helm
 
+Before installing, run the Traefik preflight checks:
+
+```bash
+NAMESPACE=wardseal \
+RELEASE_NAME=wardseal \
+ENV_VALUES=deploy/charts/wardseal/values-staging.yaml \
+./scripts/preflight_traefik.sh
+```
+
+If cert-manager is installed for staging:
+
+```bash
+NAMESPACE=wardseal \
+RELEASE_NAME=wardseal \
+ENV_VALUES=deploy/charts/wardseal/values-staging.yaml \
+CERT_ISSUER=letsencrypt-staging \
+./scripts/preflight_traefik.sh
+```
+
+For production values:
+
+```bash
+NAMESPACE=wardseal-prod \
+RELEASE_NAME=wardseal \
+ENV_VALUES=deploy/charts/wardseal/values-production.yaml \
+./scripts/preflight_traefik.sh
+```
+
+If you use cert-manager, add `CERT_ISSUER=<your-clusterissuer-name>` to validate it during preflight.
+
 ```bash
 # Add Helm dependencies
 cd deploy/charts/wardseal
@@ -182,12 +212,68 @@ helm install wardseal . \
   --values values.yaml \
   --values values-staging.yaml
 
+# Install for staging with cert-manager
+helm install wardseal . \
+  --namespace wardseal \
+  --values values.yaml \
+  --values values-staging.yaml \
+  --values values-staging-certmanager.yaml
+
 # Install for production
 helm install wardseal . \
   --namespace wardseal-prod \
   --values values.yaml \
   --values values-production.yaml
+
+# Install for production with cert-manager
+helm install wardseal . \
+  --namespace wardseal-prod \
+  --values values.yaml \
+  --values values-production.yaml \
+  --values values-production-certmanager.yaml
 ```
+
+### Step 3.1: Add Redis + distributed limiter overrides
+
+Add the following to your environment values file (example: `values-staging.yaml`):
+
+```yaml
+authsvc:
+  env:
+    REDIS_ADDR: redis.staging.svc.cluster.local:6379
+    REDIS_DB: "0"
+    WEBAUTHN_SESSION_TTL_SECONDS: "600"
+    RATE_LIMIT_USE_TENANT: "true"
+    RATE_LIMIT_KEY_PREFIX: wardseal:ratelimit:staging
+    RATE_LIMIT_DEFAULT_REQUESTS: "1600"
+    RATE_LIMIT_DEFAULT_WINDOW_SECONDS: "60"
+    RATE_LIMIT_LOGIN_REQUESTS: "80"
+    RATE_LIMIT_LOGIN_WINDOW_SECONDS: "60"
+    RATE_LIMIT_TOKEN_REQUESTS: "360"
+    RATE_LIMIT_TOKEN_WINDOW_SECONDS: "60"
+    RATE_LIMIT_SETUP_REQUESTS: "45"
+    RATE_LIMIT_SETUP_WINDOW_SECONDS: "60"
+    RATE_LIMIT_WEBHOOK_REQUESTS: "800"
+    RATE_LIMIT_WEBHOOK_WINDOW_SECONDS: "60"
+    RATE_LIMIT_DEGRADED_REQUESTS: "40"
+    RATE_LIMIT_DEGRADED_WINDOW_SECONDS: "60"
+
+dirsvc:
+  env:
+    REDIS_ADDR: redis.staging.svc.cluster.local:6379
+    REDIS_DB: "0"
+    RATE_LIMIT_USE_TENANT: "true"
+    RATE_LIMIT_KEY_PREFIX: wardseal:ratelimit:staging
+
+govsvc:
+  env:
+    REDIS_ADDR: redis.staging.svc.cluster.local:6379
+    REDIS_DB: "0"
+    RATE_LIMIT_USE_TENANT: "true"
+    RATE_LIMIT_KEY_PREFIX: wardseal:ratelimit:staging
+```
+
+> Keep service-specific key prefixes in production if you want strict isolation by service, e.g. `wardseal:ratelimit:prod:authsvc`, `...:dirsvc`, `...:govsvc`.
 
 ### Step 4: Verify Deployment
 
@@ -353,13 +439,17 @@ database:
 
 ingress:
   enabled: true
-  annotations:
-    cert-manager.io/cluster-issuer: letsencrypt-prod
   tls:
     - secretName: wardseal-tls
       hosts:
         - auth.wardseal.com
         - api.wardseal.com
+
+# Add this only if cert-manager is installed
+# values-production-certmanager.yaml
+ingress:
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
 ```
 
 ---
@@ -392,7 +482,7 @@ kubectl exec -it <pod-name> -n wardseal -- nc -zv postgres 5432
 
 ```bash
 # Check ingress controller
-kubectl get pods -n ingress-nginx
+kubectl get pods -n traefik
 
 # Check ingress resource
 kubectl describe ingress wardseal -n wardseal

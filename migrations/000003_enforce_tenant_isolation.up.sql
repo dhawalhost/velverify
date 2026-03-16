@@ -1,7 +1,7 @@
 -- 000003_enforce_tenant_isolation.up.sql
 -- Strengthen multi-tenant isolation by ensuring supporting tables carry tenant identifiers.
 
-ALTER TABLE accounts ADD COLUMN tenant_id UUID;
+ALTER TABLE accounts ADD COLUMN tenant_id VARCHAR(255);
 
 UPDATE accounts
 SET tenant_id = identities.tenant_id
@@ -15,7 +15,7 @@ ALTER TABLE accounts ADD CONSTRAINT accounts_tenant_login_key UNIQUE (tenant_id,
 
 CREATE INDEX IF NOT EXISTS idx_accounts_tenant_id ON accounts(tenant_id);
 
-ALTER TABLE identity_groups ADD COLUMN tenant_id UUID;
+ALTER TABLE identity_groups ADD COLUMN tenant_id VARCHAR(255);
 
 UPDATE identity_groups
 SET tenant_id = groups.tenant_id

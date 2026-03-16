@@ -10,6 +10,7 @@ import {
     FileText,
     Code2,
     Settings,
+    Activity,
     Fingerprint,
     Palette,
     Webhook,
@@ -32,6 +33,9 @@ import { ModeToggle } from '@/components/mode-toggle';
 const Layout: React.FC = () => {
     const location = useLocation();
     const navigate = useNavigate();
+    const policyBaseUrl = window.location.hostname.endsWith('.local')
+        ? 'http://wardseal.local'
+        : 'https://wardseal.com';
 
     const menuItems = [
         { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -48,7 +52,8 @@ const Layout: React.FC = () => {
         { path: '/webhooks', label: 'Webhooks', icon: Webhook },
         { path: '/branding', label: 'Branding', icon: Palette },
         { path: '/audit', label: 'Audit Logs', icon: FileText },
-        { path: '/developer', label: 'Developer Portal', icon: Settings },
+        { path: '/developer', label: 'API Reference', icon: Settings },
+        { path: '/developer/analytics', label: 'API Analytics', icon: Activity },
     ];
 
     const activeItem = menuItems.find(i => location.pathname.startsWith(i.path));
@@ -176,6 +181,16 @@ const Layout: React.FC = () => {
                 <div className="flex-1 p-8 max-w-[1600px] mx-auto w-full animate-in fade-in duration-500">
                     <Outlet />
                 </div>
+                <footer className="border-t py-4 px-8 text-xs text-muted-foreground">
+                    <div className="max-w-[1600px] mx-auto w-full flex flex-wrap items-center justify-between gap-2">
+                        <span>Powered by WardSeal Identity</span>
+                        <span className="flex items-center gap-3">
+                            <a href={`${policyBaseUrl}/policies#privacy`} target="_blank" rel="noreferrer" className="hover:text-foreground">Privacy</a>
+                            <a href={`${policyBaseUrl}/policies#privacy`} target="_blank" rel="noreferrer" className="hover:text-foreground">Terms</a>
+                            <a href={`${policyBaseUrl}/policies`} target="_blank" rel="noreferrer" className="hover:text-foreground">Policies</a>
+                        </span>
+                    </div>
+                </footer>
             </main>
         </div>
     );

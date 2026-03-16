@@ -254,6 +254,222 @@ curl http://localhost:8080/metrics
 
 ---
 
+## Traefik Preflight Check
+
+Run this before first Helm deployment to verify cluster connectivity, Traefik ingress class, cert issuer, and rendered ingress paths:
+
+```bash
+NAMESPACE=wardseal \
+RELEASE_NAME=wardseal \
+ENV_VALUES=deploy/charts/wardseal/values-staging.yaml \
+./scripts/preflight_traefik.sh
+```
+
+Optionally include `CERT_ISSUER=<your-clusterissuer-name>` if cert-manager is installed and you want issuer validation.
+
+For cert-manager-enabled staging:
+
+```bash
+NAMESPACE=wardseal \
+RELEASE_NAME=wardseal \
+ENV_VALUES=deploy/charts/wardseal/values-staging.yaml \
+CERT_ISSUER=letsencrypt-staging \
+./scripts/preflight_traefik.sh
+```
+
+Helm values split for TLS mode:
+
+- Without cert-manager: use `values-staging.yaml` (staging) or `values-production.yaml` (production)
+- With cert-manager: add `values-staging-certmanager.yaml` (staging) or `values-production-certmanager.yaml` (production)
+
+---
+
+## Distributed Rate-Limit Tuning Runbook
+
+The platform uses Redis-backed distributed rate limiting with endpoint-aware buckets (`login`, `token`, `setup`, `webhook`) and a strict degraded fallback when Redis is unavailable.
+
+### 1) Set baseline profile (production)
+
+```bash
+export RATE_LIMIT_USE_TENANT=true
+export RATE_LIMIT_KEY_PREFIX=wardseal:ratelimit
+export RATE_LIMIT_LOGIN_REQUESTS=60
+export RATE_LIMIT_TOKEN_REQUESTS=240
+export RATE_LIMIT_SETUP_REQUESTS=30
+export RATE_LIMIT_WEBHOOK_REQUESTS=600
+export RATE_LIMIT_DEFAULT_REQUESTS=1200
+export RATE_LIMIT_DEGRADED_REQUESTS=30
+```
+
+### 1.1) Copy-paste profiles by environment
+
+Use these blocks as starting points and adjust after load/abuse testing.
+
+#### Development (high throughput, low friction)
+
+```bash
+export REDIS_ADDR=localhost:6379
+export REDIS_DB=0
+export WEBAUTHN_SESSION_TTL_SECONDS=600
+
+export RATE_LIMIT_USE_TENANT=true
+export RATE_LIMIT_KEY_PREFIX=wardseal:ratelimit:dev
+export RATE_LIMIT_DEFAULT_REQUESTS=2400
+export RATE_LIMIT_DEFAULT_WINDOW_SECONDS=60
+export RATE_LIMIT_LOGIN_REQUESTS=120
+export RATE_LIMIT_LOGIN_WINDOW_SECONDS=60
+export RATE_LIMIT_TOKEN_REQUESTS=600
+export RATE_LIMIT_TOKEN_WINDOW_SECONDS=60
+export RATE_LIMIT_SETUP_REQUESTS=60
+export RATE_LIMIT_SETUP_WINDOW_SECONDS=60
+export RATE_LIMIT_WEBHOOK_REQUESTS=1200
+export RATE_LIMIT_WEBHOOK_WINDOW_SECONDS=60
+export RATE_LIMIT_DEGRADED_REQUESTS=60
+export RATE_LIMIT_DEGRADED_WINDOW_SECONDS=60
+```
+
+#### Staging (pre-prod safety checks)
+
+```bash
+export REDIS_ADDR=redis.staging.svc.cluster.local:6379
+export REDIS_DB=0
+export WEBAUTHN_SESSION_TTL_SECONDS=600
+
+export RATE_LIMIT_USE_TENANT=true
+export RATE_LIMIT_KEY_PREFIX=wardseal:ratelimit:staging
+export RATE_LIMIT_DEFAULT_REQUESTS=1600
+export RATE_LIMIT_DEFAULT_WINDOW_SECONDS=60
+export RATE_LIMIT_LOGIN_REQUESTS=80
+export RATE_LIMIT_LOGIN_WINDOW_SECONDS=60
+export RATE_LIMIT_TOKEN_REQUESTS=360
+export RATE_LIMIT_TOKEN_WINDOW_SECONDS=60
+export RATE_LIMIT_SETUP_REQUESTS=45
+export RATE_LIMIT_SETUP_WINDOW_SECONDS=60
+export RATE_LIMIT_WEBHOOK_REQUESTS=800
+export RATE_LIMIT_WEBHOOK_WINDOW_SECONDS=60
+export RATE_LIMIT_DEGRADED_REQUESTS=40
+export RATE_LIMIT_DEGRADED_WINDOW_SECONDS=60
+```
+
+#### Production (conservative initial rollout)
+
+```bash
+export REDIS_ADDR=redis.prod.svc.cluster.local:6379
+export REDIS_DB=0
+export WEBAUTHN_SESSION_TTL_SECONDS=600
+
+export RATE_LIMIT_USE_TENANT=true
+export RATE_LIMIT_KEY_PREFIX=wardseal:ratelimit:prod
+export RATE_LIMIT_DEFAULT_REQUESTS=1200
+export RATE_LIMIT_DEFAULT_WINDOW_SECONDS=60
+export RATE_LIMIT_LOGIN_REQUESTS=60
+export RATE_LIMIT_LOGIN_WINDOW_SECONDS=60
+export RATE_LIMIT_TOKEN_REQUESTS=240
+export RATE_LIMIT_TOKEN_WINDOW_SECONDS=60
+export RATE_LIMIT_SETUP_REQUESTS=30
+export RATE_LIMIT_SETUP_WINDOW_SECONDS=60
+export RATE_LIMIT_WEBHOOK_REQUESTS=600
+export RATE_LIMIT_WEBHOOK_WINDOW_SECONDS=60
+export RATE_LIMIT_DEGRADED_REQUESTS=30
+export RATE_LIMIT_DEGRADED_WINDOW_SECONDS=60
+```
+
+### 1.2) Helm values override examples (Kubernetes)
+
+Use environment-specific values files (for example `values-staging.yaml` and `values-production.yaml`) with the same profile values.
+
+```yaml
+# values-staging.yaml (example)
+authsvc:
+  env:
+    REDIS_ADDR: redis.staging.svc.cluster.local:6379
+    REDIS_DB: "0"
+    WEBAUTHN_SESSION_TTL_SECONDS: "600"
+    RATE_LIMIT_USE_TENANT: "true"
+    RATE_LIMIT_KEY_PREFIX: wardseal:ratelimit:staging
+    RATE_LIMIT_DEFAULT_REQUESTS: "1600"
+    RATE_LIMIT_DEFAULT_WINDOW_SECONDS: "60"
+    RATE_LIMIT_LOGIN_REQUESTS: "80"
+    RATE_LIMIT_LOGIN_WINDOW_SECONDS: "60"
+    RATE_LIMIT_TOKEN_REQUESTS: "360"
+    RATE_LIMIT_TOKEN_WINDOW_SECONDS: "60"
+    RATE_LIMIT_SETUP_REQUESTS: "45"
+    RATE_LIMIT_SETUP_WINDOW_SECONDS: "60"
+    RATE_LIMIT_WEBHOOK_REQUESTS: "800"
+    RATE_LIMIT_WEBHOOK_WINDOW_SECONDS: "60"
+    RATE_LIMIT_DEGRADED_REQUESTS: "40"
+    RATE_LIMIT_DEGRADED_WINDOW_SECONDS: "60"
+
+dirsvc:
+  env:
+    REDIS_ADDR: redis.staging.svc.cluster.local:6379
+    REDIS_DB: "0"
+    RATE_LIMIT_USE_TENANT: "true"
+    RATE_LIMIT_KEY_PREFIX: wardseal:ratelimit:staging
+    RATE_LIMIT_DEFAULT_REQUESTS: "1600"
+    RATE_LIMIT_DEFAULT_WINDOW_SECONDS: "60"
+    RATE_LIMIT_LOGIN_REQUESTS: "80"
+    RATE_LIMIT_LOGIN_WINDOW_SECONDS: "60"
+    RATE_LIMIT_TOKEN_REQUESTS: "360"
+    RATE_LIMIT_TOKEN_WINDOW_SECONDS: "60"
+    RATE_LIMIT_SETUP_REQUESTS: "45"
+    RATE_LIMIT_SETUP_WINDOW_SECONDS: "60"
+    RATE_LIMIT_WEBHOOK_REQUESTS: "800"
+    RATE_LIMIT_WEBHOOK_WINDOW_SECONDS: "60"
+    RATE_LIMIT_DEGRADED_REQUESTS: "40"
+    RATE_LIMIT_DEGRADED_WINDOW_SECONDS: "60"
+
+govsvc:
+  env:
+    REDIS_ADDR: redis.staging.svc.cluster.local:6379
+    REDIS_DB: "0"
+    RATE_LIMIT_USE_TENANT: "true"
+    RATE_LIMIT_KEY_PREFIX: wardseal:ratelimit:staging
+    RATE_LIMIT_DEFAULT_REQUESTS: "1600"
+    RATE_LIMIT_DEFAULT_WINDOW_SECONDS: "60"
+    RATE_LIMIT_LOGIN_REQUESTS: "80"
+    RATE_LIMIT_LOGIN_WINDOW_SECONDS: "60"
+    RATE_LIMIT_TOKEN_REQUESTS: "360"
+    RATE_LIMIT_TOKEN_WINDOW_SECONDS: "60"
+    RATE_LIMIT_SETUP_REQUESTS: "45"
+    RATE_LIMIT_SETUP_WINDOW_SECONDS: "60"
+    RATE_LIMIT_WEBHOOK_REQUESTS: "800"
+    RATE_LIMIT_WEBHOOK_WINDOW_SECONDS: "60"
+    RATE_LIMIT_DEGRADED_REQUESTS: "40"
+    RATE_LIMIT_DEGRADED_WINDOW_SECONDS: "60"
+```
+
+Install/upgrade with your override file:
+
+```bash
+helm upgrade --install wardseal ./deploy/charts/wardseal \
+  --namespace wardseal \
+  --values deploy/charts/wardseal/values.yaml \
+  --values deploy/charts/wardseal/values-staging.yaml
+```
+
+### 2) Canary rollout process
+
+1. Roll out to one service/pod set first.
+2. Observe `429` rate, latency, and auth failure rates for at least 30-60 minutes.
+3. Increase budgets in small increments (10-20%) if legitimate traffic is impacted.
+4. Keep degraded profile strict so Redis outages fail closed rather than fail open.
+
+### 3) Operational guardrails
+
+- Keep key prefixes service-scoped (example: `wardseal:ratelimit:authsvc`).
+- Keep tenant-aware mode enabled for multi-tenant fairness.
+- Adjust webhook limits separately from login/token limits.
+- Validate changes during peak windows before promoting to all clusters.
+
+### 4) Quick diagnosis checklist
+
+- Sudden `429` spikes on `/login` with normal Redis health: increase `RATE_LIMIT_LOGIN_REQUESTS` gradually.
+- `429` spikes across all endpoints with Redis errors: service is in degraded mode; restore Redis first.
+- One tenant impacted disproportionately: review tenant traffic and consider tenant-specific policy overlay.
+
+---
+
 ## Backup Strategy
 
 ### Database Backup

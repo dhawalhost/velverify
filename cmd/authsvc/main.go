@@ -16,9 +16,9 @@ import (
 	"github.com/dhawalhost/wardseal/pkg/middleware"
 	"github.com/dhawalhost/wardseal/pkg/observability"
 	"github.com/gin-gonic/gin"
+	"github.com/go-redis/redis/v8"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 	"go.uber.org/zap"
-	"golang.org/x/time/rate"
 )
 
 func main() {
@@ -86,6 +86,7 @@ func main() {
 	webauthnStore := auth.NewWebAuthnRepository(db)
 	brandingStore := auth.NewBrandingStore(db)
 	ssoProviderStore := auth.NewSQLSSOProviderStore(db)
+	tenantStore := auth.NewTenantStore(db)
 
 	authServiceURL := cfg.Auth.BaseURL
 
@@ -94,6 +95,7 @@ func main() {
 	refreshStore := auth.NewSQLRefreshTokenStore(db)
 	revocationStore := auth.NewSQLRevocationStore(db)
 	totpStore := auth.NewTOTPStore(db)
+	appStore := auth.NewDeveloperAppStore(db)
 
 	// Initialize Key Management Service
 	kmsConfig := kms.Config{
@@ -134,6 +136,10 @@ func main() {
 		RevocationStore:  revocationStore,
 		TOTPStore:        totpStore,
 		SSOProviderStore: ssoProviderStore,
+		TenantStore:      tenantStore,
+		AppStore:         appStore,
+		UIURL:            cfg.Auth.UIURL,
+		DeploymentMode:   cfg.Auth.DeploymentMode,
 	})
 	if err != nil {
 		log.Error("Failed to create auth service", zap.Error(err))
@@ -151,7 +157,7 @@ func main() {
 				if strings.TrimSpace(allowed) == origin {
 					c.Header("Access-Control-Allow-Origin", origin)
 					c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-					c.Header("Access-Control-Allow-Headers", "Origin, Content-Type, Authorization, X-Tenant-ID, X-Device-ID, X-OS-Version")
+					c.Header("Access-Control-Allow-Headers", "Origin, Content-Type, Authorization, X-Tenant-ID, X-User-ID, X-Device-ID, X-OS-Version")
 					c.Header("Access-Control-Allow-Credentials", "true")
 					break
 				}
@@ -183,13 +189,90 @@ func main() {
 
 	// Security Middleware
 	router.Use(middleware.SecurityHeadersMiddleware())
-	// Rate limit: 20 requests/second, burst of 40
-	router.Use(middleware.RateLimitMiddleware(rate.Limit(20), 40))
+
+	var rateLimitRedisClient *redis.Client
+	if cfg.Auth.RedisAddr != "" {
+		rateLimitRedisClient = redis.NewClient(&redis.Options{
+			Addr:     cfg.Auth.RedisAddr,
+			Password: cfg.Auth.RedisPassword,
+			DB:       cfg.Auth.RedisDB,
+		})
+		if err := rateLimitRedisClient.Ping(context.Background()).Err(); err != nil {
+			log.Warn("Distributed limiter Redis unavailable; will use strict degraded fallback",
+				zap.Error(err),
+				zap.String("redis_addr", cfg.Auth.RedisAddr))
+			rateLimitRedisClient = nil
+		}
+	}
+
+	router.Use(middleware.DistributedRateLimitMiddleware(middleware.DistributedRateLimitConfig{
+		RedisClient: rateLimitRedisClient,
+		KeyPrefix:   cfg.Auth.RateLimitKeyPrefix,
+		UseTenant:   cfg.Auth.RateLimitUseTenant,
+		DefaultProfile: middleware.RateLimitWindowProfile{
+			Requests: cfg.Auth.RateLimitDefault.Requests,
+			Window:   cfg.Auth.RateLimitDefault.Window,
+		},
+		EndpointProfiles: map[string]middleware.RateLimitWindowProfile{
+			"login": {
+				Requests: cfg.Auth.RateLimitLogin.Requests,
+				Window:   cfg.Auth.RateLimitLogin.Window,
+			},
+			"token": {
+				Requests: cfg.Auth.RateLimitToken.Requests,
+				Window:   cfg.Auth.RateLimitToken.Window,
+			},
+			"setup": {
+				Requests: cfg.Auth.RateLimitSetup.Requests,
+				Window:   cfg.Auth.RateLimitSetup.Window,
+			},
+			"webhook": {
+				Requests: cfg.Auth.RateLimitWebhook.Requests,
+				Window:   cfg.Auth.RateLimitWebhook.Window,
+			},
+		},
+		DegradedProfile: middleware.RateLimitWindowProfile{
+			Requests: cfg.Auth.RateLimitDegraded.Requests,
+			Window:   cfg.Auth.RateLimitDegraded.Window,
+		},
+	}))
+
+	// API Logger Middleware
+	router.Use(middleware.APILogger(db, log))
 
 	// Initialize login attempt store for brute-force protection
 	loginAttemptStore := auth.NewLoginAttemptStore(db)
 
-	authHandlers := auth.NewHTTPHandler(svc, log, loginAttemptStore)
+	authHandlers := auth.NewHTTPHandler(svc, log, loginAttemptStore, appStore)
+	if cfg.Auth.RedisAddr != "" {
+		webAuthnSessionStore, err := auth.NewRedisWebAuthnSessionStore(auth.RedisWebAuthnSessionStoreConfig{
+			Addr:      cfg.Auth.RedisAddr,
+			Password:  cfg.Auth.RedisPassword,
+			DB:        cfg.Auth.RedisDB,
+			TTL:       cfg.Auth.WebAuthnSessionTTL,
+			KeyPrefix: "authsvc:webauthn:session:",
+		})
+		if err != nil {
+			if cfg.Environment == config.Production {
+				log.Fatal("Failed to initialize Redis WebAuthn session store in production",
+					zap.Error(err),
+					zap.String("redis_addr", cfg.Auth.RedisAddr))
+			}
+			log.Warn("Failed to initialize Redis WebAuthn session store; using in-memory fallback",
+				zap.Error(err),
+				zap.String("redis_addr", cfg.Auth.RedisAddr))
+		} else {
+			authHandlers.SetWebAuthnSessionStore(webAuthnSessionStore)
+			log.Info("Using Redis-backed WebAuthn session store",
+				zap.String("redis_addr", cfg.Auth.RedisAddr),
+				zap.Duration("session_ttl", cfg.Auth.WebAuthnSessionTTL))
+		}
+	} else {
+		if cfg.Environment == config.Production {
+			log.Fatal("REDIS_ADDR is required in production for WebAuthn session storage")
+		}
+		log.Warn("REDIS_ADDR not set; using in-memory WebAuthn session store (not suitable for multi-replica authsvc)")
+	}
 	authHandlers.RegisterRoutes(router)
 	authHandlers.RegisterBrandingRoutes(router.Group("/"))
 

@@ -15,7 +15,30 @@ import { useAuth } from '../hooks/useAuth';
 const PortalLayout = () => {
     const location = useLocation();
     const navigate = useNavigate();
-    const { logout } = useAuth(); // Assuming useAuth exposes basic user info/logout
+    const { logout } = useAuth();
+    const policyBaseUrl = window.location.hostname.endsWith('.local')
+        ? 'http://wardseal.local'
+        : 'https://wardseal.com';
+
+    const getTokenRoles = () => {
+        const token = localStorage.getItem('token');
+        if (!token) return [] as string[];
+
+        try {
+            const [, payload] = token.split('.');
+            if (!payload) return [] as string[];
+
+            const normalized = payload.replace(/-/g, '+').replace(/_/g, '/');
+            const padded = normalized + '='.repeat((4 - (normalized.length % 4)) % 4);
+            const parsed = JSON.parse(atob(padded));
+
+            return Array.isArray(parsed?.roles) ? parsed.roles : [];
+        } catch {
+            return [] as string[];
+        }
+    };
+
+    const canAccessAdmin = getTokenRoles().includes('admin');
 
     const handleSignOut = () => {
         logout();
@@ -39,11 +62,12 @@ const PortalLayout = () => {
 
                     {/* Right Actions */}
                     <div className="flex items-center gap-4">
-                        {/* Admin Switcher (If authorized - TODO: Check Role) */}
-                        <Button variant="ghost" size="sm" className="hidden md:flex gap-2" onClick={() => navigate('/dashboard')}>
-                            <ShieldCheck className="w-4 h-4" />
-                            <span className="text-xs">Admin Console</span>
-                        </Button>
+                        {canAccessAdmin && (
+                            <Button variant="ghost" size="sm" className="hidden md:flex gap-2" onClick={() => navigate('/dashboard')}>
+                                <ShieldCheck className="w-4 h-4" />
+                                <span className="text-xs">Admin Console</span>
+                            </Button>
+                        )}
 
                         <ModeToggle />
 
@@ -62,9 +86,11 @@ const PortalLayout = () => {
                                 <DropdownMenuItem onClick={() => navigate('/portal/profile')}>
                                     Profile Settings
                                 </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => navigate('/dashboard')}>
-                                    Switch to Admin
-                                </DropdownMenuItem>
+                                {canAccessAdmin && (
+                                    <DropdownMenuItem onClick={() => navigate('/dashboard')}>
+                                        Switch to Admin
+                                    </DropdownMenuItem>
+                                )}
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={handleSignOut}>
                                     <LogOut className="mr-2 h-4 w-4" />
@@ -83,6 +109,11 @@ const PortalLayout = () => {
 
             <footer className="py-6 border-t border-border/40 text-center text-sm text-muted-foreground">
                 <p>Powered by WardSeal Identity</p>
+                <p className="mt-2 flex items-center justify-center gap-3 text-xs">
+                    <a href={`${policyBaseUrl}/policies#privacy`} target="_blank" rel="noreferrer" className="hover:text-foreground">Privacy</a>
+                    <a href={`${policyBaseUrl}/policies#privacy`} target="_blank" rel="noreferrer" className="hover:text-foreground">Terms</a>
+                    <a href={`${policyBaseUrl}/policies`} target="_blank" rel="noreferrer" className="hover:text-foreground">Policies</a>
+                </p>
             </footer>
         </div>
     );

@@ -17,7 +17,7 @@ spec:
     - from:
         - namespaceSelector:
             matchLabels:
-              name: ingress-nginx
+              name: traefik
       ports:
         - protocol: TCP
           port: 8080

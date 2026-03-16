@@ -24,7 +24,7 @@ func TestAuthorizationCodePkceFlow(t *testing.T) {
 
 	ctx := contextWithTenant(t, "11111111-1111-1111-1111-111111111111")
 
-	authResp, err := as.Authorize(ctx, AuthorizeRequest{
+	authResp, err := as.Authorize(ctx, "", AuthorizeRequest{
 		ResponseType:        "code",
 		ClientID:            "test-client",
 		RedirectURI:         "https://app.wardseal.com/callback",
@@ -61,7 +61,7 @@ func TestTokenFailsWithInvalidVerifier(t *testing.T) {
 	challenge := pkceChallenge(verifier)
 	ctx := contextWithTenant(t, "11111111-1111-1111-1111-111111111111")
 
-	authResp, err := as.Authorize(ctx, AuthorizeRequest{
+	authResp, err := as.Authorize(ctx, "", AuthorizeRequest{
 		ResponseType:        "code",
 		ClientID:            "test-client",
 		RedirectURI:         "https://app.wardseal.com/callback",
@@ -89,7 +89,7 @@ func TestTokenFailsWithInvalidVerifier(t *testing.T) {
 func TestAuthorizeRejectsUnknownClient(t *testing.T) {
 	as := newTestService(t)
 	ctx := contextWithTenant(t, "11111111-1111-1111-1111-111111111111")
-	_, err := as.Authorize(ctx, AuthorizeRequest{
+	_, err := as.Authorize(ctx, "", AuthorizeRequest{
 		ResponseType:        "code",
 		ClientID:            "unknown",
 		RedirectURI:         "https://app.wardseal.com/callback",
@@ -105,7 +105,7 @@ func TestAuthorizeRejectsUnknownClient(t *testing.T) {
 func TestAuthorizeRejectsInvalidRedirect(t *testing.T) {
 	as := newTestService(t)
 	ctx := contextWithTenant(t, "11111111-1111-1111-1111-111111111111")
-	_, err := as.Authorize(ctx, AuthorizeRequest{
+	_, err := as.Authorize(ctx, "", AuthorizeRequest{
 		ResponseType:        "code",
 		ClientID:            "test-client",
 		RedirectURI:         "https://evil.wardseal.com/callback",
@@ -121,7 +121,7 @@ func TestAuthorizeRejectsInvalidRedirect(t *testing.T) {
 func TestAuthorizeRejectsInvalidScope(t *testing.T) {
 	as := newTestService(t)
 	ctx := contextWithTenant(t, "11111111-1111-1111-1111-111111111111")
-	_, err := as.Authorize(ctx, AuthorizeRequest{
+	_, err := as.Authorize(ctx, "", AuthorizeRequest{
 		ResponseType:        "code",
 		ClientID:            "test-client",
 		RedirectURI:         "https://app.wardseal.com/callback",

@@ -1,5 +1,18 @@
 
 services:
+  traefik:
+    image: traefik:v3.1
+    command:
+      - --api.insecure=true
+      - --providers.file.filename=/etc/traefik/dynamic.yml
+      - --providers.file.watch=true
+      - --entrypoints.web.address=:80
+    ports:
+      - "80:80"
+      - "8088:8080"
+    volumes:
+      - ./deploy/local/traefik/dynamic.yml:/etc/traefik/dynamic.yml:ro
+
   postgres:
     image: postgres:14-alpine
     container_name: identity_platform_postgres
@@ -28,6 +41,23 @@ services:
       timeout: 5s
       retries: 5
 
+  migrate:
+    image: postgres:14-alpine
+    container_name: identity_platform_migrate
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./migrations:/migrations:ro
+    environment:
+      - PGPASSWORD=password
+    command: >
+      sh -c '
+      for f in /migrations/*.up.sql; do
+        psql -h postgres -U user -d identity_platform -f "$$f";
+      done
+      '
+
   authsvc:
     build:
       context: .
@@ -37,7 +67,11 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
       dirsvc:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     environment:
       - DB_HOST=postgres
@@ -46,12 +80,28 @@ services:
       - DB_NAME=identity_platform
       - DB_SSLMODE=disable
       - DIRECTORY_SERVICE_URL=http://dirsvc:8081
-      - CORS_ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
+      - CORS_ALLOWED_ORIGINS=http://console.wardseal.local,http://wardseal.local,http://help.wardseal.local
+      - AUTH_SERVICE_URL=http://auth.wardseal.local
+      - KMS_PROVIDER=local
+      - JWT_PRIVATE_KEY_PATH=/etc/wardseal/keys/private_key.pem
+      - JWT_PUBLIC_KEY_PATH=/etc/wardseal/keys/public_key.pem
+      - DEPLOYMENT_MODE=saas
+      - UI_URL=http://console.wardseal.local
+      - REDIS_ADDR=redis:6379
+      - REDIS_DB=0
+      - WEBAUTHN_SESSION_TTL_SECONDS=600
+    volumes:
+      - ./deploy/dev-keys:/etc/wardseal/keys:ro
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/health"]
       interval: 10s
       timeout: 5s
       retries: 5
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.authsvc.rule=Host(`auth.wardseal.local`)
+      - traefik.http.routers.authsvc.entrypoints=web
+      - traefik.http.services.authsvc.loadbalancer.server.port=8080
 
   dirsvc:
     build:
@@ -62,18 +112,25 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     environment:
       - DB_HOST=postgres
       - DB_USER=user
       - DB_PASSWORD=password
       - DB_NAME=identity_platform
       - DB_SSLMODE=disable
-      - CORS_ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
+      - CORS_ALLOWED_ORIGINS=http://console.wardseal.local,http://wardseal.local,http://help.wardseal.local
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8081/health"]
       interval: 10s
       timeout: 5s
       retries: 5
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.dirsvc.rule=Host(`api.wardseal.local`) && (PathPrefix(`/scim`) || PathPrefix(`/api/v1/users`) || PathPrefix(`/api/v1/groups`) || PathPrefix(`/api/v1/scim`))
+      - traefik.http.routers.dirsvc.entrypoints=web
+      - traefik.http.services.dirsvc.loadbalancer.server.port=8081
 
   govsvc:
     build:
@@ -84,6 +141,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
       dirsvc:
         condition: service_healthy
     environment:
@@ -93,26 +152,17 @@ services:
       - DB_NAME=identity_platform
       - DB_SSLMODE=disable
       - DIRECTORY_SERVICE_URL=http://dirsvc:8081
-      - CORS_ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
+      - CORS_ALLOWED_ORIGINS=http://console.wardseal.local,http://wardseal.local,http://help.wardseal.local
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8082/health"]
       interval: 10s
       timeout: 5s
       retries: 5
-
-  adminui:
-    build:
-      context: ./web/admin
-      dockerfile: Dockerfile
-      args:
-        VITE_GOVSVC_URL: http://localhost:8082
-        VITE_AUTHSVC_URL: http://localhost:8080
-        VITE_DIRSVC_URL: http://localhost:8081
-    ports:
-      - "3000:80"
-    depends_on:
-      govsvc:
-        condition: service_healthy
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.govsvc.rule=Host(`api.wardseal.local`) && (PathPrefix(`/api/v1/oauth`) || PathPrefix(`/api/v1/governance`))
+      - traefik.http.routers.govsvc.entrypoints=web
+      - traefik.http.services.govsvc.loadbalancer.server.port=8082
 
   policysvc:
     build:
@@ -123,6 +173,13 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.policysvc.rule=Host(`api.wardseal.local`) && PathPrefix(`/api/v1/policy`)
+      - traefik.http.routers.policysvc.entrypoints=web
+      - traefik.http.services.policysvc.loadbalancer.server.port=8083
 
   provsvc:
     build:
@@ -133,6 +190,49 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.provsvc.rule=Host(`api.wardseal.local`) && PathPrefix(`/api/v1/provisioning`)
+      - traefik.http.routers.provsvc.entrypoints=web
+      - traefik.http.services.provsvc.loadbalancer.server.port=8084
+
+  adminui:
+    build:
+      context: ./web/admin
+      dockerfile: Dockerfile
+      args:
+        VITE_GOVSVC_URL: http://api.wardseal.local
+        VITE_AUTHSVC_URL: http://auth.wardseal.local
+        VITE_DIRSVC_URL: http://api.wardseal.local
+        VITE_APP_MODE: saas
+    depends_on:
+      govsvc:
+        condition: service_healthy
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.adminui.rule=Host(`console.wardseal.local`)
+      - traefik.http.routers.adminui.entrypoints=web
+      - traefik.http.services.adminui.loadbalancer.server.port=80
+
+  landingui:
+    build:
+      context: ./web/landing
+      dockerfile: Dockerfile
+      args:
+        VITE_ENVIRONMENT: local
+        VITE_SITE_BASE_URL: http://wardseal.local
+        VITE_CONSOLE_BASE_URL: http://console.wardseal.local
+        VITE_HELP_BASE_URL: http://help.wardseal.local
+        VITE_SUPPORT_EMAIL: support@wardseal.com
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.landingui-site.rule=Host(`wardseal.local`)
+      - traefik.http.routers.landingui-site.entrypoints=web
+      - traefik.http.routers.landingui-help.rule=Host(`help.wardseal.local`)
+      - traefik.http.routers.landingui-help.entrypoints=web
+      - traefik.http.services.landingui.loadbalancer.server.port=80
 
 volumes:
   postgres_data:

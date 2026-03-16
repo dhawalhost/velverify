@@ -34,7 +34,7 @@ func TestPKCEFlowWithClientStore(t *testing.T) {
 	verifier := "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNO1234567890abcd"
 	challenge := pkceChallenge(verifier)
 
-	authResp, err := svc.Authorize(ctx, AuthorizeRequest{
+	authResp, err := svc.Authorize(ctx, "", AuthorizeRequest{
 		ResponseType:        "code",
 		ClientID:            "db-client",
 		RedirectURI:         "https://app-db.wardseal.com/callback",
@@ -80,7 +80,7 @@ func TestAuthorizeRejectsCrossTenantClientFromStore(t *testing.T) {
 	svc := newServiceWithStore(t, store)
 	ctx := contextWithTenant(t, "22222222-2222-2222-2222-222222222222")
 
-	_, err := svc.Authorize(ctx, AuthorizeRequest{
+	_, err := svc.Authorize(ctx, "", AuthorizeRequest{
 		ResponseType:        "code",
 		ClientID:            "db-client",
 		RedirectURI:         "https://app-db.wardseal.com/callback",
@@ -97,7 +97,7 @@ func TestAuthorizeRejectsUnknownClientFromStore(t *testing.T) {
 	svc := newServiceWithStore(t, newStubClientStore())
 	ctx := contextWithTenant(t, "11111111-1111-1111-1111-111111111111")
 
-	_, err := svc.Authorize(ctx, AuthorizeRequest{
+	_, err := svc.Authorize(ctx, "", AuthorizeRequest{
 		ResponseType:        "code",
 		ClientID:            "no-client",
 		RedirectURI:         "https://app-db.wardseal.com/callback",

@@ -4,12 +4,8 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/go-webauthn/webauthn/webauthn"
 	"go.uber.org/zap"
 )
-
-// In-memory session store for MVP. In production, use Redis.
-var webAuthnSessions = make(map[string]webauthn.SessionData)
 
 func (h *HTTPHandler) registerWebAuthnRoutes(rg *gin.RouterGroup) {
 	rg.POST("/mfa/webauthn/register/begin", h.beginWebAuthnRegistration)
@@ -47,7 +43,7 @@ func (h *HTTPHandler) beginWebAuthnRegistration(c *gin.Context) {
 	}
 
 	// Store session
-	webAuthnSessions[userID] = *session
+	h.webAuthnSessions.Set(userID, *session)
 
 	c.JSON(http.StatusOK, options)
 }
@@ -59,7 +55,7 @@ func (h *HTTPHandler) finishWebAuthnRegistration(c *gin.Context) {
 		return
 	}
 
-	session, ok := webAuthnSessions[userID]
+	session, ok := h.webAuthnSessions.Get(userID)
 	if !ok {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "session not found"})
 		return
@@ -72,7 +68,7 @@ func (h *HTTPHandler) finishWebAuthnRegistration(c *gin.Context) {
 		return
 	}
 
-	delete(webAuthnSessions, userID)
+	h.webAuthnSessions.Delete(userID)
 	c.JSON(http.StatusOK, gin.H{"message": "Registration successful"})
 }
 
@@ -101,7 +97,7 @@ func (h *HTTPHandler) beginWebAuthnLogin(c *gin.Context) {
 		return
 	}
 
-	webAuthnSessions[req.UserID] = *session
+	h.webAuthnSessions.Set(req.UserID, *session)
 	c.JSON(http.StatusOK, options)
 }
 
@@ -116,7 +112,7 @@ func (h *HTTPHandler) finishWebAuthnLogin(c *gin.Context) {
 		return
 	}
 
-	session, ok := webAuthnSessions[userID]
+	session, ok := h.webAuthnSessions.Get(userID)
 	if !ok {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "session not found"})
 		return
@@ -129,6 +125,6 @@ func (h *HTTPHandler) finishWebAuthnLogin(c *gin.Context) {
 		return
 	}
 
-	delete(webAuthnSessions, userID)
+	h.webAuthnSessions.Delete(userID)
 	c.JSON(http.StatusOK, gin.H{"access_token": token, "token_type": "Bearer"})
 }

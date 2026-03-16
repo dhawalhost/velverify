@@ -1,6 +1,7 @@
 package directory
 
 import (
+	"context"
 	"errors"
 	"net/http"
 
@@ -39,11 +40,19 @@ func (h *HTTPHandler) RegisterRoutes(router *gin.Engine) {
 	router.GET("/health", h.healthCheck)
 
 	tenantProtected := router.Group("/")
-	tenantProtected.Use(middleware.TenantExtractor(middleware.TenantConfig{}))
+	tenantProtected.Use(middleware.TenantExtractor(middleware.TenantConfig{
+		SlugResolver: func(_ context.Context, tenant string) (string, error) {
+			return tenant, nil
+		},
+	}))
 
 	internalRoutes := router.Group("/internal")
 	internalRoutes.Use(middleware.ServiceAuthenticator(h.serviceAuth))
-	internalRoutes.Use(middleware.TenantExtractor(middleware.TenantConfig{}))
+	internalRoutes.Use(middleware.TenantExtractor(middleware.TenantConfig{
+		SlugResolver: func(_ context.Context, tenant string) (string, error) {
+			return tenant, nil
+		},
+	}))
 	internalRoutes.POST("/credentials/verify", h.verifyCredentials)
 
 	// Global internal routes (no tenant context required)
@@ -453,8 +462,9 @@ func (h *HTTPHandler) tenantID(c *gin.Context) (string, bool) {
 }
 
 type CreateTenantRequest struct {
-	ID   string `json:"id" binding:"required,uuid"`
+	ID   string `json:"id" binding:"required"`
 	Name string `json:"name" binding:"required"`
+	Slug string `json:"slug" binding:"required"`
 	Plan string `json:"plan"`
 }
 
@@ -470,11 +480,15 @@ func (h *HTTPHandler) createTenant(c *gin.Context) {
 		plan = "default" // or "free"
 	}
 
-	if err := h.svc.CreateTenant(c.Request.Context(), req.ID, req.Name, plan); err != nil {
+	if err := h.svc.CreateTenant(c.Request.Context(), req.ID, req.Name, req.Slug, plan); err != nil {
+		if errors.Is(err, ErrAlreadyExists) {
+			c.JSON(http.StatusConflict, gin.H{"error": "tenant already exists"})
+			return
+		}
 		h.logger.Error("Failed to create tenant", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create tenant"})
 		return
 	}
 
-	c.JSON(http.StatusCreated, gin.H{"message": "tenant created"})
+	c.JSON(http.StatusCreated, gin.H{"message": "tenant created successfully"})
 }

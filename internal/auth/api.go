@@ -1,10 +1,15 @@
 package auth
 
 import (
+	"context"
+	"encoding/base64"
 	"errors"
+	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/dhawalhost/wardseal/pkg/middleware"
 	"github.com/gin-gonic/gin"
@@ -24,7 +29,7 @@ const (
 // setAuthCookies sets httpOnly secure cookies for authentication tokens
 func setAuthCookies(c *gin.Context, accessToken, refreshToken string) {
 	secure := os.Getenv("ENVIRONMENT") == "production"
-	sameSite := http.SameSiteStrictMode
+	sameSite := http.SameSiteLaxMode
 
 	// Access token cookie (1 hour)
 	c.SetSameSite(sameSite)
@@ -63,34 +68,80 @@ type HTTPHandler struct {
 	logger            *zap.Logger
 	validate          *validator.Validate
 	loginAttemptStore LoginAttemptStore
+	appStore          DeveloperAppStore
+	webAuthnSessions  WebAuthnSessionStore
 }
 
 // NewHTTPHandler creates a new HTTPHandler.
-func NewHTTPHandler(svc Service, logger *zap.Logger, loginAttemptStore LoginAttemptStore) *HTTPHandler {
-	return &HTTPHandler{svc: svc, logger: logger, validate: validator.New(), loginAttemptStore: loginAttemptStore}
+func NewHTTPHandler(svc Service, logger *zap.Logger, loginAttemptStore LoginAttemptStore, appStore DeveloperAppStore) *HTTPHandler {
+	return &HTTPHandler{
+		svc:               svc,
+		logger:            logger,
+		validate:          validator.New(),
+		loginAttemptStore: loginAttemptStore,
+		appStore:          appStore,
+		webAuthnSessions:  newInMemoryWebAuthnSessionStore(),
+	}
+}
+
+// SetWebAuthnSessionStore allows overriding the default in-memory session store.
+func (h *HTTPHandler) SetWebAuthnSessionStore(store WebAuthnSessionStore) {
+	if store == nil {
+		return
+	}
+	h.webAuthnSessions = store
 }
 
 // RegisterRoutes registers the authentication routes.
 func (h *HTTPHandler) RegisterRoutes(router *gin.Engine) {
-	tenantProtected := router.Group("/")
-	tenantProtected.Use(middleware.TenantExtractor(middleware.TenantConfig{}))
+	// Health check
+	router.GET("/health", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"healthy": true})
+	})
 
-	// Public routes (but still tenant-aware)
+	// Public routes (but still tenant-aware if slug provided)
+	router.GET("/api/v1/setup/status", h.getSetupStatus)
 	router.POST("/api/v1/signup", h.signup)
+	router.POST("/api/v1/setup", h.performSetup)
+	router.POST("/api/v1/setup/password", h.completePasswordSetup)
 	router.POST("/login/lookup", h.lookupUser) // Public lookup for tenant discovery
 
-	// System Setup Routes (Public, no auth required to check status)
-	router.GET("/api/v1/setup/status", h.getSetupStatus)
-	router.POST("/api/v1/setup", h.performSetup)
+	// Path-based multi-tenancy group
+	tenantGroup := router.Group("/t/:tenant")
+	tenantGroup.Use(middleware.TenantExtractor(middleware.TenantConfig{
+		HeaderName: "X-Tenant-ID", // Still check header
+		SlugResolver: func(ctx context.Context, slug string) (string, error) {
+			return h.svc.ResolveTenantSlug(ctx, slug)
+		},
+	}))
 
-	tenantProtected.POST("/login", h.login)
-	tenantProtected.POST("/login/mfa", h.completeMFALogin)
-	tenantProtected.POST("/logout", h.logout)
-	tenantProtected.GET("/oauth2/authorize", h.authorize)
-	tenantProtected.POST("/oauth2/token", h.token)
-	tenantProtected.POST("/oauth2/introspect", h.introspect)
-	tenantProtected.POST("/oauth2/revoke", h.revoke)
+	// OIDC Discovery SHOULD NOT require a tenant ID in the request context specifically if it's based on the path,
+	// but our TenantExtractor will provide it if we hit /t/:tenant/.well-known/openid-configuration.
+	// We should also support the legacy global discovery if needed, but for now we focus on the path.
+
+	tenantGroup.GET("/.well-known/openid-configuration", h.oidcConfig)
+	tenantGroup.GET("/.well-known/jwks.json", h.jwks)
+
+	// Protected routes within the tenant group
+	tenantGroup.POST("/login", h.login)
+	tenantGroup.POST("/login/mfa", h.completeMFALogin)
+	tenantGroup.POST("/logout", h.logout)
+	tenantGroup.GET("/oauth2/authorize", h.authorize)
+	tenantGroup.POST("/oauth2/token", h.token)
+	tenantGroup.POST("/oauth2/introspect", h.introspect)
+	tenantGroup.POST("/oauth2/revoke", h.revoke)
+
+	// Global routes (legacy or fallback)
 	router.GET("/.well-known/jwks.json", h.jwks)
+
+	tenantProtected := router.Group("/")
+	tenantProtected.Use(middleware.TenantExtractor(middleware.TenantConfig{
+		HeaderName:    "X-Tenant-ID",
+		AllowFallback: false, // Disallow fallback for security in SaaS
+		SlugResolver: func(ctx context.Context, slug string) (string, error) {
+			return h.svc.ResolveTenantSlug(ctx, slug)
+		},
+	}))
 
 	// Device routes
 	deviceGroup := tenantProtected.Group("/api/v1/devices")
@@ -125,9 +176,16 @@ func (h *HTTPHandler) RegisterRoutes(router *gin.Engine) {
 
 	// User Portal API (Protected)
 	userAPI := tenantProtected.Group("/api/v1/user")
+	// Use the same signing secret as the service (signer)
+	// Use the service's ValidateToken method
+	userAPI.Use(middleware.RequireUserAuth(h.svc.ValidateToken))
 	userAPI.GET("/apps", h.getUserApps)
 	userAPI.GET("/profile", h.getUserProfile)
 	userAPI.POST("/profile", h.updateUserProfile)
+
+	setupAPI := tenantProtected.Group("/api/v1/setup")
+	setupAPI.Use(middleware.RequireUserAuth(h.svc.ValidateToken))
+	setupAPI.POST("/password-link", h.createPasswordSetupLink)
 }
 
 func (h *HTTPHandler) getSetupStatus(c *gin.Context) {
@@ -140,9 +198,36 @@ func (h *HTTPHandler) getSetupStatus(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"setup_required": required})
 }
 
+func (h *HTTPHandler) tenantSlugForID(ctx context.Context, tenantID string) string {
+	if tenantID == "" {
+		return ""
+	}
+	impl, ok := h.svc.(*authService)
+	if !ok || impl.tenantStore == nil {
+		return ""
+	}
+	slug, err := impl.tenantStore.GetSlugByID(ctx, tenantID)
+	if err != nil {
+		h.logger.Warn("Failed to resolve tenant slug", zap.String("tenant_id", tenantID), zap.Error(err))
+		return ""
+	}
+	return slug
+}
+
 // SetupRequest holds credentials for system owner setup.
 type SetupRequest struct {
 	Email    string `json:"email" binding:"required,email"`
+	Password string `json:"password" binding:"required,min=8"`
+}
+
+type PasswordSetupLinkRequest struct {
+	UserID       string `json:"user_id" binding:"required"`
+	Mode         string `json:"mode" binding:"required,oneof=invite reset"`
+	ExpiresHours int    `json:"expires_hours"`
+}
+
+type CompletePasswordSetupRequest struct {
+	Token    string `json:"token" binding:"required"`
 	Password string `json:"password" binding:"required,min=8"`
 }
 
@@ -168,9 +253,78 @@ func (h *HTTPHandler) performSetup(c *gin.Context) {
 	setAuthCookies(c, token, "")
 
 	c.JSON(http.StatusOK, gin.H{
-		"token":   token,
-		"message": "System owner created successfully",
+		"token":       token,
+		"tenant_id":   "admin-system",
+		"tenant_slug": "admin",
+		"message":     "System owner created successfully",
 	})
+}
+
+func (h *HTTPHandler) createPasswordSetupLink(c *gin.Context) {
+	tenantID, err := middleware.TenantIDFromContext(c.Request.Context())
+	if err != nil || tenantID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "tenant context required"})
+		return
+	}
+
+	var req PasswordSetupLinkRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	impl, ok := h.svc.(*authService)
+	if !ok {
+		h.logger.Error("service type assertion failed for password setup link")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal service error"})
+		return
+	}
+
+	token, expiresAt, err := impl.generatePasswordSetupToken(tenantID, req.UserID, req.Mode, req.ExpiresHours)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	baseUIURL := strings.TrimRight(h.svc.UIURL(), "/")
+	setupURL := fmt.Sprintf("%s/set-password?token=%s&mode=%s", baseUIURL, url.QueryEscape(token), url.QueryEscape(req.Mode))
+
+	c.JSON(http.StatusOK, gin.H{
+		"mode":       req.Mode,
+		"token":      token,
+		"url":        setupURL,
+		"expires_at": expiresAt.Format(time.RFC3339),
+	})
+}
+
+func (h *HTTPHandler) completePasswordSetup(c *gin.Context) {
+	var req CompletePasswordSetupRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	impl, ok := h.svc.(*authService)
+	if !ok {
+		h.logger.Error("service type assertion failed for complete password setup")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal service error"})
+		return
+	}
+
+	if err := impl.setPasswordWithSetupToken(c.Request.Context(), req.Token, req.Password); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "password set successfully"})
+}
+
+func tenantIDFromRequest(c *gin.Context) string {
+	tenantID, err := middleware.TenantIDFromGinContext(c)
+	if err == nil && tenantID != "" {
+		return tenantID
+	}
+	return c.GetHeader("X-Tenant-ID")
 }
 
 func (h *HTTPHandler) login(c *gin.Context) {
@@ -189,7 +343,7 @@ func (h *HTTPHandler) login(c *gin.Context) {
 
 	deviceID := c.Request.Header.Get("X-Device-ID")
 	ip := c.ClientIP()
-	tenantID := c.GetHeader("X-Tenant-ID")
+	tenantID := tenantIDFromRequest(c)
 
 	// Check account lockout
 	if h.loginAttemptStore != nil && tenantID != "" {
@@ -252,7 +406,19 @@ func (h *HTTPHandler) login(c *gin.Context) {
 	// Set httpOnly cookies for session security
 	setAuthCookies(c, token, "")
 
-	c.JSON(http.StatusOK, LoginResponse{Token: token})
+	// Extract roles for the response
+	claims, _ := h.svc.ValidateToken(token)
+	roles := []string{}
+	if claims != nil {
+		roles = claims.Roles
+	}
+
+	c.JSON(http.StatusOK, LoginResponse{
+		Token:      token,
+		Roles:      roles,
+		TenantID:   tenantID,
+		TenantSlug: h.tenantSlugForID(c.Request.Context(), tenantID),
+	})
 }
 
 type LookupRequest struct {
@@ -296,9 +462,9 @@ func (h *HTTPHandler) completeMFALogin(c *gin.Context) {
 		return
 	}
 
-	tenantID := c.GetHeader("X-Tenant-ID")
+	tenantID := tenantIDFromRequest(c)
 	if tenantID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "X-Tenant-ID header required"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "tenant context required"})
 		return
 	}
 
@@ -318,7 +484,19 @@ func (h *HTTPHandler) completeMFALogin(c *gin.Context) {
 	setAuthCookies(c, req.PendingToken, "")
 
 	// TOTP verified, return the pending token as the final token
-	c.JSON(http.StatusOK, LoginResponse{Token: req.PendingToken})
+	// Extract roles
+	claims, _ := h.svc.ValidateToken(req.PendingToken)
+	roles := []string{}
+	if claims != nil {
+		roles = claims.Roles
+	}
+
+	c.JSON(http.StatusOK, LoginResponse{
+		Token:      req.PendingToken,
+		Roles:      roles,
+		TenantID:   tenantID,
+		TenantSlug: h.tenantSlugForID(c.Request.Context(), tenantID),
+	})
 }
 
 func (h *HTTPHandler) logout(c *gin.Context) {
@@ -341,7 +519,77 @@ func (h *HTTPHandler) authorize(c *gin.Context) {
 		return
 	}
 
-	resp, err := h.svc.Authorize(c.Request.Context(), req)
+	// 1. Require User Session (Session Cookie)
+	cookie, err := c.Cookie(AccessTokenCookie)
+	if err != nil {
+		// Not logged in -> Redirect to Wardseal login page
+		// We pass the current authorize URL as the redirect_uri so they come back after logging in
+		loginURL := fmt.Sprintf("%s/login?redirect_uri=%s", h.svc.UIURL(), url.QueryEscape(c.Request.URL.String()))
+		c.Redirect(http.StatusFound, loginURL)
+		return
+	}
+
+	// 2. Validate the token to extract the UserID
+	var userID string
+	// Check for proper token
+	claims, err := h.svc.ValidateToken(cookie)
+	if err == nil {
+		userID = claims.Subject
+	}
+
+	if userID == "" {
+		h.logger.Warn("Unauthorized access attempt to OIDC endpoint")
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
+	// 3. Verify Application Assignment
+	tenantID, err := middleware.TenantIDFromGinContext(c)
+	if err != nil {
+		h.logger.Error("Failed to extract tenant ID", zap.Error(err))
+		c.JSON(http.StatusBadRequest, gin.H{"error": "missing tenant identifier"})
+		return
+	}
+
+	if tenantID != "" && h.appStore != nil {
+		app, err := h.appStore.GetByClientID(c.Request.Context(), req.ClientID)
+		if err != nil {
+			h.logger.Error("Failed to load application by client ID", zap.Error(err), zap.String("clientID", req.ClientID), zap.String("tenantID", tenantID), zap.String("userID", userID))
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to verify app assignment"})
+			return
+		}
+		if app != nil {
+			if app.TenantID != tenantID {
+				h.logger.Warn("Application tenant mismatch", zap.String("clientID", req.ClientID), zap.String("tenantID", tenantID), zap.String("appTenantID", app.TenantID), zap.String("userID", userID), zap.String("appID", app.ID))
+				c.JSON(http.StatusForbidden, gin.H{
+					"error":             "access_denied",
+					"error_description": "This application belongs to a different tenant. Sign in to the correct tenant or use an application client from this tenant.",
+				})
+				return
+			}
+
+			assigned, err := h.appStore.CheckAssignment(c.Request.Context(), tenantID, app.ID, userID)
+			if err != nil {
+				h.logger.Error("Failed to check app assignment", zap.Error(err), zap.String("clientID", req.ClientID), zap.String("tenantID", tenantID), zap.String("userID", userID), zap.String("appID", app.ID))
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to verify app assignment"})
+				return
+			}
+			if !assigned && app.OwnerID == userID {
+				assigned = true
+				h.logger.Info("Allowing app owner without explicit assignment", zap.String("clientID", req.ClientID), zap.String("tenantID", tenantID), zap.String("userID", userID), zap.String("appID", app.ID))
+			}
+			if !assigned {
+				h.logger.Warn("User not assigned to application", zap.String("clientID", req.ClientID), zap.String("tenantID", tenantID), zap.String("userID", userID), zap.String("appID", app.ID))
+				c.JSON(http.StatusForbidden, gin.H{
+					"error":             "access_denied",
+					"error_description": "You are not assigned to this application. Please contact your administrator.",
+				})
+				return
+			}
+		}
+	}
+
+	resp, err := h.svc.Authorize(c.Request.Context(), userID, req)
 	if err != nil {
 		h.logger.Error("Authorize failed", zap.Error(err))
 		svcErr := &Error{}
@@ -365,6 +613,8 @@ func (h *HTTPHandler) token(c *gin.Context) {
 		return
 	}
 
+	populateClientCredentialsFromBasicAuth(c, &req)
+
 	if err := h.validate.Struct(req); err != nil {
 		h.logger.Error("Token request validation failed", zap.Error(err))
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -386,10 +636,61 @@ func (h *HTTPHandler) token(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
+func populateClientCredentialsFromBasicAuth(c *gin.Context, req *TokenRequest) {
+	if req == nil || req.ClientID != "" {
+		return
+	}
+
+	authHeader := c.GetHeader("Authorization")
+	if !strings.HasPrefix(authHeader, "Basic ") {
+		return
+	}
+
+	decoded, err := base64.StdEncoding.DecodeString(strings.TrimPrefix(authHeader, "Basic "))
+	if err != nil {
+		return
+	}
+
+	parts := strings.SplitN(string(decoded), ":", 2)
+	if len(parts) != 2 {
+		return
+	}
+
+	if req.ClientID == "" {
+		req.ClientID = parts[0]
+	}
+	if req.ClientSecret == "" {
+		req.ClientSecret = parts[1]
+	}
+}
+
 func (h *HTTPHandler) jwks(c *gin.Context) {
 	// Assuming JWKS() method is available on the service
 	jwks := h.svc.JWKS()
 	c.JSON(http.StatusOK, jwks)
+}
+
+func (h *HTTPHandler) oidcConfig(c *gin.Context) {
+	config := h.svc.GetOIDCConfiguration()
+
+	// Update endpoints based on extracted tenant (if any) to reflect the multi-tenancy path
+	tenant, err := middleware.TenantIDFromGinContext(c)
+	if err == nil && tenant != "" {
+		// If we are in a /t/:tenant context, the issuer should actually be the tenant-specific one?
+		// Most OIDC providers (like Google/Microsoft) use the tenant-specific URL as the issuer.
+
+		tenantParam := c.Param("tenant")
+		if tenantParam != "" {
+			tenantPath := fmt.Sprintf("/t/%s", tenantParam)
+			config.Issuer = fmt.Sprintf("%s%s", config.Issuer, tenantPath)
+			config.AuthorizationEndpoint = strings.Replace(config.AuthorizationEndpoint, "/oauth2", tenantPath+"/oauth2", 1)
+			config.TokenEndpoint = strings.Replace(config.TokenEndpoint, "/oauth2", tenantPath+"/oauth2", 1)
+			config.JwksURI = strings.Replace(config.JwksURI, "/.well-known", tenantPath+"/.well-known", 1)
+			config.UserinfoEndpoint = strings.Replace(config.UserinfoEndpoint, "/api", tenantPath+"/api", 1)
+		}
+	}
+
+	c.JSON(http.StatusOK, config)
 }
 
 func (h *HTTPHandler) introspect(c *gin.Context) {
@@ -467,7 +768,7 @@ func (h *HTTPHandler) signup(c *gin.Context) {
 	}
 
 	// Call Service Signup
-	token, tenantID, err := h.svc.SignUp(c.Request.Context(), req.Email, req.Password, req.CompanyName, req.Plan)
+	token, tenantID, tenantSlug, err := h.svc.SignUp(c.Request.Context(), req.Email, req.Password, req.CompanyName, req.Plan)
 	if err != nil {
 		h.logger.Error("Signup failed", zap.Error(err))
 		if strings.Contains(err.Error(), "conflict") || strings.Contains(err.Error(), "exists") {
@@ -485,8 +786,9 @@ func (h *HTTPHandler) signup(c *gin.Context) {
 	setAuthCookies(c, token, "")
 
 	c.JSON(http.StatusCreated, gin.H{
-		"token":     token,
-		"tenant_id": tenantID,
-		"message":   "Signup successful",
+		"token":       token,
+		"tenant_id":   tenantID,
+		"tenant_slug": tenantSlug,
+		"message":     "Signup successful",
 	})
 }

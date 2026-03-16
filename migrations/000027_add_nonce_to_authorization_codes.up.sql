@@ -1,0 +1,2 @@
+ALTER TABLE authorization_codes
+ADD COLUMN IF NOT EXISTS nonce VARCHAR(255);

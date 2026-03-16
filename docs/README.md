@@ -20,6 +20,17 @@ WardSeal is built as a microservices architecture. Below are the detailed docume
 *   [Getting Started](../GETTING_STARTED.md)
 *   [Quickstart Guide](../QUICKSTART.md)
 *   [Developer Tasks](../TASKS.md)
+*   [Environment Variables](environment-variables.md)
+*   [Deployment Guide](deployment.md)
 
 ## API Reference
 *   See `api/` directory for Protocol Buffer definitions (if applicable).
+
+## Policies & Compliance
+*   [Policy Pack](policies/README.md)
+*   [Privacy Policy](policies/privacy-policy.md)
+*   [Terms of Service](policies/terms-of-service.md)
+*   [Data Processing Addendum (DPA)](policies/data-processing-addendum-dpa.md)
+*   [EU/EEA Addendum](policies/addenda/eu-eea-privacy-and-dpa-addendum.md)
+*   [India DPDP Addendum](policies/addenda/india-dpdp-addendum.md)
+*   [US State Privacy Addendum](policies/addenda/us-state-privacy-addendum.md)

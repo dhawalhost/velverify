@@ -118,14 +118,119 @@ govsvc:
       memory: 128Mi
 
 # =====================
+# Policy Service
+# =====================
+policysvc:
+  enabled: true
+  replicaCount: 2
+
+  image:
+    repository: ghcr.io/dhawalhost/wardseal-policysvc
+    pullPolicy: IfNotPresent
+    tag: "latest"
+
+  service:
+    type: ClusterIP
+    port: 8083
+
+  env:
+    LOG_LEVEL: info
+
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+
+# =====================
+# Provisioning Service
+# =====================
+provsvc:
+  enabled: true
+  replicaCount: 2
+
+  image:
+    repository: ghcr.io/dhawalhost/wardseal-provsvc
+    pullPolicy: IfNotPresent
+    tag: "latest"
+
+  service:
+    type: ClusterIP
+    port: 8084
+
+  env:
+    LOG_LEVEL: info
+
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+
+# =====================
+# Admin UI
+# =====================
+adminui:
+  enabled: true
+  replicaCount: 2
+
+  image:
+    repository: ghcr.io/dhawalhost/wardseal-adminui
+    pullPolicy: IfNotPresent
+    tag: "latest"
+
+  service:
+    type: ClusterIP
+    port: 80
+
+  resources:
+    limits:
+      cpu: 200m
+      memory: 128Mi
+    requests:
+      cpu: 50m
+      memory: 32Mi
+
+# =====================
+# Landing Site
+# NOT part of the core platform. Only deployed for WardSeal's own SaaS offering.
+# Enterprise / self-hosted installs should leave this disabled.
+# The landing site is designed to live in its own repo; web/landing/ is a
+# standalone project that can be extracted without any changes.
+# =====================
+landingui:
+  enabled: false   # <-- stays false for all enterprise / self-hosted deploys
+
+  image:
+    repository: ghcr.io/dhawalhost/wardseal-landingui
+    pullPolicy: IfNotPresent
+    tag: "latest"
+
+  service:
+    type: ClusterIP
+    port: 80
+
+  resources:
+    limits:
+      cpu: 50m
+      memory: 32Mi
+    requests:
+      cpu: 10m
+      memory: 16Mi
+
+# =====================
 # Ingress Configuration
 # =====================
 ingress:
   enabled: true
-  className: nginx
+  className: traefik
   annotations:
-    nginx.ingress.kubernetes.io/ssl-redirect: "true"
-    cert-manager.io/cluster-issuer: letsencrypt-prod
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.tls: "true"
   hosts:
     - host: auth.wardseal.com
       paths:
@@ -151,8 +256,23 @@ ingress:
           pathType: Prefix
           service: govsvc
           port: 8082
+        - path: /api/v1/policy
+          pathType: Prefix
+          service: policysvc
+          port: 8083
+        - path: /api/v1/provisioning
+          pathType: Prefix
+          service: provsvc
+          port: 8084
+    - host: console.wardseal.com
+      paths:
+        - path: /
+          pathType: Prefix
+          service: adminui
+          port: 80
   tls:
     - secretName: wardseal-tls
       hosts:
         - auth.wardseal.com
         - api.wardseal.com
+        - console.wardseal.com

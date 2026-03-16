@@ -1,0 +1,46 @@
+{{ .Chart.Name | title }} has been deployed successfully!
+
+RELEASE NAME: {{ .Release.Name }}
+NAMESPACE: {{ .Release.Namespace }}
+
+1. Get the application URL:
+{{- if .Values.ingress.enabled }}
+  {{- range .Values.ingress.hosts }}
+  https://{{ .host }}
+  {{- end }}
+{{- else }}
+  Run these commands to access the service:
+  
+  export POD_NAME=$(kubectl get pods -n {{ .Release.Namespace }} -l "app.kubernetes.io/name={{ include "provsvc.name" . }},app.kubernetes.io/instance={{ .Release.Name }}" -o jsonpath="{.items[0].metadata.name}")
+  
+  kubectl port-forward $POD_NAME 8081:8081 -n {{ .Release.Namespace }}
+  
+  Then visit: http://127.0.0.1:8081
+{{- end }}
+
+2. Check the deployment status:
+  kubectl get pods -n {{ .Release.Namespace }} -l "app.kubernetes.io/name={{ include "provsvc.name" . }}"
+
+3. View logs:
+  kubectl logs -f deployment/{{ include "provsvc.fullname" . }} -n {{ .Release.Namespace }}
+
+4. Database credentials:
+{{- if .Values.database }}
+  Ensure the secret '{{ .Values.database.existingSecret }}' exists in namespace {{ .Release.Namespace }}
+  kubectl get secret {{ .Values.database.existingSecret }} -n {{ .Release.Namespace }}
+{{- end }}
+
+{{- if .Values.autoscaling.enabled }}
+
+5. Autoscaling is enabled:
+  kubectl get hpa {{ include "provsvc.fullname" . }} -n {{ .Release.Namespace }}
+{{- end }}
+
+{{- if .Values.metrics.enabled }}
+
+6. Metrics are exposed at:
+  Port: {{ .Values.metrics.port }}
+  Path: {{ .Values.metrics.path }}
+{{- end }}
+
+For more information, visit: https://github.com/dhawalhost/wardseal

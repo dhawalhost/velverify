@@ -164,20 +164,19 @@ func (s *governanceService) CreateAccessRequest(ctx context.Context, tenantID st
 	if err := requireTenant(tenantID); err != nil {
 		return AccessRequest{}, err
 	}
-	// TODO: Get requester ID from context or input. For now assuming it is handled by handler or middleware.
-	// But service signature uses input struct.
-	// input struct doesn't have RequesterID.
-	// I should pass requesterID as argument or extract from context if context has user info.
-	// Middleware puts TenantID in context, but what about UserID?
-	// Auth service validates token. If token claims has 'sub', that is userID.
-	// I should probably pass requesterID as argument.
-	// For now using dummy or fix signature.
-	// I'll assume input has RequesterID added or I modify usage later.
-	// Let's modify CreateAccessRequest signature in interface to accept requesterID.
+	requesterID := strings.TrimSpace(input.RequesterID)
+	if requesterID == "" {
+		if userFromContext, ok := ctx.Value("user_id").(string); ok {
+			requesterID = strings.TrimSpace(userFromContext)
+		}
+	}
+	if requesterID == "" {
+		return AccessRequest{}, validationError("requester_id is required")
+	}
 
 	req := AccessRequest{
 		TenantID:     tenantID,
-		RequesterID:  "todo-user-id", // Placeholder
+		RequesterID:  requesterID,
 		ResourceType: input.ResourceType,
 		ResourceID:   input.ResourceID,
 		Reason:       input.Reason,
@@ -222,12 +221,14 @@ func (s *governanceService) ApproveAccessRequest(ctx context.Context, tenantID, 
 	}
 
 	// Provision the access
-	if req.ResourceType == "group" {
+	switch req.ResourceType {
+	case "group":
 		if err := s.dirClient.AddUserToGroup(ctx, tenantID, req.RequesterID, req.ResourceID); err != nil {
 			return fmt.Errorf("provisioning failed: %w", err)
 		}
+	case "app":
+		return validationError("resource_type 'app' is not supported yet")
 	}
-	// TODO: Handle 'app' resource type if needed
 
 	// Update status to approved
 	if err := s.reqStore.UpdateRequestStatus(ctx, requestID, "approved"); err != nil {

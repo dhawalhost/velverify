@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button as MovingButton } from '@/components/ui/button'; // Just use Button
 import { Loader2, ShieldCheck, Smartphone, CheckCircle, XCircle, Trash2 } from 'lucide-react';
+import { api } from '../api';
 
 const MFASetup: React.FC = () => {
     const [enrolling, setEnrolling] = useState(false);
@@ -22,17 +23,9 @@ const MFASetup: React.FC = () => {
 
     const fetchStatus = async () => {
         try {
-            const response = await fetch(`/api/v1/mfa/totp/status?user_id=${encodeURIComponent(getUserId())}`, {
-                headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`,
-                    'X-Tenant-ID': localStorage.getItem('tenantID') || '',
-                }
-            });
-            if (response.ok) {
-                const data = await response.json();
-                setEnrolled(data.enrolled);
-                setVerified(data.verified);
-            }
+            const response = await api.get(`/api/v1/mfa/totp/status?user_id=${encodeURIComponent(getUserId())}`);
+            setEnrolled(response.data.enrolled);
+            setVerified(response.data.verified);
         } catch (err) {
             console.error('Failed to fetch TOTP status', err);
         } finally {
@@ -48,25 +41,12 @@ const MFASetup: React.FC = () => {
         setEnrolling(true);
         setError('');
         try {
-            const response = await fetch('/api/v1/mfa/totp/enroll', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`,
-                    'X-Tenant-ID': localStorage.getItem('tenantID') || '',
-                },
-                body: JSON.stringify({ user_id: getUserId() }),
-            });
-            if (!response.ok) {
-                const err = await response.json();
-                throw new Error(err.error || 'Enrollment failed');
-            }
-            const data = await response.json();
-            setQrCode(data.qr_code);
-            setSecret(data.secret);
+            const response = await api.post('/api/v1/mfa/totp/enroll', { user_id: getUserId() });
+            setQrCode(response.data.qr_code);
+            setSecret(response.data.secret);
             setEnrolled(true);
         } catch (err: any) {
-            setError(err.message);
+            setError(err.response?.data?.error || err.message);
         } finally {
             setEnrolling(false);
         }
@@ -75,43 +55,23 @@ const MFASetup: React.FC = () => {
     const handleVerify = async () => {
         setError('');
         try {
-            const response = await fetch('/api/v1/mfa/totp/verify', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`,
-                    'X-Tenant-ID': localStorage.getItem('tenantID') || '',
-                },
-                body: JSON.stringify({ user_id: getUserId(), code: verifyCode }),
-            });
-            if (!response.ok) {
-                const err = await response.json();
-                throw new Error(err.error || 'Verification failed');
-            }
+            await api.post('/api/v1/mfa/totp/verify', { user_id: getUserId(), code: verifyCode });
             setVerified(true);
             setQrCode('');
             setSecret('');
         } catch (err: any) {
-            setError(err.message);
+            setError(err.response?.data?.error || err.message);
         }
     };
 
     const handleDisable = async () => {
         if (!window.confirm('Are you sure you want to disable TOTP MFA? This reduces your account security.')) return;
         try {
-            const response = await fetch(`/api/v1/mfa/totp?user_id=${encodeURIComponent(getUserId())}`, {
-                method: 'DELETE',
-                headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`,
-                    'X-Tenant-ID': localStorage.getItem('tenantID') || '',
-                },
-            });
-            if (response.ok) {
-                setEnrolled(false);
-                setVerified(false);
-                setQrCode('');
-                setSecret('');
-            }
+            await api.delete(`/api/v1/mfa/totp?user_id=${encodeURIComponent(getUserId())}`);
+            setEnrolled(false);
+            setVerified(false);
+            setQrCode('');
+            setSecret('');
         } catch (err) {
             console.error('Failed to disable TOTP', err);
         }

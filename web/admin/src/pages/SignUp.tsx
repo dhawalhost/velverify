@@ -12,6 +12,9 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 const SignUp: React.FC = () => {
     const navigate = useNavigate();
     const [searchParams] = useSearchParams(); // Need to import useSearchParams
+    const policyBaseUrl = window.location.hostname.endsWith('.local')
+        ? 'http://wardseal.local'
+        : 'https://wardseal.com';
     const [companyName, setCompanyName] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -50,6 +53,9 @@ const SignUp: React.FC = () => {
             const data = await signup(email, password, companyName, plan);
             localStorage.setItem('token', data.token);
             localStorage.setItem('tenantID', data.tenant_id);
+                if (data.tenant_slug) {
+                    localStorage.setItem('tenantSlug', data.tenant_slug);
+                }
             localStorage.setItem('userId', email);
             // SignUp success, redirect to dashboard
             navigate('/dashboard');
@@ -137,12 +143,19 @@ const SignUp: React.FC = () => {
                     </form>
                 </CardContent>
                 <CardFooter className="flex justify-center border-t p-4 mt-2">
-                    <p className="text-sm text-muted-foreground">
-                        Already have an account?{' '}
-                        <Link to="/login" className="text-primary hover:underline font-medium">
-                            Sign in
-                        </Link>
-                    </p>
+                    <div className="text-sm text-muted-foreground text-center">
+                        <p>
+                            Already have an account?{' '}
+                            <Link to="/login" className="text-primary hover:underline font-medium">
+                                Sign in
+                            </Link>
+                        </p>
+                        <p className="mt-2 text-xs flex items-center justify-center gap-3">
+                            <a href={`${policyBaseUrl}/policies#privacy`} target="_blank" rel="noreferrer" className="text-primary hover:underline">Privacy</a>
+                            <a href={`${policyBaseUrl}/policies#privacy`} target="_blank" rel="noreferrer" className="text-primary hover:underline">Terms</a>
+                            <a href={`${policyBaseUrl}/policies`} target="_blank" rel="noreferrer" className="text-primary hover:underline">Policies</a>
+                        </p>
+                    </div>
                 </CardFooter>
             </Card>
         </div>

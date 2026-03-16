@@ -29,7 +29,6 @@ import (
 	"github.com/go-webauthn/webauthn/protocol"
 	"github.com/go-webauthn/webauthn/webauthn"
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/google/uuid"
 	"go.uber.org/zap"
 	"golang.org/x/crypto/bcrypt"
 	"gopkg.in/go-jose/go-jose.v2"
@@ -38,7 +37,7 @@ import (
 // Service defines the interface for the auth service.
 type Service interface {
 	Login(ctx context.Context, username, password, deviceID, userAgent, ip, clientOSVersion string) (string, error)
-	Authorize(ctx context.Context, req AuthorizeRequest) (AuthorizeResponse, error)
+	Authorize(ctx context.Context, userID string, req AuthorizeRequest) (AuthorizeResponse, error)
 	Token(ctx context.Context, req TokenRequest) (TokenResponse, error)
 	Introspect(ctx context.Context, req IntrospectRequest) (IntrospectResponse, error)
 	Revoke(ctx context.Context, req RevokeRequest) error
@@ -57,6 +56,7 @@ type Service interface {
 	// Branding
 	GetBranding(ctx context.Context, tenantID string) (BrandingConfig, error)
 	UpdateBranding(ctx context.Context, config BrandingConfig) error
+	GetOIDCConfiguration() OpenIDConfiguration
 
 	// Client Management for Portal
 	ListClients(ctx context.Context, tenantID string) ([]oauthclient.Client, error)
@@ -70,17 +70,22 @@ type Service interface {
 	// User Lookup
 	LookupUser(ctx context.Context, tenantID, email string) (LookupResult, error)
 	// SignUp
-	SignUp(ctx context.Context, email, password, companyName, plan string) (string, string, error)
+	SignUp(ctx context.Context, email, password, companyName, plan string) (string, string, string, error)
 
 	// System Setup
 	GetSystemSetupStatus(ctx context.Context) (bool, error)
 	PerformSystemSetup(ctx context.Context, email, password string) (string, error)
+
+	ResolveTenantSlug(ctx context.Context, slug string) (string, error)
+	UIURL() string
+	ValidateToken(tokenString string) (*middleware.Claims, error)
 }
 
 type LookupResult struct {
 	UserID          string `json:"user_id"`
 	WebAuthnEnabled bool   `json:"webauthn_enabled"`
 	TenantID        string `json:"tenant_id,omitempty"`
+	TenantSlug      string `json:"tenant_slug,omitempty"`
 }
 
 type authService struct {
@@ -104,7 +109,11 @@ type authService struct {
 	federationStore     FederationStore
 	totpStore           TOTPStore
 	ssoProviderStore    SSOProviderStore
+	tenantStore         TenantStore
+	appStore            DeveloperAppStore
 	deploymentMode      string
+	baseURL             string
+	uiURL               string
 }
 
 // AuthorizationCodeStore defines the interface for storing authorization codes.
@@ -147,6 +156,9 @@ type Config struct {
 	RevocationStore  RevocationStore
 	TOTPStore        TOTPStore
 	SSOProviderStore SSOProviderStore
+	TenantStore      TenantStore
+	AppStore         DeveloperAppStore
+	UIURL            string
 	// KMS Signer (optional, defaults to ephemeral local signer)
 	Signer kms.Signer
 	// Deployment Mode: "saas" or "selfhost" (default)
@@ -204,10 +216,17 @@ func NewService(cfg Config) (Service, error) {
 		return nil, err
 	}
 
+	rpID := "localhost"
+	if parsedBaseURL, parseErr := url.Parse(cfg.BaseURL); parseErr == nil {
+		if host := parsedBaseURL.Hostname(); host != "" {
+			rpID = host
+		}
+	}
+
 	// WebAuthn Init
 	w, err := webauthn.New(&webauthn.Config{
 		RPDisplayName: "WardSeal Identity",
-		RPID:          "localhost",                                    // TODO: Configurable
+		RPID:          rpID,
 		RPOrigins:     []string{cfg.BaseURL, "http://localhost:5173"}, // Admin UI origin
 	})
 	if err != nil {
@@ -272,10 +291,13 @@ func NewService(cfg Config) (Service, error) {
 		webAuthn:            w,
 		webAuthnStore:       cfg.WebAuthnStore,
 		federationStore:     cfg.FederationStore,
-		totpStore:           cfg.TOTPStore,
 		brandingStore:       cfg.BrandingStore,
 		ssoProviderStore:    cfg.SSOProviderStore,
+		tenantStore:         cfg.TenantStore,
+		appStore:            cfg.AppStore,
 		deploymentMode:      deploymentMode,
+		baseURL:             cfg.BaseURL,
+		uiURL:               cfg.UIURL,
 	}, nil
 }
 
@@ -432,6 +454,23 @@ func parseUserAgent(ua string) (string, string) {
 	return "Unknown", "Unknown"
 }
 
+func slugifyTenantName(name string) string {
+	name = strings.ToLower(strings.TrimSpace(name))
+	re := regexp.MustCompile(`[^a-z0-9]+`)
+	slug := re.ReplaceAllString(name, "-")
+	slug = strings.Trim(slug, "-")
+	if slug == "" {
+		slug = "tenant"
+	}
+	if len(slug) > 48 {
+		slug = strings.Trim(slug[:48], "-")
+		if slug == "" {
+			slug = "tenant"
+		}
+	}
+	return slug
+}
+
 func (s *authService) LookupUser(ctx context.Context, tenantID, email string) (LookupResult, error) {
 	// 0. Tenant Discovery (if not provided)
 	if tenantID == "" {
@@ -517,7 +556,18 @@ func (s *authService) LookupUser(ctx context.Context, tenantID, email string) (L
 	return LookupResult{
 		UserID:          userResp.User.ID,
 		WebAuthnEnabled: len(creds) > 0,
-		TenantID:        tenantID, // Return the discovered tenant ID
+		TenantID:        tenantID,
+		TenantSlug: func() string {
+			if s.tenantStore == nil {
+				return ""
+			}
+			slug, err := s.tenantStore.GetSlugByID(ctx, tenantID)
+			if err != nil {
+				zap.L().Warn("Failed to resolve tenant slug", zap.String("tenant_id", tenantID), zap.Error(err))
+				return ""
+			}
+			return slug
+		}(),
 	}, nil
 }
 
@@ -535,7 +585,32 @@ func (s *authService) JWKS() jose.JSONWebKeySet {
 	}
 }
 
-func (s *authService) Authorize(ctx context.Context, req AuthorizeRequest) (AuthorizeResponse, error) {
+func (s *authService) GetOIDCConfiguration() OpenIDConfiguration {
+	return OpenIDConfiguration{
+		Issuer:                            s.baseURL,
+		AuthorizationEndpoint:             fmt.Sprintf("%s/oauth2/authorize", s.baseURL),
+		TokenEndpoint:                     fmt.Sprintf("%s/oauth2/token", s.baseURL),
+		UserinfoEndpoint:                  fmt.Sprintf("%s/api/v1/user/profile", s.baseURL),
+		JwksURI:                           fmt.Sprintf("%s/.well-known/jwks.json", s.baseURL),
+		ScopesSupported:                   []string{"openid", "profile", "email", "offline_access"},
+		ResponseTypesSupported:            []string{"code"},
+		GrantTypesSupported:               []string{"authorization_code", "refresh_token", "client_credentials"},
+		SubjectTypesSupported:             []string{"public"},
+		IDTokenSigningAlgValuesSupported:  []string{"RS256"},
+		TokenEndpointAuthMethodsSupported: []string{"client_secret_basic", "client_secret_post"},
+		CodeChallengeMethodsSupported:     []string{"S256"},
+		ClaimsSupported:                   []string{"sub", "iss", "aud", "exp", "iat", "email", "name", "tenant"},
+	}
+}
+
+func (s *authService) ResolveTenantSlug(ctx context.Context, slug string) (string, error) {
+	if s.tenantStore == nil {
+		return "", errors.New("tenant store not configured")
+	}
+	return s.tenantStore.GetIDBySlug(ctx, slug)
+}
+
+func (s *authService) Authorize(ctx context.Context, userID string, req AuthorizeRequest) (AuthorizeResponse, error) {
 	tenantID, err := middleware.TenantIDFromContext(ctx)
 	if err != nil {
 		return AuthorizeResponse{}, err
@@ -574,6 +649,8 @@ func (s *authService) Authorize(ctx context.Context, req AuthorizeRequest) (Auth
 		RedirectURI:         req.RedirectURI,
 		Scope:               req.Scope,
 		TenantID:            tenantID,
+		UserID:              userID,
+		Nonce:               req.Nonce,
 		CodeChallenge:       req.CodeChallenge,
 		CodeChallengeMethod: method,
 		ExpiresAt:           expiresAt,
@@ -613,6 +690,9 @@ func (s *authService) handleAuthorizationCodeGrant(ctx context.Context, tenantID
 	if err != nil {
 		return TokenResponse{}, err
 	}
+	if !client.allowsGrant("authorization_code") {
+		return TokenResponse{}, &Error{"unauthorized_client", "authorization_code grant is not enabled for this client"}
+	}
 	if !client.allowsRedirect(req.RedirectURI) {
 		return TokenResponse{}, ErrInvalidRedirectURI
 	}
@@ -631,7 +711,7 @@ func (s *authService) handleAuthorizationCodeGrant(ctx context.Context, tenantID
 	}
 	_ = s.codeStore.Delete(ctx, req.Code)
 
-	return s.issueTokens(ctx, tenantID, req.ClientID, code.Scope, "user")
+	return s.issueTokens(ctx, tenantID, req.ClientID, code.Scope, code.UserID, code.Nonce)
 }
 
 func (s *authService) handleClientCredentialsGrant(ctx context.Context, tenantID string, req TokenRequest) (TokenResponse, error) {
@@ -642,6 +722,9 @@ func (s *authService) handleClientCredentialsGrant(ctx context.Context, tenantID
 	client, err := s.resolveClient(ctx, tenantID, req.ClientID)
 	if err != nil {
 		return TokenResponse{}, err
+	}
+	if !client.allowsGrant("client_credentials") {
+		return TokenResponse{}, &Error{"unauthorized_client", "client_credentials grant is not enabled for this client"}
 	}
 
 	// Client credentials flow requires a confidential client
@@ -723,13 +806,21 @@ func (s *authService) handleRefreshTokenGrant(ctx context.Context, tenantID stri
 		return TokenResponse{}, &Error{"invalid_grant", "refresh token tenant mismatch"}
 	}
 
+	client, err := s.resolveClient(ctx, tenantID, stored.ClientID)
+	if err != nil {
+		return TokenResponse{}, err
+	}
+	if !client.allowsGrant("refresh_token") {
+		return TokenResponse{}, &Error{"unauthorized_client", "refresh_token grant is not enabled for this client"}
+	}
+
 	// Rotate refresh token - delete old and issue new
 	_ = s.refreshTokenStore.Delete(ctx, req.RefreshToken)
 
-	return s.issueTokens(ctx, tenantID, stored.ClientID, stored.Scope, stored.SubjectType)
+	return s.issueTokens(ctx, tenantID, stored.ClientID, stored.Scope, stored.SubjectType, "")
 }
 
-func (s *authService) issueTokens(ctx context.Context, tenantID, clientID, scope, subjectType string) (TokenResponse, error) {
+func (s *authService) issueTokens(ctx context.Context, tenantID, clientID, scope, subjectType, nonce string) (TokenResponse, error) {
 	accessToken, err := s.generateAccessToken(tenantID, clientID, scope, subjectType)
 	if err != nil {
 		return TokenResponse{}, err
@@ -740,13 +831,47 @@ func (s *authService) issueTokens(ctx context.Context, tenantID, clientID, scope
 		return TokenResponse{}, err
 	}
 
-	return TokenResponse{
+	resp := TokenResponse{
 		AccessToken:  accessToken,
 		TokenType:    "Bearer",
 		ExpiresIn:    3600,
 		RefreshToken: refreshToken,
 		Scope:        scope,
-	}, nil
+	}
+
+	if hasScope(scope, "openid") {
+		idToken, err := s.generateIDToken(tenantID, clientID, subjectType, nonce)
+		if err != nil {
+			return TokenResponse{}, err
+		}
+		resp.IDToken = idToken
+	}
+
+	return resp, nil
+}
+
+func (s *authService) issueTokensWithoutRefresh(tenantID, clientID, scope, subjectType, nonce string) (TokenResponse, error) {
+	accessToken, err := s.generateAccessToken(tenantID, clientID, scope, subjectType)
+	if err != nil {
+		return TokenResponse{}, err
+	}
+
+	resp := TokenResponse{
+		AccessToken: accessToken,
+		TokenType:   "Bearer",
+		ExpiresIn:   3600,
+		Scope:       scope,
+	}
+
+	if hasScope(scope, "openid") {
+		idToken, err := s.generateIDToken(tenantID, clientID, subjectType, nonce)
+		if err != nil {
+			return TokenResponse{}, err
+		}
+		resp.IDToken = idToken
+	}
+
+	return resp, nil
 }
 
 func (s *authService) generateAccessToken(tenantID, clientID, scope, subjectType string) (string, error) {
@@ -762,6 +887,36 @@ func (s *authService) generateAccessToken(tenantID, clientID, scope, subjectType
 	}
 
 	return s.signer.Sign(claims)
+}
+
+func (s *authService) generateIDToken(tenantID, clientID, subjectType, nonce string) (string, error) {
+	subject := subjectType
+	if subject == "" {
+		subject = clientID
+	}
+
+	claims := jwt.MapClaims{
+		"sub":    subject,
+		"iss":    fmt.Sprintf("%s/t/%s", s.baseURL, tenantID),
+		"aud":    clientID,
+		"exp":    time.Now().Add(time.Hour).Unix(),
+		"iat":    time.Now().Unix(),
+		"tenant": tenantID,
+	}
+	if nonce != "" {
+		claims["nonce"] = nonce
+	}
+
+	return s.signer.Sign(claims)
+}
+
+func hasScope(scope, target string) bool {
+	for _, value := range strings.Fields(scope) {
+		if value == target {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *authService) generateRefreshToken(ctx context.Context, tenantID, clientID, scope, subjectType string) (string, error) {
@@ -925,14 +1080,16 @@ func newInvalidScopeError(detail string) *Error {
 }
 
 type authorizationCode struct {
-	Code                string
-	ClientID            string
-	RedirectURI         string
-	Scope               string
-	TenantID            string
-	CodeChallenge       string
-	CodeChallengeMethod string
-	ExpiresAt           time.Time
+	Code                string    `db:"code"`
+	ClientID            string    `db:"client_id"`
+	RedirectURI         string    `db:"redirect_uri"`
+	Scope               string    `db:"scope"`
+	TenantID            string    `db:"tenant_id"`
+	UserID              string    `db:"user_id"`
+	Nonce               string    `db:"nonce"`
+	CodeChallenge       string    `db:"code_challenge"`
+	CodeChallengeMethod string    `db:"code_challenge_method"`
+	ExpiresAt           time.Time `db:"expires_at"`
 }
 
 type authorizationCodeStore struct {
@@ -999,21 +1156,53 @@ func buildAuthorizationRedirect(baseURI, code, state string) (string, error) {
 	return parsed.String(), nil
 }
 
+func (s *authService) UIURL() string {
+	return s.uiURL
+}
+
 func (s *authService) resolveClient(ctx context.Context, tenantID, clientID string) (ClientConfig, error) {
 	if s.clientStore != nil {
 		record, err := s.clientStore.GetClient(ctx, tenantID, clientID)
-		if err != nil {
-			if errors.Is(err, oauthclient.ErrNotFound) {
+		if err == nil {
+			cfg := clientConfigFromRecord(record)
+			if err := cfg.validate(); err == nil {
+				return cfg, nil
+			}
+		}
+	}
+
+	// Fallback to Developer Portal apps
+	if s.appStore != nil {
+		app, err := s.appStore.GetByClientID(ctx, clientID)
+		if err == nil && app != nil {
+			// Ensure tenant mismatch is caught if needed, though for public/developer apps
+			// we might allow it depending on policy.
+			// But usually we want to enforce it.
+			if app.TenantID != tenantID {
 				return ClientConfig{}, ErrInvalidClient
 			}
-			return ClientConfig{}, err
+
+			var redirectURIs []string
+			_ = json.Unmarshal(app.RedirectURIs, &redirectURIs)
+
+			var allowedScopes []string
+			_ = json.Unmarshal(app.Scopes, &allowedScopes)
+
+			var grantTypes []string
+			_ = json.Unmarshal(app.GrantTypes, &grantTypes)
+
+			return ClientConfig{
+				ID:            app.ClientID,
+				TenantID:      app.TenantID,
+				Name:          app.Name,
+				ClientType:    app.AppType,
+				RedirectURIs:  redirectURIs,
+				AllowedScopes: allowedScopes,
+				GrantTypes:    grantTypes,
+			}.withDefaults(), nil
 		}
-		cfg := clientConfigFromRecord(record)
-		if err := cfg.validate(); err != nil {
-			return ClientConfig{}, err
-		}
-		return cfg, nil
 	}
+
 	if s.clients == nil {
 		return ClientConfig{}, ErrInvalidClient
 	}
@@ -1041,17 +1230,17 @@ func clientConfigFromRecord(record oauthclient.Client) ClientConfig {
 		ClientType:    clientType,
 		RedirectURIs:  append([]string(nil), record.RedirectURIs...),
 		AllowedScopes: append([]string(nil), record.AllowedScopes...),
-	}
+	}.withDefaults()
 }
 
 // refreshTokenEntry represents a stored refresh token.
 type refreshTokenEntry struct {
-	Token       string
-	ClientID    string
-	TenantID    string
-	Scope       string
-	SubjectType string
-	ExpiresAt   time.Time
+	Token       string    `db:"token"`
+	ClientID    string    `db:"client_id"`
+	TenantID    string    `db:"tenant_id"`
+	Scope       string    `db:"scope"`
+	SubjectType string    `db:"subject_type"`
+	ExpiresAt   time.Time `db:"expires_at"`
 }
 
 // refreshTokenStore provides in-memory storage for refresh tokens.
@@ -1208,44 +1397,68 @@ func (s *authService) FinishWebAuthnLogin(ctx context.Context, userID string, se
 func (s *authService) WebAuthn() *webauthn.WebAuthn {
 	return s.webAuthn
 }
-func (s *authService) SignUp(ctx context.Context, email, password, companyName, plan string) (string, string, error) {
+func (s *authService) SignUp(ctx context.Context, email, password, companyName, plan string) (string, string, string, error) {
 	// 0. Check if Public Signup is allowed
 	if s.deploymentMode != "saas" {
-		return "", "", errors.New("public signup is disabled in this deployment mode")
+		return "", "", "", errors.New("public signup is disabled in this deployment mode")
 	}
 
-	// 1. Generate new Tenant ID
-	tenantID := uuid.New().String()
+	// 1. Generate & Create Tenant in Directory Service (with retry for collisions)
+	var tenantID string
+	baseSlug := slugifyTenantName(companyName)
+	tenantSlug := baseSlug
+	maxRetries := 5
+	for i := 0; i < maxRetries; i++ {
+		tenantID = generateShortID()
+		if i == 0 {
+			tenantSlug = baseSlug
+		} else {
+			suffix := tenantID
+			if len(suffix) > 6 {
+				suffix = suffix[:6]
+			}
+			tenantSlug = fmt.Sprintf("%s-%s", baseSlug, suffix)
+		}
 
-	// 2. Create Tenant in Directory Service
-	if plan == "" {
-		plan = "free"
+		tenantPayload := map[string]interface{}{
+			"id":   tenantID,
+			"name": companyName,
+			"slug": tenantSlug,
+			"plan": plan,
+		}
+		tenantBody, err := json.Marshal(tenantPayload)
+		if err != nil {
+			return "", "", "", err
+		}
+
+		reqTenant, err := http.NewRequestWithContext(ctx, "POST", fmt.Sprintf("%s/tenants", s.directoryServiceURL), bytes.NewReader(tenantBody))
+		if err != nil {
+			return "", "", "", err
+		}
+		reqTenant.Header.Set("Content-Type", "application/json")
+		if s.serviceAuthToken != "" {
+			reqTenant.Header.Set(s.serviceAuthHeader, s.serviceAuthToken)
+		}
+
+		respTenant, err := s.httpClient.Do(reqTenant)
+		if err != nil {
+			return "", "", "", fmt.Errorf("failed to create tenant: %w", err)
+		}
+		defer respTenant.Body.Close()
+
+		if respTenant.StatusCode == http.StatusCreated {
+			goto TenantCreated
+		}
+
+		if respTenant.StatusCode == http.StatusConflict && i < maxRetries-1 {
+			// Collision! Retry with a new ID
+			continue
+		}
+
+		return "", "", "", fmt.Errorf("directory service create tenant failed: status %d", respTenant.StatusCode)
 	}
-	tenantPayload := map[string]interface{}{
-		"id":   tenantID,
-		"name": companyName,
-		"plan": plan,
-	}
-	tenantBody, err := json.Marshal(tenantPayload)
-	if err != nil {
-		return "", "", err
-	}
-	reqTenant, err := http.NewRequestWithContext(ctx, "POST", fmt.Sprintf("%s/tenants", s.directoryServiceURL), bytes.NewReader(tenantBody))
-	if err != nil {
-		return "", "", err
-	}
-	reqTenant.Header.Set("Content-Type", "application/json")
-	if s.serviceAuthToken != "" {
-		reqTenant.Header.Set(s.serviceAuthHeader, s.serviceAuthToken)
-	}
-	respTenant, err := s.httpClient.Do(reqTenant)
-	if err != nil {
-		return "", "", fmt.Errorf("failed to create tenant: %w", err)
-	}
-	defer func() { _ = respTenant.Body.Close() }()
-	if respTenant.StatusCode != http.StatusCreated {
-		return "", "", fmt.Errorf("directory service create tenant failed: status %d", respTenant.StatusCode)
-	}
+
+TenantCreated:
 
 	// 3. Create User in Directory Service
 	// We call POST /users directly on directory service URL, injecting the new Tenant ID header.
@@ -1259,12 +1472,12 @@ func (s *authService) SignUp(ctx context.Context, email, password, companyName, 
 	}
 	body, err := json.Marshal(userPayload)
 	if err != nil {
-		return "", "", err
+		return "", "", "", err
 	}
 
 	req, err := http.NewRequestWithContext(ctx, "POST", fmt.Sprintf("%s/users", s.directoryServiceURL), bytes.NewReader(body))
 	if err != nil {
-		return "", "", err
+		return "", "", "", err
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set(middleware.DefaultTenantHeader, tenantID)
@@ -1274,7 +1487,7 @@ func (s *authService) SignUp(ctx context.Context, email, password, companyName, 
 
 	resp, err := s.httpClient.Do(req)
 	if err != nil {
-		return "", "", err
+		return "", "", "", err
 	}
 	defer func() { _ = resp.Body.Close() }()
 
@@ -1284,7 +1497,7 @@ func (s *authService) SignUp(ctx context.Context, email, password, companyName, 
 			Error string `json:"error"`
 		}
 		_ = json.NewDecoder(resp.Body).Decode(&errResp)
-		return "", "", fmt.Errorf("failed to create user: status %d, error: %s", resp.StatusCode, errResp.Error)
+		return "", "", "", fmt.Errorf("failed to create user: status %d, error: %s", resp.StatusCode, errResp.Error)
 	}
 
 	// 3. Login to get token
@@ -1312,7 +1525,7 @@ func (s *authService) SignUp(ctx context.Context, email, password, companyName, 
 	// Need to re-read body if I didn't close it? `defer` closes at end of func.
 	// Re-reading is fine if I decode it now.
 	if err := json.NewDecoder(resp.Body).Decode(&createUserResp); err != nil {
-		return "", "", fmt.Errorf("failed to decode create user response: %w", err)
+		return "", "", "", fmt.Errorf("failed to decode create user response: %w", err)
 	}
 
 	claims := jwt.MapClaims{
@@ -1327,16 +1540,22 @@ func (s *authService) SignUp(ctx context.Context, email, password, companyName, 
 
 	signedToken, err := s.signer.Sign(claims)
 	if err != nil {
-		return "", "", err
+		return "", "", "", err
 	}
 
-	return signedToken, tenantID, nil
+	return signedToken, tenantID, tenantSlug, nil
 }
 
 func (s *authService) GetSystemSetupStatus(ctx context.Context) (bool, error) {
 	// Check if any users exist in the system tenant
-	// We use the magic system tenant ID
-	systemTenantID := "11111111-1111-1111-1111-111111111111"
+	// Resolve canonical system tenant slug to tenant ID when available; fallback to literal system tenant ID
+	systemTenantID, err := s.ResolveTenantSlug(ctx, "admin")
+	if err != nil {
+		return false, fmt.Errorf("failed to resolve system tenant: %w", err)
+	}
+	if systemTenantID == "" {
+		systemTenantID = "admin-system"
+	}
 
 	req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("%s/users", s.directoryServiceURL), nil)
 	if err != nil {
@@ -1385,7 +1604,13 @@ func (s *authService) PerformSystemSetup(ctx context.Context, email, password st
 		return "", errors.New("system setup not required (or already completed)")
 	}
 
-	systemTenantID := "11111111-1111-1111-1111-111111111111"
+	systemTenantID, err := s.ResolveTenantSlug(ctx, "admin")
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve system tenant: %w", err)
+	}
+	if systemTenantID == "" {
+		systemTenantID = "admin-system"
+	}
 
 	// Create the User in Directory Service
 	userPayload := struct {
@@ -1505,4 +1730,125 @@ func (s *authService) UpdateUserSelf(ctx context.Context, tenantID, userID strin
 	}
 
 	return nil
+}
+
+func generateShortID() string {
+	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	b := make([]byte, 10)
+	_, _ = rand.Read(b)
+	result := make([]byte, len(b))
+	for i := range b {
+		result[i] = charset[int(b[i])%len(charset)]
+	}
+	return "ws-" + string(result)
+}
+
+func (s *authService) generatePasswordSetupToken(tenantID, userID, mode string, expiresHours int) (string, time.Time, error) {
+	if tenantID == "" || userID == "" {
+		return "", time.Time{}, fmt.Errorf("tenant and user are required")
+	}
+	if mode != "invite" && mode != "reset" {
+		return "", time.Time{}, fmt.Errorf("invalid mode")
+	}
+	if expiresHours <= 0 {
+		expiresHours = 72
+	}
+	if expiresHours > 168 {
+		expiresHours = 168
+	}
+
+	now := time.Now()
+	expiresAt := now.Add(time.Duration(expiresHours) * time.Hour)
+	claims := jwt.MapClaims{
+		"iss":     s.baseURL,
+		"aud":     "wardseal-password-setup",
+		"sub":     userID,
+		"tenant":  tenantID,
+		"purpose": "password_setup",
+		"mode":    mode,
+		"iat":     now.Unix(),
+		"exp":     expiresAt.Unix(),
+		"nbf":     now.Unix(),
+	}
+
+	token, err := s.signer.Sign(claims)
+	if err != nil {
+		return "", time.Time{}, err
+	}
+
+	return token, expiresAt, nil
+}
+
+func (s *authService) setPasswordWithSetupToken(ctx context.Context, tokenString, password string) error {
+	if len(password) < 8 {
+		return fmt.Errorf("password must be at least 8 characters")
+	}
+
+	revoked, err := s.revokedTokens.IsRevoked(ctx, tokenString)
+	if err != nil {
+		return fmt.Errorf("failed to validate setup token")
+	}
+	if revoked {
+		return fmt.Errorf("setup token already used or revoked")
+	}
+
+	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+		if token.Method.Alg() != s.signer.Algorithm() {
+			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+		}
+		return s.signer.PublicKey(), nil
+	})
+	if err != nil {
+		return fmt.Errorf("invalid setup token")
+	}
+
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok || !token.Valid {
+		return fmt.Errorf("invalid setup token")
+	}
+
+	purpose, _ := claims["purpose"].(string)
+	if purpose != "password_setup" {
+		return fmt.Errorf("invalid setup token purpose")
+	}
+
+	tenantID, _ := claims["tenant"].(string)
+	userID, _ := claims["sub"].(string)
+	if tenantID == "" || userID == "" {
+		return fmt.Errorf("invalid setup token claims")
+	}
+
+	if err := s.UpdateUserSelf(ctx, tenantID, userID, map[string]interface{}{"password": password}); err != nil {
+		return err
+	}
+
+	if err := s.revokedTokens.Revoke(ctx, tokenString); err != nil {
+		return fmt.Errorf("password updated but failed to revoke setup token")
+	}
+
+	return nil
+}
+
+func (s *authService) ValidateToken(tokenString string) (*middleware.Claims, error) {
+	// If the signer is a LocalSigner or VaultSigner, we can use its PublicKey to verify
+	// But the signer interface doesn't have a generic verify yet in a way that returns Claims.
+	// However, we can use jwt.ParseWithClaims with the public key.
+
+	token, err := jwt.ParseWithClaims(tokenString, &middleware.Claims{}, func(token *jwt.Token) (interface{}, error) {
+		// Verify the algorithm matches
+		if token.Method.Alg() != s.signer.Algorithm() {
+			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+		}
+		return s.signer.PublicKey(), nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	if claims, ok := token.Claims.(*middleware.Claims); ok && token.Valid {
+		return claims, nil
+	}
+
+	return nil, fmt.Errorf("invalid token")
 }

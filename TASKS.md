@@ -47,7 +47,7 @@ This document provides a granular checklist of tasks to be completed for each ph
 ### 1.5. Observability
 
 -   [x] Add Prometheus metrics to all services (`pkg/observability`)
--   [ ] Set up a Grafana dashboard for key metrics
+-   [x] Set up a Grafana dashboard for key metrics (`deploy/observability/grafana/wardseal-overview-dashboard.json`)
 -   [x] Implement distributed tracing with OpenTelemetry
 
 ## Phase 2: Enterprise SSO & Provisioning
@@ -64,7 +64,7 @@ This document provides a granular checklist of tasks to be completed for each ph
 -   [x] Implement SCIM 2.0 server endpoints (`/scim/v2`)
 -   [x] Support core SCIM resources: `User`, `Group`
 -   [x] Implement SCIM filtering and pagination
--   [ ] Write unit and integration tests for SCIM flows
+-   [x] Write unit and integration tests for SCIM flows (`internal/scim/service_test.go`)
 
 ### 2.3. Connector Framework (`provsvc`)
 
@@ -126,6 +126,42 @@ This document provides a granular checklist of tasks to be completed for each ph
 -   [ ] Conduct load testing and performance benchmarking
 -   [ ] Optimize database queries and other performance bottlenecks
 -   [ ] Develop a strategy for horizontal scaling of services
+
+#### 4.2.1. Shared State Readiness (horizontal scaling prerequisite)
+
+-   [x] Move OAuth authorization code storage to a shared persistent store (`SQLAuthorizationCodeStore`)
+-   [x] Move refresh token storage to a shared persistent store (`SQLRefreshTokenStore`)
+-   [x] Move token revocation checks to a shared persistent store (`SQLRevocationStore`)
+-   [x] Add pluggable WebAuthn session store with optional Redis backend and in-memory fallback
+-   [x] Replace remaining in-memory auth flow session state (MFA/WebAuthn transient sessions) with Redis-backed storage
+-   [x] Add runtime guardrails that fail fast if production starts with in-memory critical stores
+
+#### 4.2.2. Edge and Ingress Scale Plan
+
+-   [ ] Introduce Traefik as edge proxy in local and staging environments
+-   [ ] Keep static Admin UI serving separate from API routing responsibilities
+-   [ ] Define and test path routing parity for `/t/*`, `/api/v1/*`, `/scim/*`, `/login/lookup`, and `/.well-known/*`
+-   [ ] Enable sticky-session-free routing (all auth endpoints must be stateless across replicas)
+
+#### 4.2.3. Distributed Rate Limiting
+
+-   [x] Replace per-instance in-memory IP limiter with Redis-backed distributed limiter
+-   [x] Add tenant-aware and endpoint-aware limits (login, token, setup, webhook)
+-   [x] Add safe fallback behavior for Redis outages (degraded mode with strict defaults)
+
+#### 4.2.4. Service Autoscaling and Resilience
+
+-   [ ] Add HPA policies for `authsvc`, `dirsvc`, and `govsvc` (CPU and latency targets)
+-   [ ] Add PodDisruptionBudgets and anti-affinity for critical services
+-   [ ] Tune readiness/liveness probes and startup probes for scale-out stability
+-   [ ] Validate database connection pool sizing against max replica counts
+
+#### 4.2.5. Capacity Verification and SLOs
+
+-   [ ] Define SLOs (availability, p95/p99 latency, token issuance success rate)
+-   [ ] Create repeatable k6/Gatling load profiles for auth flows (login, PKCE, refresh, setup-link redemption)
+-   [ ] Run baseline (single replica) vs scaled (N replicas) benchmarks and publish results
+-   [ ] Add dashboards/alerts for saturation, queueing, 5xx, and auth error rates
 
 ### 4.3. High Availability & Disaster Recovery
 

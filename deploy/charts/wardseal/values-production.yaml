@@ -24,8 +24,16 @@ authsvc:
       memory: 256Mi
   
   env:
+    AUTH_SERVICE_URL: https://auth.wardseal.com
     DIRECTORY_SERVICE_URL: http://wardseal-dirsvc:8081
+    UI_URL: https://console.wardseal.com
     LOG_LEVEL: warn
+    REDIS_ENABLED: "true"
+    REDIS_ADDR: redis-production.wardseal.svc.cluster.local:6379
+    WEBAUTHN_SESSION_TTL_SECONDS: "600"
+    RATE_LIMIT_USE_TENANT: "true"
+    RATE_LIMIT_KEY_PREFIX: wardseal:ratelimit
+    CORS_ALLOWED_ORIGINS: https://wardseal.com,https://console.wardseal.com,https://help.wardseal.com
   
   # Security contexts
   podSecurityContext:
@@ -123,6 +131,11 @@ dirsvc:
   
   env:
     LOG_LEVEL: warn
+    REDIS_ENABLED: "true"
+    REDIS_ADDR: redis-production.wardseal.svc.cluster.local:6379
+    RATE_LIMIT_USE_TENANT: "true"
+    RATE_LIMIT_KEY_PREFIX: wardseal:ratelimit
+    CORS_ALLOWED_ORIGINS: https://wardseal.com,https://console.wardseal.com,https://help.wardseal.com
   
   podSecurityContext:
     runAsNonRoot: true
@@ -214,6 +227,11 @@ govsvc:
   env:
     DIRECTORY_SERVICE_URL: http://wardseal-dirsvc:8081
     LOG_LEVEL: warn
+    REDIS_ENABLED: "true"
+    REDIS_ADDR: redis-production.wardseal.svc.cluster.local:6379
+    RATE_LIMIT_USE_TENANT: "true"
+    RATE_LIMIT_KEY_PREFIX: wardseal:ratelimit
+    CORS_ALLOWED_ORIGINS: https://wardseal.com,https://console.wardseal.com,https://help.wardseal.com
   
   podSecurityContext:
     runAsNonRoot: true
@@ -286,17 +304,18 @@ govsvc:
 # ====================
 # Ingress - Production
 # ====================
+adminui:
+  enabled: true
+
+landingui:
+  enabled: true
+
 ingress:
   enabled: true
-  className: nginx
+  className: traefik
   annotations:
-    nginx.ingress.kubernetes.io/ssl-redirect: "true"
-    cert-manager.io/cluster-issuer: letsencrypt-prod
-    nginx.ingress.kubernetes.io/rate-limit: "100"
-    nginx.ingress.kubernetes.io/configuration-snippet: |
-      more_set_headers "X-Frame-Options: DENY";
-      more_set_headers "X-Content-Type-Options: nosniff";
-      more_set_headers "X-XSS-Protection: 1; mode=block";
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.tls: "true"
   hosts:
     - host: auth.wardseal.com
       paths:
@@ -322,8 +341,37 @@ ingress:
           pathType: Prefix
           service: govsvc
           port: 8082
+        - path: /api/v1/policy
+          pathType: Prefix
+          service: policysvc
+          port: 8083
+        - path: /api/v1/provisioning
+          pathType: Prefix
+          service: provsvc
+          port: 8084
+    - host: console.wardseal.com
+      paths:
+        - path: /
+          pathType: Prefix
+          service: adminui
+          port: 80
+    - host: wardseal.com
+      paths:
+        - path: /
+          pathType: Prefix
+          service: landingui
+          port: 80
+    - host: help.wardseal.com
+      paths:
+        - path: /
+          pathType: Prefix
+          service: landingui
+          port: 80
   tls:
     - secretName: wardseal-tls
       hosts:
         - auth.wardseal.com
         - api.wardseal.com
+        - console.wardseal.com
+        - wardseal.com
+        - help.wardseal.com

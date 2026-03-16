@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { ExternalLink, LayoutGrid, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { getUserApps } from '../api';
 
 interface Application {
     id: string;
@@ -18,22 +19,11 @@ const PortalDashboard = () => {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        // TODO: Fetch user's assigned applications from API
-        // GET /api/v1/portal/applications
         const fetchApplications = async () => {
             setLoading(true);
             try {
-                // Placeholder - replace with actual API call
-                // const response = await fetch('/api/v1/portal/applications');
-                // const data = await response.json();
-                // setApplications(data);
-
-                // Mock data for now
-                setApplications([
-                    { id: '1', name: 'Email', description: 'Corporate email access', launch_url: '#' },
-                    { id: '2', name: 'HR Portal', description: 'Human resources management', launch_url: '#' },
-                    { id: '3', name: 'Expense Tracker', description: 'Submit and track expenses', launch_url: '#' },
-                ]);
+                const data = await getUserApps();
+                setApplications(data.apps || []);
             } catch (error) {
                 console.error('Failed to fetch applications:', error);
             } finally {

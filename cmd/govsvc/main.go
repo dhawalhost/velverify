@@ -24,9 +24,9 @@ import (
 	"github.com/dhawalhost/wardseal/pkg/observability"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	"github.com/go-redis/redis/v8"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 	"go.uber.org/zap"
-	"golang.org/x/time/rate"
 )
 
 func main() {
@@ -82,12 +82,60 @@ func main() {
 
 	// Security Middleware
 	router.Use(middleware.SecurityHeadersMiddleware())
-	// Rate limit: 20 req/s, burst 40
-	router.Use(middleware.RateLimitMiddleware(rate.Limit(20), 40))
+
+	var rateLimitRedisClient *redis.Client
+	if cfg.Auth.RedisAddr != "" {
+		rateLimitRedisClient = redis.NewClient(&redis.Options{
+			Addr:     cfg.Auth.RedisAddr,
+			Password: cfg.Auth.RedisPassword,
+			DB:       cfg.Auth.RedisDB,
+		})
+		if err := rateLimitRedisClient.Ping(context.Background()).Err(); err != nil {
+			log.Warn("Distributed limiter Redis unavailable; will use strict degraded fallback",
+				zap.Error(err),
+				zap.String("redis_addr", cfg.Auth.RedisAddr))
+			rateLimitRedisClient = nil
+		}
+	}
+
+	router.Use(middleware.DistributedRateLimitMiddleware(middleware.DistributedRateLimitConfig{
+		RedisClient: rateLimitRedisClient,
+		KeyPrefix:   cfg.Auth.RateLimitKeyPrefix + ":govsvc",
+		UseTenant:   cfg.Auth.RateLimitUseTenant,
+		DefaultProfile: middleware.RateLimitWindowProfile{
+			Requests: cfg.Auth.RateLimitDefault.Requests,
+			Window:   cfg.Auth.RateLimitDefault.Window,
+		},
+		EndpointProfiles: map[string]middleware.RateLimitWindowProfile{
+			"login": {
+				Requests: cfg.Auth.RateLimitLogin.Requests,
+				Window:   cfg.Auth.RateLimitLogin.Window,
+			},
+			"token": {
+				Requests: cfg.Auth.RateLimitToken.Requests,
+				Window:   cfg.Auth.RateLimitToken.Window,
+			},
+			"setup": {
+				Requests: cfg.Auth.RateLimitSetup.Requests,
+				Window:   cfg.Auth.RateLimitSetup.Window,
+			},
+			"webhook": {
+				Requests: cfg.Auth.RateLimitWebhook.Requests,
+				Window:   cfg.Auth.RateLimitWebhook.Window,
+			},
+		},
+		DegradedProfile: middleware.RateLimitWindowProfile{
+			Requests: cfg.Auth.RateLimitDegraded.Requests,
+			Window:   cfg.Auth.RateLimitDegraded.Window,
+		},
+	}))
+
+	// API Logger Middleware
+	router.Use(middleware.APILogger(db, log))
 
 	corsConfig := cors.Config{
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowHeaders:     []string{"Origin", "Content-Type", "X-Tenant-ID", "Authorization"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "X-Tenant-ID", "X-User-ID", "X-Device-ID", "X-OS-Version", "Authorization"},
 		ExposeHeaders:    []string{"Content-Length"},
 		AllowCredentials: true,
 		MaxAge:           12 * time.Hour,
@@ -117,7 +165,12 @@ func main() {
 	campaignHandlers := governance.NewCampaignHTTPHandler(campaignSvc, log)
 
 	apiGroup := router.Group("/api/v1")
-	apiGroup.Use(middleware.TenantExtractor(middleware.TenantConfig{}))
+	apiGroup.Use(middleware.TenantExtractor(middleware.TenantConfig{
+		SlugResolver: func(_ context.Context, tenant string) (string, error) {
+			// In local/dev, we allow slugs like 'admin-system' directly
+			return tenant, nil
+		},
+	}))
 	campaignHandlers.RegisterRoutes(apiGroup)
 
 	// RBAC handlers

@@ -1,0 +1,60 @@
+replicaCount: 1
+
+nameOverride: ""
+fullnameOverride: ""
+
+image:
+  registry: ""
+  repository: ghcr.io/dhawalhost/wardseal-landingui
+  pullPolicy: IfNotPresent
+  tag: ""
+  pullSecrets: []
+
+service:
+  type: ClusterIP
+  port: 80
+  annotations: {}
+
+ingress:
+  enabled: false
+  className: traefik
+  annotations: {}
+  hosts: []
+  tls: []
+
+resources:
+  limits:
+    cpu: 50m
+    memory: 32Mi
+  requests:
+    cpu: 10m
+    memory: 16Mi
+
+autoscaling:
+  enabled: false
+
+serviceAccount:
+  create: false
+  name: ""
+
+podSecurityContext: {}
+securityContext: {}
+podAnnotations: {}
+podLabels: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+livenessProbe:
+  httpGet:
+    path: /
+    port: http
+  initialDelaySeconds: 5
+  periodSeconds: 15
+
+readinessProbe:
+  httpGet:
+    path: /
+    port: http
+  initialDelaySeconds: 3
+  periodSeconds: 10

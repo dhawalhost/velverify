@@ -33,7 +33,7 @@ kubectl get pods -n argocd
 kubectl get storageclass
 
 # Check ingress controller (production)
-kubectl get pods -n ingress-nginx
+kubectl get pods -n traefik
 ```
 
 ## Deploying Vault via ArgoCD

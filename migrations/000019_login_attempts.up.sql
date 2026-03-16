@@ -1,7 +1,7 @@
 -- Login attempts tracking for brute-force protection
 CREATE TABLE IF NOT EXISTS login_attempts (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id UUID NOT NULL,
+    tenant_id VARCHAR(255) NOT NULL,
     username VARCHAR(255) NOT NULL,
     ip_address VARCHAR(45),
     success BOOLEAN NOT NULL,
@@ -15,7 +15,7 @@ CREATE INDEX idx_login_attempts_ip ON login_attempts(ip_address, attempted_at DE
 -- Account lockout status
 CREATE TABLE IF NOT EXISTS account_lockouts (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id UUID NOT NULL,
+    tenant_id VARCHAR(255) NOT NULL,
     username VARCHAR(255) NOT NULL,
     locked_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     locked_until TIMESTAMP WITH TIME ZONE NOT NULL,

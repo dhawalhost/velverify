@@ -1,7 +1,7 @@
 -- Provisioning tasks queue
 CREATE TABLE IF NOT EXISTS provisioning_tasks (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id UUID NOT NULL,
+    tenant_id VARCHAR(255) NOT NULL,
     connector_id UUID NOT NULL,
     operation VARCHAR(100) NOT NULL, -- create_user, delete_user, add_to_group, etc.
     resource_type VARCHAR(50) NOT NULL,
@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS provisioning_tasks (
 -- Connector configurations
 CREATE TABLE IF NOT EXISTS connectors (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id UUID NOT NULL,
+    tenant_id VARCHAR(255) NOT NULL,
     name VARCHAR(255) NOT NULL,
     type VARCHAR(50) NOT NULL, -- ldap, azure-ad, google, scim
     enabled BOOLEAN NOT NULL DEFAULT true,

@@ -1,7 +1,7 @@
 -- API Keys / Personal Access Tokens
 CREATE TABLE IF NOT EXISTS api_keys (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id UUID NOT NULL,
+    tenant_id VARCHAR(255) NOT NULL,
     owner_id VARCHAR(255) NOT NULL,          -- User who created the key
     name VARCHAR(255) NOT NULL,
     key_prefix VARCHAR(12) NOT NULL,         -- First 12 chars for display (vv_live_xxx)

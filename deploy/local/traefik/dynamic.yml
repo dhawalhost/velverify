@@ -1,0 +1,85 @@
+http:
+  routers:
+    authsvc:
+      entryPoints:
+        - web
+      rule: Host(`auth.wardseal.local`)
+      service: authsvc
+
+    dirsvc:
+      entryPoints:
+        - web
+      rule: Host(`api.wardseal.local`) && (PathPrefix(`/scim`) || PathPrefix(`/api/v1/users`) || PathPrefix(`/api/v1/groups`) || PathPrefix(`/api/v1/scim`))
+      service: dirsvc
+
+    govsvc:
+      entryPoints:
+        - web
+      rule: Host(`api.wardseal.local`) && (PathPrefix(`/api/v1/oauth`) || PathPrefix(`/api/v1/governance`))
+      service: govsvc
+
+    policysvc:
+      entryPoints:
+        - web
+      rule: Host(`api.wardseal.local`) && PathPrefix(`/api/v1/policy`)
+      service: policysvc
+
+    provsvc:
+      entryPoints:
+        - web
+      rule: Host(`api.wardseal.local`) && PathPrefix(`/api/v1/provisioning`)
+      service: provsvc
+
+    adminui:
+      entryPoints:
+        - web
+      rule: Host(`console.wardseal.local`)
+      service: adminui
+
+    landingui-site:
+      entryPoints:
+        - web
+      rule: Host(`wardseal.local`)
+      service: landingui
+
+    landingui-help:
+      entryPoints:
+        - web
+      rule: Host(`help.wardseal.local`)
+      service: landingui
+
+  services:
+    authsvc:
+      loadBalancer:
+        servers:
+          - url: http://authsvc:8080
+
+    dirsvc:
+      loadBalancer:
+        servers:
+          - url: http://dirsvc:8081
+
+    govsvc:
+      loadBalancer:
+        servers:
+          - url: http://govsvc:8082
+
+    policysvc:
+      loadBalancer:
+        servers:
+          - url: http://policysvc:8083
+
+    provsvc:
+      loadBalancer:
+        servers:
+          - url: http://provsvc:8084
+
+    adminui:
+      loadBalancer:
+        servers:
+          - url: http://adminui:80
+
+    landingui:
+      loadBalancer:
+        servers:
+          - url: http://landingui:80

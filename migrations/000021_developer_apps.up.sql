@@ -1,7 +1,7 @@
 -- Developer Apps table for self-service app registration
 CREATE TABLE IF NOT EXISTS developer_apps (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id UUID NOT NULL,
+    tenant_id VARCHAR(255) NOT NULL,
     owner_id VARCHAR(255) NOT NULL,          -- User who created the app
     name VARCHAR(255) NOT NULL,
     description TEXT,

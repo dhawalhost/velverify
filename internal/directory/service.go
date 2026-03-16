@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"strings"
 
 	"github.com/jmoiron/sqlx"
 	"golang.org/x/crypto/bcrypt"
@@ -39,7 +40,7 @@ type Service interface {
 	GetTenantByEmail(ctx context.Context, email string) (string, error)
 
 	// Tenant Management
-	CreateTenant(ctx context.Context, id, name, plan string) error
+	CreateTenant(ctx context.Context, id, name, slug, plan string) error
 }
 
 type directoryService struct {
@@ -47,6 +48,7 @@ type directoryService struct {
 }
 
 var ErrInvalidCredentials = errors.New("invalid credentials")
+var ErrAlreadyExists = errors.New("already exists")
 
 // NewService creates a new directory service.
 func NewService(db *sqlx.DB) Service { // Use sqlx.DB
@@ -266,9 +268,17 @@ func (s *directoryService) GetTenantByEmail(ctx context.Context, email string) (
 	return tenantID, nil
 }
 
-func (s *directoryService) CreateTenant(ctx context.Context, id, name, plan string) error {
+func (s *directoryService) CreateTenant(ctx context.Context, id, name, slug, plan string) error {
 	_, err := s.db.ExecContext(ctx,
-		`INSERT INTO tenants (id, name, plan, created_at, updated_at) VALUES ($1, $2, $3, NOW(), NOW()) ON CONFLICT (id) DO NOTHING`,
-		id, name, plan)
-	return err
+		`INSERT INTO tenants (id, name, slug, plan, created_at, updated_at) VALUES ($1, $2, $3, $4, NOW(), NOW())`,
+		id, name, slug, plan)
+	if err != nil {
+		// PostgreSql error code 23505 is unique_violation
+		// This is a bit brittle, but works for our Postgres setup.
+		if strings.Contains(err.Error(), "duplicate key value violates unique constraint") {
+			return ErrAlreadyExists
+		}
+		return err
+	}
+	return nil
 }

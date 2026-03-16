@@ -1,6 +1,11 @@
-# Identity & Governance Platform
+# WardSeal: Identity & Governance Platform
 
-This repository contains the source code for the Identity & Governance Platform, a multi-tenant, enterprise-grade identity solution.
+WardSeal is an **Open Core** Identity & Access Management (IAM) platform. It provides enterprise-grade identity infrastructure that can be self-hosted on your own infrastructure or used as a managed service via WardSeal Cloud.
+
+## Deployment Models
+
+-   **Community Edition (Open Source)**: The core identity engine, auth services, and admin console. Ideal for self-hosting on Kubernetes or Docker.
+-   **WardSeal Cloud (SaaS)**: A fully managed, high-availability version of WardSeal with additional enterprise features like advanced compliance reporting, dedicated support, and automated scaling.
 
 ## Project Structure
 
@@ -51,23 +56,33 @@ curl http://localhost:8082/health
 
 ## Local development with Docker Compose
 
-Use the compose stack to spin up Postgres, Redis, the identity services, the governance API, and the Admin UI in one command. The new `adminui` container serves the Vite build through NGINX and is preconfigured to call `govsvc` inside the compose network.
+Use the compose stack to spin up Postgres, Redis, the identity services, the governance API, the public landing/help site, and the Admin Console behind a local reverse proxy. The frontend containers serve their production builds through NGINX and are preconfigured for the local host-routed domain model.
 
 ```bash
-docker compose up --build postgres redis dirsvc authsvc govsvc adminui
+docker compose up --build traefik postgres redis dirsvc authsvc govsvc policysvc provsvc adminui landingui
 ```
 
-- Governance API: <http://localhost:8082> (requires `X-Tenant-ID` header)
-- Admin UI: <http://localhost:5173> (talks to govsvc via the internal service URL)
+- Landing Site: <http://wardseal.local>
+- Help Portal: <http://help.wardseal.local>
+- Admin Console: <http://console.wardseal.local>
+- Auth Service: <http://auth.wardseal.local>
+- API Gateway Host: <http://api.wardseal.local>
+- Traefik Dashboard: <http://localhost:8088>
 
-When running the stack locally, `govsvc` now honors a `CORS_ALLOWED_ORIGINS` env var (comma separated) that defaults to `http://localhost:5173,http://127.0.0.1:5173`. Update it if you need to serve the Admin UI from a different host/port.
+Add these entries to `/etc/hosts` if they are not already present:
 
-The Admin UI JavaScript bundle reads `VITE_GOVSVC_URL` at build time (Compose now sets it to `http://localhost:8082`). You can override it by editing `docker-compose.yml`, rebuilding the `adminui` image, or by using the Base URL input inside the UI. Clearing the field reverts to the origin currently serving the UI, which is handy if you front the entire stack with a single domain.
+```text
+127.0.0.1 wardseal.local help.wardseal.local console.wardseal.local auth.wardseal.local api.wardseal.local
+```
 
-To point the UI at a different governance endpoint, override the build arg when building the image:
+When running the stack locally, the services honor `CORS_ALLOWED_ORIGINS` env vars that are aligned to those hostnames by default.
+
+The Admin Console JavaScript bundle reads `VITE_*` values at build time. Compose sets them to the local routed hosts by default. You can override them by editing [docker-compose.yml](docker-compose.yml) and rebuilding the relevant image.
+
+To point the console at a different governance endpoint, override the build arg when building the image:
 
 ```bash
-docker compose build --build-arg VITE_GOVSVC_URL=https://govsvc.wardseal.com adminui
+docker compose build --build-arg VITE_GOVSVC_URL=https://api.wardseal.com adminui
 ```
 
 ## Kubernetes deployment (Helm)
@@ -169,7 +184,7 @@ curl -X POST http://localhost:8082/api/v1/oauth/clients \
         "client_id": "admin-portal",
         "name": "Admin Portal",
         "client_type": "confidential",
-        "redirect_uris": ["https://admin.wardseal.com/callback"],
+        "redirect_uris": ["https://console.wardseal.com/callback"],
         "allowed_scopes": ["openid", "profile"],
         "client_secret": "replace-me"
     }'
@@ -190,7 +205,7 @@ go run ./cmd/admincli create \
     -client-id admin-portal \
     -name "Admin Portal" \
     -type confidential \
-    -redirects https://admin.wardseal.com/callback \
+    -redirects https://console.wardseal.com/callback \
     -scopes openid,profile \
     -secret super-secret
 ```

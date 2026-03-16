@@ -5,6 +5,7 @@ type User struct {
 	Schemas  []string `json:"schemas"`
 	ID       string   `json:"id,omitempty"`
 	UserName string   `json:"userName"`
+	Password string   `json:"password,omitempty"`
 	Name     struct {
 		GivenName  string `json:"givenName,omitempty"`
 		FamilyName string `json:"familyName,omitempty"`

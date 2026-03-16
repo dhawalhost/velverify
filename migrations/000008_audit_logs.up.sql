@@ -1,7 +1,7 @@
 -- Immutable audit log
 CREATE TABLE IF NOT EXISTS audit_logs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id UUID NOT NULL,
+    tenant_id VARCHAR(255) NOT NULL,
     timestamp TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
     actor_id UUID, -- User who performed the action (null for system)
     actor_type VARCHAR(50) NOT NULL DEFAULT 'user', -- user, system, service

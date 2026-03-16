@@ -1,8 +1,8 @@
 import axios from 'axios';
 
-export const AUTHSVC_URL = (import.meta as any).env?.VITE_AUTHSVC_URL || 'http://localhost:8080';
-const DIRSVC_URL = (import.meta as any).env?.VITE_DIRSVC_URL || 'http://localhost:8081';
-const GOVSVC_URL = (import.meta as any).env?.VITE_GOVSVC_URL || 'http://localhost:8082';
+export const AUTHSVC_URL = (import.meta as any).env?.VITE_AUTHSVC_URL || '';
+const DIRSVC_URL = (import.meta as any).env?.VITE_DIRSVC_URL || '';
+const GOVSVC_URL = (import.meta as any).env?.VITE_GOVSVC_URL || '';
 
 console.log('API Strings:', { AUTHSVC_URL, DIRSVC_URL, GOVSVC_URL });
 
@@ -34,11 +34,15 @@ dirApi.interceptors.request.use(
     (config) => {
         const token = localStorage.getItem('token');
         const tenantID = localStorage.getItem('tenantID');
+        const userId = localStorage.getItem('userId');
         if (token) {
             config.headers.Authorization = `Bearer ${token}`;
         }
         if (tenantID) {
             config.headers['X-Tenant-ID'] = tenantID;
+        }
+        if (userId) {
+            config.headers['X-User-ID'] = userId;
         }
         return config;
     },
@@ -50,11 +54,15 @@ govApi.interceptors.request.use(
     (config) => {
         const token = localStorage.getItem('token');
         const tenantID = localStorage.getItem('tenantID');
+        const userId = localStorage.getItem('userId');
         if (token) {
             config.headers.Authorization = `Bearer ${token}`;
         }
         if (tenantID) {
             config.headers['X-Tenant-ID'] = tenantID;
+        }
+        if (userId) {
+            config.headers['X-User-ID'] = userId;
         }
         return config;
     },
@@ -66,11 +74,15 @@ api.interceptors.request.use(
     (config) => {
         const token = localStorage.getItem('token');
         const tenantID = localStorage.getItem('tenantID');
+        const userId = localStorage.getItem('userId');
         if (token) {
             config.headers.Authorization = `Bearer ${token}`;
         }
         if (tenantID) {
             config.headers['X-Tenant-ID'] = tenantID;
+        }
+        if (userId) {
+            config.headers['X-User-ID'] = userId;
         }
         return config;
     },
@@ -85,7 +97,11 @@ export const login = async (username: string, password: string, deviceID?: strin
     if (osVersion) {
         headers['X-OS-Version'] = osVersion;
     }
-    const response = await api.post('/login', { username, password }, { headers });
+    const tenantID = localStorage.getItem('tenantID');
+    const tenantSlug = localStorage.getItem('tenantSlug');
+    const tenantPath = tenantSlug || tenantID;
+    const path = tenantPath ? `/t/${tenantPath}/login` : '/login';
+    const response = await api.post(path, { username, password }, { headers });
     return response.data;
 };
 
@@ -95,6 +111,13 @@ export const signup = async (email: string, password: string, companyName: strin
 };
 
 // System Setup
+export const logout = async () => {
+    const tenantID = localStorage.getItem('tenantID');
+    const tenantSlug = localStorage.getItem('tenantSlug');
+    const tenantPath = tenantSlug || tenantID;
+    const path = tenantPath ? `/t/${tenantPath}/logout` : '/logout';
+    await api.post(path);
+};
 export const getSetupStatus = async () => {
     const response = await api.get('/api/v1/setup/status');
     return response.data;
@@ -111,7 +134,11 @@ export const lookupUser = async (email: string) => {
 };
 
 export const completeMfaLogin = async (pendingToken: string, totpCode: string, userId: string) => {
-    const response = await api.post('/login/mfa', {
+    const tenantID = localStorage.getItem('tenantID');
+    const tenantSlug = localStorage.getItem('tenantSlug');
+    const tenantPath = tenantSlug || tenantID;
+    const path = tenantPath ? `/t/${tenantPath}/login/mfa` : '/login/mfa';
+    const response = await api.post(path, {
         pending_token: pendingToken,
         totp_code: totpCode,
         user_id: userId
@@ -157,6 +184,20 @@ export const createUser = async (userData: any) => {
         schemas: ["urn:ietf:params:scim:schemas:core:2.0:User"],
         ...userData
     });
+    return response.data;
+};
+
+export const requestPasswordSetupLink = async (userID: string, mode: 'invite' | 'reset', expiresHours: number = 72) => {
+    const response = await api.post('/api/v1/setup/password-link', {
+        user_id: userID,
+        mode,
+        expires_hours: expiresHours,
+    });
+    return response.data;
+};
+
+export const completePasswordSetup = async (token: string, password: string) => {
+    const response = await api.post('/api/v1/setup/password', { token, password });
     return response.data;
 };
 
@@ -456,6 +497,27 @@ export const generateDomainToken = async (orgId: string) => {
 
 export const verifyDomain = async (orgId: string) => {
     const response = await govApi.post(`/api/v1/organizations/${orgId}/domain-verification/verify`);
+    return response.data;
+};
+
+// Developer Portal
+export const getDeveloperAnalytics = async () => {
+    const response = await api.get('/api/v1/developer/analytics');
+    return response.data;
+};
+
+export const getAppLogs = async (appId: string) => {
+    const response = await api.get(`/api/v1/apps/${appId}/logs`);
+    return response.data;
+};
+
+export const getAPIKeyLogs = async (keyId: string) => {
+    const response = await api.get(`/api/v1/api-keys/${keyId}/logs`);
+    return response.data;
+};
+
+export const getUserApps = async () => {
+    const response = await api.get('/api/v1/user/apps');
     return response.data;
 };
 

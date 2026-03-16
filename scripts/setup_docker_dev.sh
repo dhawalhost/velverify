@@ -18,7 +18,7 @@ fi
 sed -i '' '/^version:/d' docker-compose.yml 2>/dev/null || true
 
 echo -e "${GREEN}Step 1: Starting Database and Redis...${NC}"
-docker compose up -d postgres redis
+docker compose up -d traefik postgres redis
 echo "Waiting for Postgres to be ready..."
 until docker compose exec -T postgres pg_isready -U user -d identity_platform 2>/dev/null; do
   sleep 2
@@ -69,13 +69,21 @@ docker compose build adminui
 echo "Starting adminui..."
 docker compose up -d adminui
 
+echo "Building landingui..."
+docker compose build landingui
+echo "Starting landingui..."
+docker compose up -d landingui
+
 echo ""
 echo -e "${GREEN}Setup Complete!${NC}"
 echo "================================================"
-echo "Admin UI:          http://localhost:5173"
-echo "Auth Service:      http://localhost:8080"
-echo "Directory Service: http://localhost:8081"
-echo "Governance Service: http://localhost:8082"
+echo "Add to /etc/hosts: 127.0.0.1 wardseal.local help.wardseal.local console.wardseal.local auth.wardseal.local api.wardseal.local"
+echo "Landing Site:       http://wardseal.local"
+echo "Help Portal:        http://help.wardseal.local"
+echo "Admin Console:      http://console.wardseal.local"
+echo "Auth Service:       http://auth.wardseal.local"
+echo "API Gateway Host:   http://api.wardseal.local"
+echo "Traefik Dashboard:  http://localhost:8088"
 echo "================================================"
 echo ""
 echo "View logs: docker compose logs -f"

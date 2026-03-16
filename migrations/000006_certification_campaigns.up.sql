@@ -1,7 +1,7 @@
 -- Certification Campaigns
 CREATE TABLE IF NOT EXISTS certification_campaigns (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id UUID NOT NULL,
+    tenant_id VARCHAR(255) NOT NULL,
     name VARCHAR(255) NOT NULL,
     description TEXT,
     status VARCHAR(50) NOT NULL DEFAULT 'draft', -- draft, active, completed, cancelled
@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS certification_campaigns (
 CREATE TABLE IF NOT EXISTS certification_items (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     campaign_id UUID NOT NULL REFERENCES certification_campaigns(id) ON DELETE CASCADE,
-    tenant_id UUID NOT NULL,
+    tenant_id VARCHAR(255) NOT NULL,
     user_id UUID NOT NULL, -- User whose access is being reviewed
     resource_type VARCHAR(50) NOT NULL, -- 'group', 'app', 'role'
     resource_id UUID NOT NULL,

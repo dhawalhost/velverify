@@ -8,7 +8,10 @@ type LoginRequest struct {
 
 // LoginResponse holds the response values for the Login endpoint.
 type LoginResponse struct {
-	Token string `json:"token"`
+	Token      string   `json:"token"`
+	Roles      []string `json:"roles,omitempty"`
+	TenantID   string   `json:"tenant_id,omitempty"`
+	TenantSlug string   `json:"tenant_slug,omitempty"`
 }
 
 // AuthorizeRequest holds the request parameters for the Authorize endpoint.
@@ -18,6 +21,7 @@ type AuthorizeRequest struct {
 	RedirectURI         string `form:"redirect_uri" json:"redirect_uri" validate:"required,url"`
 	Scope               string `form:"scope" json:"scope" validate:"required"`
 	State               string `form:"state" json:"state"`
+	Nonce               string `form:"nonce" json:"nonce"`
 	CodeChallenge       string `form:"code_challenge" json:"code_challenge" validate:"required"`
 	CodeChallengeMethod string `form:"code_challenge_method" json:"code_challenge_method" validate:"omitempty,oneof=S256"`
 }
@@ -81,4 +85,23 @@ type IntrospectResponse struct {
 type RevokeRequest struct {
 	Token         string `form:"token" json:"token" validate:"required"`
 	TokenTypeHint string `form:"token_type_hint" json:"token_type_hint"`
+}
+
+// OpenIDConfiguration holds the OIDC discovery metadata.
+type OpenIDConfiguration struct {
+	Issuer                            string   `json:"issuer"`
+	AuthorizationEndpoint             string   `json:"authorization_endpoint"`
+	TokenEndpoint                     string   `json:"token_endpoint"`
+	UserinfoEndpoint                  string   `json:"userinfo_endpoint,omitempty"`
+	JwksURI                           string   `json:"jwks_uri"`
+	RegistrationEndpoint              string   `json:"registration_endpoint,omitempty"`
+	ScopesSupported                   []string `json:"scopes_supported,omitempty"`
+	ResponseTypesSupported            []string `json:"response_types_supported"`
+	ResponseModesSupported            []string `json:"response_modes_supported,omitempty"`
+	GrantTypesSupported               []string `json:"grant_types_supported,omitempty"`
+	SubjectTypesSupported             []string `json:"subject_types_supported"`
+	IDTokenSigningAlgValuesSupported  []string `json:"id_token_signing_alg_values_supported"`
+	TokenEndpointAuthMethodsSupported []string `json:"token_endpoint_auth_methods_supported,omitempty"`
+	CodeChallengeMethodsSupported     []string `json:"code_challenge_methods_supported,omitempty"`
+	ClaimsSupported                   []string `json:"claims_supported,omitempty"`
 }

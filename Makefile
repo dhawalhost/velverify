@@ -32,7 +32,8 @@ GOLANGCI_LINT_VERSION = v2.7.2
 .PHONY: all build clean deps test lint test-coverage test-integration \
         docker-up docker-down install-migrate migrate-create migrate-up migrate-down \
         build-images push-images run-authsvc run-dirsvc run-govsvc \
-        install-tools lint-fix fmt help
+	install-tools lint-fix fmt help validate-env-config \
+	sync-charts deploy-local-k8s destroy-local-k8s
 
 # ==================
 # Main targets
@@ -213,3 +214,28 @@ frontend-build: ## Build frontend for production
 
 frontend-lint: ## Lint frontend code
 	cd web/admin && npm run lint
+
+validate-env-config: ## Validate local/staging/production Helm config consistency
+	./scripts/validate_env_config.sh
+
+# ==================
+# Local k8s (Rancher Desktop)
+# ==================
+
+sync-charts: ## Sync local Helm sub-charts, update Chart.lock, and verify dependencies
+	bash scripts/deploy_local_k8s.sh --sync-charts-only
+
+deploy-local-k8s: ## Full local k8s deploy (includes image build + chart sync)
+	bash scripts/deploy_local_k8s.sh
+
+deploy-local-k8s-fast: ## Redeploy without rebuilding images (~30s — use after first deploy)
+	bash scripts/deploy_local_k8s.sh --skip-build --skip-infra --skip-sync
+
+deploy-local-k8s-no-landing: ## Full deploy, skip landing site build
+	bash scripts/deploy_local_k8s.sh --without-landing
+
+destroy-local-k8s: ## Tear down local k8s resources
+	bash scripts/destroy_local_k8s.sh
+
+destroy-local-k8s-clean: ## Tear down local k8s resources and remove /etc/hosts entries
+	bash scripts/destroy_local_k8s.sh --remove-hosts

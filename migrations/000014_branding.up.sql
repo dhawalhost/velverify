@@ -1,5 +1,5 @@
 CREATE TABLE IF NOT EXISTS tenant_branding (
-    tenant_id UUID PRIMARY KEY,
+    tenant_id VARCHAR(255) PRIMARY KEY,
     logo_url TEXT,
     primary_color VARCHAR(7), -- Hex code e.g. #FFFFFF
     background_color VARCHAR(7),

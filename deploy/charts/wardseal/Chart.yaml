@@ -20,3 +20,28 @@ dependencies:
     version: "0.1.0"
     repository: "file://../govsvc"
     condition: govsvc.enabled
+
+  - name: policysvc
+    version: "0.1.0"
+    repository: "file://../policysvc"
+    condition: policysvc.enabled
+
+  - name: provsvc
+    version: "0.1.0"
+    repository: "file://../provsvc"
+    condition: provsvc.enabled
+
+  - name: adminui
+    version: "0.1.0"
+    repository: "file://../adminui"
+    condition: adminui.enabled
+
+  - name: landingui
+    version: "0.1.0"
+    repository: "file://../landingui"
+    condition: landingui.enabled
+
+  - name: docs
+    version: "0.1.0"
+    repository: "file://../docs"
+    condition: docs.enabled

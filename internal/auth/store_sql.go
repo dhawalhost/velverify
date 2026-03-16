@@ -25,8 +25,8 @@ func NewSQLAuthorizationCodeStore(db *sqlx.DB) *SQLAuthorizationCodeStore {
 
 func (s *SQLAuthorizationCodeStore) Save(ctx context.Context, code authorizationCode) error {
 	query := `
-		INSERT INTO authorization_codes (code, client_id, redirect_uri, scope, tenant_id, code_challenge, code_challenge_method, expires_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		INSERT INTO authorization_codes (code, client_id, redirect_uri, scope, tenant_id, nonce, code_challenge, code_challenge_method, expires_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 	`
 	_, err := s.db.ExecContext(ctx, query,
 		code.Code,
@@ -34,6 +34,7 @@ func (s *SQLAuthorizationCodeStore) Save(ctx context.Context, code authorization
 		code.RedirectURI,
 		code.Scope,
 		code.TenantID,
+		code.Nonce,
 		code.CodeChallenge,
 		code.CodeChallengeMethod,
 		code.ExpiresAt,
@@ -43,7 +44,7 @@ func (s *SQLAuthorizationCodeStore) Save(ctx context.Context, code authorization
 
 func (s *SQLAuthorizationCodeStore) Get(ctx context.Context, code string) (authorizationCode, bool, error) {
 	var entry authorizationCode
-	query := `SELECT code, client_id, redirect_uri, scope, tenant_id, code_challenge, code_challenge_method, expires_at FROM authorization_codes WHERE code = $1`
+	query := `SELECT code, client_id, redirect_uri, scope, tenant_id, nonce, code_challenge, code_challenge_method, expires_at FROM authorization_codes WHERE code = $1`
 	err := s.db.GetContext(ctx, &entry, query, code)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {

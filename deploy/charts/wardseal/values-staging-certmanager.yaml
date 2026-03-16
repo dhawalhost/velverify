@@ -1,0 +1,8 @@
+# Staging cert-manager overlay
+# Use this file in addition to values-staging.yaml when cert-manager is installed.
+
+ingress:
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.tls: "true"
+    cert-manager.io/cluster-issuer: letsencrypt-staging

@@ -61,6 +61,7 @@ type CampaignStore interface {
 
 	// Items
 	CreateItem(ctx context.Context, item CertificationItem) (string, error)
+	GetItem(ctx context.Context, itemID string) (CertificationItem, error)
 	ListItems(ctx context.Context, campaignID, decision string) ([]CertificationItem, error)
 	ListItemsByReviewer(ctx context.Context, tenantID, reviewerID string) ([]CertificationItem, error)
 	UpdateItemDecision(ctx context.Context, itemID, decision, comment string) error
@@ -126,6 +127,12 @@ func (s *campaignStore) CreateItem(ctx context.Context, item CertificationItem) 
 		item.CampaignID, item.TenantID, item.UserID, item.ResourceType, item.ResourceID, item.ResourceName,
 	).Scan(&id)
 	return id, err
+}
+
+func (s *campaignStore) GetItem(ctx context.Context, itemID string) (CertificationItem, error) {
+	var item CertificationItem
+	err := s.db.GetContext(ctx, &item, `SELECT * FROM certification_items WHERE id = $1`, itemID)
+	return item, err
 }
 
 func (s *campaignStore) ListItems(ctx context.Context, campaignID, decision string) ([]CertificationItem, error) {

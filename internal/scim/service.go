@@ -2,6 +2,8 @@ package scim
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"time"
@@ -26,6 +28,9 @@ func (s *Service) CreateUser(ctx context.Context, tenantID string, req User) (Us
 	if req.UserName == "" {
 		return User{}, errors.New("userName is required")
 	}
+	if req.Password != "" && len(req.Password) < 8 {
+		return User{}, errors.New("password must be at least 8 characters")
+	}
 	email := req.UserName
 	// If emails present, use primary or first one as well? For now, assume userName is email.
 	if len(req.Emails) > 0 {
@@ -37,10 +42,15 @@ func (s *Service) CreateUser(ctx context.Context, tenantID string, req User) (Us
 		}
 	}
 
+	password := req.Password
+	if password == "" {
+		password = generateInitialPassword()
+	}
+
 	dirUser := directory.User{
 		Email:    email,
 		Status:   "active",
-		Password: "ChangeMe123!", // Dummy password for now, or generated
+		Password: password,
 	}
 	if !req.Active {
 		dirUser.Status = "inactive"
@@ -59,6 +69,14 @@ func (s *Service) CreateUser(ctx context.Context, tenantID string, req User) (Us
 		Location:     fmt.Sprintf("/scim/v2/Users/%s", id),
 	}
 	return req, nil
+}
+
+func generateInitialPassword() string {
+	buf := make([]byte, 18)
+	if _, err := rand.Read(buf); err != nil {
+		return "ChangeMe123!"
+	}
+	return "Ws!" + base64.RawURLEncoding.EncodeToString(buf)
 }
 
 // GetUser retrieves a SCIM user by ID.

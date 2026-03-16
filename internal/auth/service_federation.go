@@ -54,7 +54,7 @@ func (s *authService) SocialLogin(ctx context.Context, req SocialLoginRequest) (
 
 	clientID := ""
 	if ssoProvider.OIDCClientID != nil {
-		clientID = *ssoProvider.OIDCClientID
+		clientID = strings.TrimSpace(*ssoProvider.OIDCClientID)
 	}
 
 	conf := &oauth2.Config{
@@ -175,9 +175,22 @@ func (s *authService) SocialLogin(ctx context.Context, req SocialLoginRequest) (
 	// 3. Issue Tokens (Same as Login)
 	// We assume minimal scope for now or default
 	scope := "openid profile email"
-	_ = userID // TODO: issueTokens should use userID for subject claim
+	tokenClientID := socialTokenClientID(req.Provider, clientID)
 
-	return s.issueTokens(ctx, tenantID, "social-client", scope, "user") // ClientID is dummy for now
+	return s.issueTokensWithoutRefresh(tenantID, tokenClientID, scope, userID, "")
+}
+
+func socialTokenClientID(provider, oidcClientID string) string {
+	if oidcClientID != "" {
+		return oidcClientID
+	}
+
+	provider = strings.TrimSpace(provider)
+	if provider == "" {
+		return "social:unknown"
+	}
+
+	return fmt.Sprintf("social:%s", provider)
 }
 
 // Helper structs for internal calls
@@ -205,9 +218,9 @@ func (s *authService) findUserByEmail(ctx context.Context, tenantID, email strin
 		return nil, err
 	}
 	req.Header.Set(middleware.DefaultTenantHeader, tenantID)
-	// Internal Auth
+	// Internal Auth for SCIM requires Bearer Token format
 	if s.serviceAuthToken != "" {
-		req.Header.Set(s.serviceAuthHeader, s.serviceAuthToken)
+		req.Header.Set("Authorization", "Bearer "+s.serviceAuthToken)
 	}
 
 	resp, err := s.httpClient.Do(req)
@@ -281,8 +294,9 @@ func (s *authService) provisionUser(ctx context.Context, tenantID, email, name s
 	}
 	req.Header.Set("Content-Type", "application/scim+json")
 	req.Header.Set(middleware.DefaultTenantHeader, tenantID)
+	// Internal Auth for SCIM requires Bearer Token format
 	if s.serviceAuthToken != "" {
-		req.Header.Set(s.serviceAuthHeader, s.serviceAuthToken)
+		req.Header.Set("Authorization", "Bearer "+s.serviceAuthToken)
 	}
 
 	resp, err := s.httpClient.Do(req)

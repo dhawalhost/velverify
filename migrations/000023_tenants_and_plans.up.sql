@@ -1,5 +1,5 @@
 CREATE TABLE IF NOT EXISTS tenants (
-    id UUID PRIMARY KEY,
+    id VARCHAR(255) PRIMARY KEY,
     name VARCHAR(255) NOT NULL DEFAULT 'My Organization',
     plan VARCHAR(50) NOT NULL DEFAULT 'free',
     license_key TEXT,

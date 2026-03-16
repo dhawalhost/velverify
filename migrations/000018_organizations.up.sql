@@ -2,7 +2,7 @@
 -- Organization = Tenant's customer (enterprise account)
 CREATE TABLE IF NOT EXISTS organizations (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id UUID NOT NULL,
+    tenant_id VARCHAR(255) NOT NULL,
     name VARCHAR(255) NOT NULL,
     display_name VARCHAR(255),
     domain VARCHAR(255),

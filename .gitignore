@@ -39,3 +39,13 @@ config/.env.development
 # OS-specific files
 .DS_Store
 Thumbs.db
+
+# pem keys
+deploy/dev-keys
+
+web/admin/node_modules
+web/admin/dist
+web/landing/node_modules
+web/landing/dist
+web/help/node_modules
+web/help/dist

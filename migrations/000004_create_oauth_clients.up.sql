@@ -3,7 +3,7 @@
 
 CREATE TABLE IF NOT EXISTS oauth_clients (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id UUID NOT NULL,
+    tenant_id VARCHAR(255) NOT NULL,
     client_id TEXT NOT NULL,
     client_type TEXT NOT NULL DEFAULT 'public',
     name TEXT NOT NULL,

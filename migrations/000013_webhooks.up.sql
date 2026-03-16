@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS webhooks (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id UUID NOT NULL,
+    tenant_id VARCHAR(255) NOT NULL,
     url TEXT NOT NULL,
     secret TEXT NOT NULL, -- HMAC secret
     events TEXT[] NOT NULL, -- Array of event names e.g. ['user.created', 'login.success']

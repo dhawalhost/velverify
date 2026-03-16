@@ -9,6 +9,10 @@ import { ShieldCheck, Fingerprint, ArrowRight, User as UserIcon, Lock } from 'lu
 import { startAuthentication } from '@simplewebauthn/browser';
 
 const Login: React.FC = () => {
+    const policyBaseUrl = window.location.hostname.endsWith('.local')
+        ? 'http://wardseal.local'
+        : 'https://wardseal.com';
+
     const getDeviceID = () => {
         let deviceID = localStorage.getItem('deviceID');
         if (!deviceID) {
@@ -88,6 +92,29 @@ const Login: React.FC = () => {
     }, [tenantID]);
 
 
+    const performRedirection = (data: any) => {
+        const redirectUri = searchParams.get('redirect_uri');
+        console.log('Performing redirection. redirectUri:', redirectUri, 'data:', data);
+
+        if (redirectUri) {
+            // Explicitly handle relative paths by using window.location for full page transition
+            if (redirectUri.startsWith('/')) {
+                window.location.assign(window.location.origin + redirectUri);
+            } else {
+                window.location.href = redirectUri;
+            }
+            return;
+        }
+
+        // Role-based redirection fallback
+        const roles = data.roles || [];
+        if (roles.includes('admin')) {
+            navigate('/dashboard');
+        } else {
+            navigate('/portal');
+        }
+    };
+
     const handleIdentifierSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
@@ -117,6 +144,9 @@ const Login: React.FC = () => {
             if (lookup.tenant_id) {
                 setTenantID(lookup.tenant_id);
                 localStorage.setItem('tenantID', lookup.tenant_id);
+            }
+            if (lookup.tenant_slug) {
+                localStorage.setItem('tenantSlug', lookup.tenant_slug);
             }
 
             setStep('challenge');
@@ -166,7 +196,14 @@ const Login: React.FC = () => {
 
             localStorage.setItem('token', data.token);
             localStorage.setItem('userId', email);
-            navigate('/dashboard');
+            if (data.tenant_id) {
+                localStorage.setItem('tenantID', data.tenant_id);
+            }
+            if (data.tenant_slug) {
+                localStorage.setItem('tenantSlug', data.tenant_slug);
+            }
+
+            performRedirection(data);
         } catch (err: any) {
             console.error(err);
             // Ensure tenantID is still set if login fails (it should be from step 1)
@@ -191,7 +228,14 @@ const Login: React.FC = () => {
 
             localStorage.setItem('token', data.token);
             localStorage.setItem('userId', email);
-            navigate('/dashboard');
+            if (data.tenant_id) {
+                localStorage.setItem('tenantID', data.tenant_id);
+            }
+            if (data.tenant_slug) {
+                localStorage.setItem('tenantSlug', data.tenant_slug);
+            }
+
+            performRedirection(data);
         } catch (err: any) {
             console.error(err);
             setError('Passkey authentication failed');
@@ -207,7 +251,14 @@ const Login: React.FC = () => {
             const data = await completeMfaLogin(pendingToken, totpCode, mfaUserId);
             localStorage.setItem('token', data.token);
             localStorage.setItem('userId', email);
-            navigate('/dashboard');
+            if (data.tenant_id) {
+                localStorage.setItem('tenantID', data.tenant_id);
+            }
+            if (data.tenant_slug) {
+                localStorage.setItem('tenantSlug', data.tenant_slug);
+            }
+
+            performRedirection(data);
         } catch (err: any) {
             console.error(err);
             setError('Invalid TOTP code');
@@ -220,7 +271,7 @@ const Login: React.FC = () => {
     if (mfaRequired) {
         return (
             <div className="flex items-center justify-center min-h-screen bg-muted/20 p-4">
-                <Card className="w-full max-w-md shadow-lg border-muted/40">
+                <Card className="w-full max-w-md shadow-lg border-muted/40 font-inter">
                     <CardHeader className="text-center">
                         <div className="mx-auto w-16 h-16 flex items-center justify-center mb-4">
                             <img src="/wardseal.svg" alt="Logo" className="w-full h-full object-contain" />
@@ -293,8 +344,6 @@ const Login: React.FC = () => {
                             </div>
 
                             {/* Tenant ID Field - Hidden/Optional now */}
-                            {/* We can still allow manual entry for power users via details/accordion, or logic */}
-                            {/* For now, hidden unless explicitly requested or present */}
                             {searchParams.get('debug') === 'true' && (
                                 <div className="space-y-2">
                                     <Label htmlFor="tenant" className="text-muted-foreground text-xs font-normal">Tenant (Optional)</Label>
@@ -372,6 +421,11 @@ const Login: React.FC = () => {
                     </p>
                     <p className="text-center text-xs text-muted-foreground w-full">
                         New here? <a href="/signup" className="text-primary hover:underline">Create an account</a>
+                    </p>
+                    <p className="text-center text-xs text-muted-foreground w-full flex items-center justify-center gap-3">
+                        <a href={`${policyBaseUrl}/policies#privacy`} target="_blank" rel="noreferrer" className="text-primary hover:underline">Privacy</a>
+                        <a href={`${policyBaseUrl}/policies#privacy`} target="_blank" rel="noreferrer" className="text-primary hover:underline">Terms</a>
+                        <a href={`${policyBaseUrl}/policies`} target="_blank" rel="noreferrer" className="text-primary hover:underline">Policies</a>
                     </p>
                 </CardFooter>
             </Card>

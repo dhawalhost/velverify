@@ -75,6 +75,39 @@ go test -v -tags=integration ./tests/integration/...
 | `JWT_PUBLIC_KEY` | ❌ | - | Public key for verifying JWTs |
 | `LOG_LEVEL` | ❌ | `info` | Logging level: `debug`, `info`, `warn`, `error` |
 
+#### Redis-backed session and distributed rate-limit settings
+
+| Variable | Required | Default | Description |
+| :--- | :---: | :--- | :--- |
+| `REDIS_ADDR` | ⚠️ | - | Redis host:port. Required in production for WebAuthn transient session storage. |
+| `REDIS_PASSWORD` | ❌ | - | Redis password (if enabled). |
+| `REDIS_DB` | ❌ | `0` | Redis DB index. |
+| `WEBAUTHN_SESSION_TTL_SECONDS` | ❌ | `600` | TTL for transient WebAuthn sessions. |
+| `RATE_LIMIT_USE_TENANT` | ❌ | `true` | When `true`, limiter buckets include tenant scope. |
+| `RATE_LIMIT_KEY_PREFIX` | ❌ | `authsvc:ratelimit` | Base Redis key prefix for limiter counters. |
+| `RATE_LIMIT_DEFAULT_REQUESTS` | ❌ | `1200` | Default request budget per window. |
+| `RATE_LIMIT_DEFAULT_WINDOW_SECONDS` | ❌ | `60` | Default limiter window in seconds. |
+| `RATE_LIMIT_LOGIN_REQUESTS` | ❌ | `60` | Login endpoint budget per window. |
+| `RATE_LIMIT_LOGIN_WINDOW_SECONDS` | ❌ | `60` | Login limiter window in seconds. |
+| `RATE_LIMIT_TOKEN_REQUESTS` | ❌ | `240` | Token endpoint budget per window. |
+| `RATE_LIMIT_TOKEN_WINDOW_SECONDS` | ❌ | `60` | Token limiter window in seconds. |
+| `RATE_LIMIT_SETUP_REQUESTS` | ❌ | `30` | Setup endpoint budget per window. |
+| `RATE_LIMIT_SETUP_WINDOW_SECONDS` | ❌ | `60` | Setup limiter window in seconds. |
+| `RATE_LIMIT_WEBHOOK_REQUESTS` | ❌ | `600` | Webhook endpoint budget per window. |
+| `RATE_LIMIT_WEBHOOK_WINDOW_SECONDS` | ❌ | `60` | Webhook limiter window in seconds. |
+| `RATE_LIMIT_DEGRADED_REQUESTS` | ❌ | `30` | Strict fallback budget when Redis is unavailable. |
+| `RATE_LIMIT_DEGRADED_WINDOW_SECONDS` | ❌ | `60` | Fallback limiter window in seconds. |
+
+#### Recommended starting profiles
+
+| Environment | Login | Token | Setup | Webhook | Default | Degraded |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| Development | 120/min | 600/min | 60/min | 1200/min | 2400/min | 60/min |
+| Staging | 80/min | 360/min | 45/min | 800/min | 1600/min | 40/min |
+| Production (initial) | 60/min | 240/min | 30/min | 600/min | 1200/min | 30/min |
+
+> Tune these per tenant size and observed traffic patterns. Start conservative on auth-critical endpoints (`/login`, `/oauth2/token`) and increase only after load and abuse testing.
+
 #### Enterprise License (Optional)
 | Variable | Required | Default | Description |
 | :--- | :---: | :--- | :--- |

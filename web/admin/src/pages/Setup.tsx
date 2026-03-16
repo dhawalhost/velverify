@@ -52,9 +52,8 @@ const Setup: React.FC = () => {
             const resp = await performSetup(email, password);
             // Store token/tenant and redirect to dashboard
             localStorage.setItem('token', resp.token);
-            // Setup doesn't return full login response structure usually, but backend sends "token" and "message".
-            // We should set tenantID to the system tenant "11111111-1111-1111-1111-111111111111"
-            localStorage.setItem('tenantID', '11111111-1111-1111-1111-111111111111');
+            localStorage.setItem('tenantID', resp.tenant_id || 'admin-system');
+            localStorage.setItem('tenantSlug', resp.tenant_slug || 'admin');
 
             navigate('/dashboard');
         } catch (err: any) {

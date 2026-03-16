@@ -30,7 +30,7 @@ service:
 # ====================
 ingress:
   enabled: false
-  className: nginx
+  className: traefik
   annotations: {}
     # cert-manager.io/cluster-issuer: "letsencrypt-prod"
   hosts: []
@@ -87,7 +87,7 @@ securityContext:
 # ====================
 livenessProbe:
   httpGet:
-    path: /health/live
+    path: /health
     port: http
   initialDelaySeconds: 30
   periodSeconds: 10
@@ -96,7 +96,7 @@ livenessProbe:
 
 readinessProbe:
   httpGet:
-    path: /health/ready
+    path: /health
     port: http
   initialDelaySeconds: 10
   periodSeconds: 5
@@ -105,7 +105,7 @@ readinessProbe:
 
 startupProbe:
   httpGet:
-    path: /health/startup
+    path: /health
     port: http
   initialDelaySeconds: 0
   periodSeconds: 5

@@ -1,0 +1,8 @@
+# Production no-cert-manager compatibility overlay
+# values-production.yaml is already cert-manager agnostic.
+# This file is kept for backward compatibility with existing deployment commands.
+
+ingress:
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.tls: "true"

@@ -8,5 +8,20 @@ dependencies:
 - name: govsvc
   repository: file://../govsvc
   version: 0.1.0
-digest: sha256:f012422ba98a972bef929a3f6f2fa436c921be6a8255206be06b457392b23661
-generated: "2026-01-15T15:12:59.358337+05:30"
+- name: policysvc
+  repository: file://../policysvc
+  version: 0.1.0
+- name: provsvc
+  repository: file://../provsvc
+  version: 0.1.0
+- name: adminui
+  repository: file://../adminui
+  version: 0.1.0
+- name: landingui
+  repository: file://../landingui
+  version: 0.1.0
+- name: docs
+  repository: file://../docs
+  version: 0.1.0
+digest: sha256:5f55bc2260062a038ca2f6cdb1f163c057386848b7fcf3e1c4e9b931f515ab64
+generated: "2026-03-16T15:35:25.506842+05:30"

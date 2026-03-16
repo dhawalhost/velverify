@@ -41,16 +41,16 @@ type Connector interface {
 
 // Config holds connector configuration.
 type Config struct {
-	ID          string            `json:"id"`
-	TenantID    string            `json:"tenant_id"`
-	Name        string            `json:"name"`
-	Type        string            `json:"type"` // ldap, azure-ad, google, scim
-	Enabled     bool              `json:"enabled"`
-	Endpoint    string            `json:"endpoint"`
-	Credentials map[string]string `json:"credentials"` // Encrypted at rest
-	Settings    map[string]string `json:"settings"`
-	CreatedAt   time.Time         `json:"created_at"`
-	UpdatedAt   time.Time         `json:"updated_at"`
+	ID          string            `json:"id" db:"id"`
+	TenantID    string            `json:"tenant_id" db:"tenant_id"`
+	Name        string            `json:"name" db:"name"`
+	Type        string            `json:"type" db:"type"` // ldap, azure-ad, google, scim
+	Enabled     bool              `json:"enabled" db:"enabled"`
+	Endpoint    string            `json:"endpoint" db:"endpoint"`
+	Credentials map[string]string `json:"credentials" db:"-"` // Encrypted at rest
+	Settings    map[string]string `json:"settings" db:"-"`
+	CreatedAt   time.Time         `json:"created_at" db:"created_at"`
+	UpdatedAt   time.Time         `json:"updated_at" db:"updated_at"`
 }
 
 // User represents a user in an external system.

@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"encoding/json"
 	"net/http"
 
 	"github.com/dhawalhost/wardseal/pkg/middleware"
@@ -24,38 +25,48 @@ func (h *HTTPHandler) getUserApps(c *gin.Context) {
 		return
 	}
 
-	// In the future, this should filter by User's group assignments/permissions.
-	// For now, we return ALL clients in the tenant associated with "applications" (not service accounts ideally, but client_type check maybe?)
-	clients, err := h.svc.ListClients(c.Request.Context(), tenantID)
+	userID := c.GetString("user_id")
+	if userID == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "user context required"})
+		return
+	}
+
+	// Fetch apps assigned to this specific user
+	apps, err := h.appStore.ListAssignedApps(c.Request.Context(), tenantID, userID)
 	if err != nil {
-		h.logger.Error("Failed to list clients for user portal", zap.String("tenant_id", tenantID), zap.Error(err))
+		h.logger.Error("Failed to list assigned apps for user portal",
+			zap.String("tenant_id", tenantID),
+			zap.String("user_id", userID),
+			zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to list applications"})
 		return
 	}
 
-	apps := make([]UserAppResponse, 0, len(clients))
-	for _, client := range clients {
-		// Filter out internal clients or infrastructure clients if needed.
-		// For now, show everything except maybe the admin console itself if it were registered as a client?
-		// We can just assume all OAuth clients are "Apps".
-
+	resp := make([]UserAppResponse, 0, len(apps))
+	for _, app := range apps {
 		launchURL := ""
-		if len(client.RedirectURIs) > 0 {
-			// Naive launch URL: just the first redirect URI.
-			// In reality, this should be an OIDC initiation endpoint /oauth2/auth?client_id=...
-			launchURL = client.RedirectURIs[0]
+		var redirectURIs []string
+		if err := json.Unmarshal(app.RedirectURIs, &redirectURIs); err == nil && len(redirectURIs) > 0 {
+			launchURL = redirectURIs[0]
 		}
 
-		apps = append(apps, UserAppResponse{
-			ID:          client.ClientID, // Use ClientID for display/linking
-			Name:        client.Name,
-			Description: client.Description.String,
+		resp = append(resp, UserAppResponse{
+			ID:          app.ID,
+			Name:        app.Name,
+			Description: stringValue(app.Description),
 			LaunchURL:   launchURL,
-			IconURL:     "", // TODO: Add icon support to Client model
+			IconURL:     stringValue(app.LogoURL),
 		})
 	}
 
-	c.JSON(http.StatusOK, gin.H{"apps": apps})
+	c.JSON(http.StatusOK, gin.H{"apps": resp})
+}
+
+func stringValue(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
 }
 
 // getUserProfile returns the current logged-in user's profile info.

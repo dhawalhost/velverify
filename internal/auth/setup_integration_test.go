@@ -11,6 +11,7 @@ import (
 	"github.com/dhawalhost/wardseal/internal/auth"
 	"github.com/dhawalhost/wardseal/internal/oauthclient"
 	"github.com/dhawalhost/wardseal/internal/saml"
+	"github.com/dhawalhost/wardseal/pkg/middleware"
 	"github.com/gin-gonic/gin"
 	"github.com/go-webauthn/webauthn/protocol"
 	"github.com/go-webauthn/webauthn/webauthn"
@@ -40,7 +41,7 @@ func (m *MockService) PerformSystemSetup(ctx context.Context, email, password st
 }
 
 // ... other interface methods mocked as needed (stubbed for now to satisfy interface)
-func (m *MockService) Authorize(ctx context.Context, req auth.AuthorizeRequest) (auth.AuthorizeResponse, error) {
+func (m *MockService) Authorize(ctx context.Context, userID string, req auth.AuthorizeRequest) (auth.AuthorizeResponse, error) {
 	return auth.AuthorizeResponse{}, nil
 }
 func (m *MockService) Token(ctx context.Context, req auth.TokenRequest) (auth.TokenResponse, error) {
@@ -80,8 +81,17 @@ func (m *MockService) TOTP() auth.TOTPStore { return nil }
 func (m *MockService) LookupUser(ctx context.Context, tenantID, email string) (auth.LookupResult, error) {
 	return auth.LookupResult{}, nil
 }
-func (m *MockService) SignUp(ctx context.Context, email, password, companyName, plan string) (string, string, error) {
-	return "", "", nil
+func (m *MockService) SignUp(ctx context.Context, email, password, companyName, plan string) (string, string, string, error) {
+	return "", "", "", nil
+}
+func (m *MockService) ResolveTenantSlug(ctx context.Context, slug string) (string, error) {
+	return slug, nil
+}
+func (m *MockService) UIURL() string {
+	return "http://localhost:5173"
+}
+func (m *MockService) GetOIDCConfiguration() auth.OpenIDConfiguration {
+	return auth.OpenIDConfiguration{}
 }
 func (m *MockService) ListClients(ctx context.Context, tenantID string) ([]oauthclient.Client, error) {
 	return nil, nil
@@ -89,14 +99,17 @@ func (m *MockService) ListClients(ctx context.Context, tenantID string) ([]oauth
 func (m *MockService) UpdateUserSelf(ctx context.Context, tenantID, userID string, updates map[string]interface{}) error {
 	return nil
 }
+func (m *MockService) ValidateToken(tokenString string) (*middleware.Claims, error) {
+	return nil, nil
+}
 
 // Simple test to verify the HTTP wiring for Setup and Login
 func TestSystemSetupAndLoginFlow(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	mockSvc := new(MockService)
-	// LoginAttemptStore can be nil for this test
-	h := auth.NewHTTPHandler(mockSvc, nil, nil)
+	// LoginAttemptStore and DeveloperAppStore can be nil for this test
+	h := auth.NewHTTPHandler(mockSvc, nil, nil, nil)
 
 	router := gin.New()
 	h.RegisterRoutes(router)
@@ -139,7 +152,7 @@ func TestSystemSetupAndLoginFlow(t *testing.T) {
 		}
 		jsonBody, _ := json.Marshal(body)
 		w := httptest.NewRecorder()
-		req, _ := http.NewRequest("POST", "/login", bytes.NewReader(jsonBody))
+		req, _ := http.NewRequest("POST", "/t/11111111-1111-1111-1111-111111111111/login", bytes.NewReader(jsonBody))
 		// Mock Tenant ID as if we are on the login page (setup usually assumes system tenant or no tenant initially/discovery)
 		// UI might send a header.
 		req.Header.Set("Content-Type", "application/json")

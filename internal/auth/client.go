@@ -16,6 +16,7 @@ type ClientConfig struct {
 	ClientType    string   `json:"client_type"`
 	RedirectURIs  []string `json:"redirect_uris"`
 	AllowedScopes []string `json:"allowed_scopes"`
+	GrantTypes    []string `json:"grant_types"`
 }
 
 func (c ClientConfig) validate() error {
@@ -35,6 +36,19 @@ func (c ClientConfig) validate() error {
 	}
 	if len(c.AllowedScopes) == 0 {
 		return fmt.Errorf("client %s must declare at least one scope", c.ID)
+	}
+	if len(c.GrantTypes) == 0 {
+		return fmt.Errorf("client %s must declare at least one grant type", c.ID)
+	}
+	allowedGrantTypes := map[string]struct{}{
+		"authorization_code": {},
+		"refresh_token":      {},
+		"client_credentials": {},
+	}
+	for _, grantType := range c.GrantTypes {
+		if _, ok := allowedGrantTypes[grantType]; !ok {
+			return fmt.Errorf("client %s has invalid grant type %s", c.ID, grantType)
+		}
 	}
 	if c.ClientType != "public" && c.ClientType != "confidential" {
 		return fmt.Errorf("client %s has invalid client_type %s", c.ID, c.ClientType)
@@ -65,9 +79,21 @@ func (c ClientConfig) validateScopes(requested string) error {
 	return nil
 }
 
+func (c ClientConfig) allowsGrant(grantType string) bool {
+	for _, configuredGrant := range c.GrantTypes {
+		if configuredGrant == grantType {
+			return true
+		}
+	}
+	return false
+}
+
 func (c ClientConfig) withDefaults() ClientConfig {
 	if c.ClientType == "" {
 		c.ClientType = "public"
+	}
+	if len(c.GrantTypes) == 0 {
+		c.GrantTypes = []string{"authorization_code", "refresh_token", "client_credentials"}
 	}
 	return c
 }

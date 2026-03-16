@@ -88,10 +88,20 @@ docker compose ps
 If you want to use the web-based admin interface:
 
 ```bash
-docker compose up -d adminui
+docker compose up -d traefik adminui landingui
 ```
 
-The Admin UI will be available at <http://localhost:5173> (proxied to `govsvc` at port 8082).
+Make sure your `/etc/hosts` contains:
+
+```text
+127.0.0.1 wardseal.local help.wardseal.local console.wardseal.local auth.wardseal.local api.wardseal.local
+```
+
+Then use:
+
+- Admin Console: <http://console.wardseal.local>
+- Landing Site: <http://wardseal.local>
+- Help Portal: <http://help.wardseal.local>
 
 ### 6. Verify the setup
 

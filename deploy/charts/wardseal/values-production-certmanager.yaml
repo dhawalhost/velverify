@@ -1,0 +1,6 @@
+# Production cert-manager overlay
+# Use this file with values-production.yaml when cert-manager is installed.
+
+ingress:
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod

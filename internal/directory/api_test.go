@@ -254,6 +254,6 @@ func (m *mockDirectoryService) GetTenantByEmail(context.Context, string) (string
 	return "22222222-2222-2222-2222-222222222222", nil
 }
 
-func (m *mockDirectoryService) CreateTenant(context.Context, string, string, string) error {
+func (m *mockDirectoryService) CreateTenant(context.Context, string, string, string, string) error {
 	return nil
 }

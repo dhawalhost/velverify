@@ -342,13 +342,40 @@ func (c *Connector) RemoveUserFromGroup(ctx context.Context, userID, groupID str
 }
 
 func (c *Connector) GetGroupMembers(ctx context.Context, groupID string) ([]connector.User, error) {
-	group, err := c.GetGroup(ctx, groupID)
+	req, err := http.NewRequestWithContext(ctx, "GET", c.config.Endpoint+"/Groups/"+groupID, nil)
 	if err != nil {
 		return nil, err
 	}
-	_ = group // Group resource should contain members
-	// TODO: Parse members from group response
-	return []connector.User{}, nil
+	c.setHeaders(req)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode >= 300 {
+		return nil, fmt.Errorf("get group members failed: %d", resp.StatusCode)
+	}
+
+	var result scimGroupResource
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, err
+	}
+
+	members := make([]connector.User, 0, len(result.Members))
+	for _, member := range result.Members {
+		if member.Value == "" {
+			continue
+		}
+		members = append(members, connector.User{
+			ExternalID: member.Value,
+			Username:   member.Value,
+			Active:     true,
+		})
+	}
+
+	return members, nil
 }
 
 func (c *Connector) setHeaders(req *http.Request) {
@@ -386,6 +413,9 @@ type scimUserResource struct {
 type scimGroupResource struct {
 	ID          string `json:"id,omitempty"`
 	DisplayName string `json:"displayName"`
+	Members     []struct {
+		Value string `json:"value"`
+	} `json:"members,omitempty"`
 }
 
 type scimListResponse struct {

@@ -3,6 +3,7 @@ package governance
 import (
 	"errors"
 	"net/http"
+	"strings"
 
 	"github.com/dhawalhost/wardseal/internal/oauthclient"
 	"github.com/dhawalhost/wardseal/pkg/middleware"
@@ -150,6 +151,9 @@ func (h *HTTPHandler) createAccessRequest(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	if req.RequesterID == "" {
+		req.RequesterID = actorIDFromRequest(c)
+	}
 	resp, err := h.svc.CreateAccessRequest(c.Request.Context(), tenantID, req)
 	if err != nil {
 		h.handleServiceError(c, err)
@@ -180,8 +184,11 @@ func (h *HTTPHandler) approveAccessRequest(c *gin.Context) {
 	requestID := c.Param("accessRequestID")
 	var body ApprovalDecision
 	_ = c.ShouldBindJSON(&body) // Optional body - ignore error
-	// TODO: Get approver ID from context (authenticated user)
-	approverID := "todo-admin-id"
+	approverID := actorIDFromRequest(c)
+	if approverID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "approver user id required"})
+		return
+	}
 
 	if err := h.svc.ApproveAccessRequest(c.Request.Context(), tenantID, requestID, approverID, body.Comment); err != nil {
 		h.handleServiceError(c, err)
@@ -198,7 +205,11 @@ func (h *HTTPHandler) rejectAccessRequest(c *gin.Context) {
 	requestID := c.Param("accessRequestID")
 	var body ApprovalDecision
 	_ = c.ShouldBindJSON(&body) // Optional body - ignore error
-	approverID := "todo-admin-id"
+	approverID := actorIDFromRequest(c)
+	if approverID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "approver user id required"})
+		return
+	}
 
 	if err := h.svc.RejectAccessRequest(c.Request.Context(), tenantID, requestID, approverID, body.Comment); err != nil {
 		h.handleServiceError(c, err)
@@ -228,4 +239,14 @@ func (h *HTTPHandler) handleServiceError(c *gin.Context, err error) {
 	}
 	h.logger.Error("governance service error", zap.Error(err))
 	c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+}
+
+func actorIDFromRequest(c *gin.Context) string {
+	if userID := strings.TrimSpace(c.GetString("user_id")); userID != "" {
+		return userID
+	}
+	if userID := strings.TrimSpace(c.GetHeader("X-User-ID")); userID != "" {
+		return userID
+	}
+	return ""
 }

@@ -62,6 +62,7 @@ type AccessRequest struct {
 }
 
 type CreateAccessRequest struct {
+	RequesterID  string `json:"requester_id,omitempty"`
 	ResourceType string `json:"resource_type"`
 	ResourceID   string `json:"resource_id"`
 	Reason       string `json:"reason"`

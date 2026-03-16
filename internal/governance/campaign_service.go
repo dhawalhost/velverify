@@ -121,6 +121,16 @@ func (s *campaignService) ApproveItem(ctx context.Context, itemID, comment strin
 }
 
 func (s *campaignService) RevokeItem(ctx context.Context, itemID, comment string) error {
-	// TODO: Integrate with dirClient to actually revoke access
+	item, err := s.store.GetItem(ctx, itemID)
+	if err != nil {
+		return fmt.Errorf("failed to get item for revocation: %w", err)
+	}
+
+	if item.ResourceType == "group" && s.dirClient != nil {
+		if err := s.dirClient.RemoveUserFromGroup(ctx, item.TenantID, item.UserID, item.ResourceID); err != nil {
+			return fmt.Errorf("failed to revoke directory access: %w", err)
+		}
+	}
+
 	return s.store.UpdateItemDecision(ctx, itemID, "revoke", comment)
 }

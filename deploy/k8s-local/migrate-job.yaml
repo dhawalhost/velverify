@@ -1,0 +1,68 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: migrations
+  namespace: wardseal-local
+# Migrations are mounted from a local hostPath volume via the deploy script.
+# The Job below runs all *.up.sql files against the local postgres instance.
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: wardseal-migrate
+  namespace: wardseal-local
+  labels:
+    app: wardseal-migrate
+spec:
+  ttlSecondsAfterFinished: 300   # auto-clean after 5 min
+  backoffLimit: 3
+  template:
+    metadata:
+      labels:
+        app: wardseal-migrate
+    spec:
+      restartPolicy: OnFailure
+      initContainers:
+        # Wait until postgres is ready before attempting migrations
+        - name: wait-for-postgres
+          image: postgres:15-alpine
+          env:
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: wardseal-db-credentials
+                  key: password
+          command:
+            - sh
+            - -c
+            - |
+              until pg_isready -h postgres.wardseal-local.svc.cluster.local -U user -d identity_platform; do
+                echo "Waiting for postgres..."; sleep 2;
+              done
+      containers:
+        - name: migrate
+          image: postgres:15-alpine
+          env:
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: wardseal-db-credentials
+                  key: password
+          volumeMounts:
+            - name: migrations
+              mountPath: /migrations
+          command:
+            - sh
+            - -c
+            - |
+              set -e
+              echo "Running migrations..."
+              for f in $(ls /migrations/*.up.sql | sort); do
+                echo "Applying $f"
+                psql -h postgres.wardseal-local.svc.cluster.local -U user -d identity_platform -f "$f"
+              done
+              echo "All migrations complete."
+      volumes:
+        - name: migrations
+          configMap:
+            name: wardseal-migrations-cm

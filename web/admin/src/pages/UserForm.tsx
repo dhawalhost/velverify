@@ -8,7 +8,20 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { createUser } from '../api';
+import { createUser, requestPasswordSetupLink } from '../api';
+
+type CredentialMode = 'admin_password' | 'generated_password' | 'invite_link' | 'reset_link';
+
+const generateStrongPassword = () => {
+    const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%^&*';
+    const bytes = new Uint8Array(20);
+    crypto.getRandomValues(bytes);
+    let out = 'Ws!';
+    for (let i = 0; i < bytes.length; i += 1) {
+        out += alphabet[bytes[i] % alphabet.length];
+    }
+    return out;
+};
 
 const UserForm: React.FC = () => {
     const navigate = useNavigate();
@@ -20,16 +33,49 @@ const UserForm: React.FC = () => {
     const [firstName, setFirstName] = useState('');
     const [lastName, setLastName] = useState('');
     const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
     const [active, setActive] = useState(true);
+    const [credentialMode, setCredentialMode] = useState<CredentialMode>('admin_password');
+    const [generatedPassword, setGeneratedPassword] = useState('');
+    const [setupLink, setSetupLink] = useState('');
+    const [successMessage, setSuccessMessage] = useState('');
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
+        setSuccessMessage('');
+        setSetupLink('');
         setLoading(true);
 
+        let passwordToUse = '';
+        if (credentialMode === 'admin_password') {
+            if (password.length < 8) {
+                setError('Password must be at least 8 characters.');
+                setLoading(false);
+                return;
+            }
+            if (password !== confirmPassword) {
+                setError('Passwords do not match.');
+                setLoading(false);
+                return;
+            }
+            passwordToUse = password;
+        }
+
+        if (credentialMode === 'generated_password') {
+            if (!generatedPassword || generatedPassword.length < 8) {
+                setError('Generate an initial password before creating the user.');
+                setLoading(false);
+                return;
+            }
+            passwordToUse = generatedPassword;
+        }
+
         try {
-            await createUser({
+            const created = await createUser({
                 userName: userName || email,
+                ...(passwordToUse ? { password: passwordToUse } : {}),
                 name: {
                     givenName: firstName,
                     familyName: lastName
@@ -39,6 +85,26 @@ const UserForm: React.FC = () => {
                 ],
                 active: active
             });
+
+            const createdUserID = created?.id || created?.user_id;
+            if (!createdUserID) {
+                setSuccessMessage('User created successfully.');
+                return;
+            }
+
+            if (credentialMode === 'invite_link' || credentialMode === 'reset_link') {
+                const mode = credentialMode === 'invite_link' ? 'invite' : 'reset';
+                const linkResp = await requestPasswordSetupLink(createdUserID, mode, 72);
+                setSetupLink(linkResp.url || '');
+                setSuccessMessage(`User created. ${mode === 'invite' ? 'Invite' : 'Reset'} link generated.`);
+                return;
+            }
+
+            if (credentialMode === 'generated_password') {
+                setSuccessMessage('User created with generated initial password. Copy it now and share securely.');
+                return;
+            }
+
             navigate('/users');
         } catch (err: any) {
             console.error("Failed to create user", err);
@@ -70,6 +136,11 @@ const UserForm: React.FC = () => {
                         {error && (
                             <Alert variant="destructive">
                                 <AlertDescription>{error}</AlertDescription>
+                            </Alert>
+                        )}
+                        {successMessage && (
+                            <Alert>
+                                <AlertDescription>{successMessage}</AlertDescription>
                             </Alert>
                         )}
 
@@ -118,6 +189,92 @@ const UserForm: React.FC = () => {
                             />
                             <p className="text-sm text-muted-foreground">Leave empty to use email as username</p>
                         </div>
+
+                        <div className="space-y-2">
+                            <Label htmlFor="credentialMode">Credential Setup Method</Label>
+                            <select
+                                id="credentialMode"
+                                className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm"
+                                value={credentialMode}
+                                onChange={(e) => {
+                                    const mode = e.target.value as CredentialMode;
+                                    setCredentialMode(mode);
+                                    setSetupLink('');
+                                    setSuccessMessage('');
+                                    if (mode === 'generated_password') {
+                                        const generated = generateStrongPassword();
+                                        setGeneratedPassword(generated);
+                                        setPassword(generated);
+                                        setConfirmPassword(generated);
+                                    }
+                                }}
+                            >
+                                <option value="admin_password">Create password by admin</option>
+                                <option value="generated_password">Initial password generation</option>
+                                <option value="invite_link">Tokenized invite link</option>
+                                <option value="reset_link">Reset link</option>
+                            </select>
+                        </div>
+
+                        {credentialMode === 'admin_password' && (
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="password">Initial Password</Label>
+                                <Input
+                                    id="password"
+                                    type="password"
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    placeholder="At least 8 characters"
+                                    required
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="confirmPassword">Confirm Password</Label>
+                                <Input
+                                    id="confirmPassword"
+                                    type="password"
+                                    value={confirmPassword}
+                                    onChange={(e) => setConfirmPassword(e.target.value)}
+                                    placeholder="Re-enter password"
+                                    required
+                                />
+                            </div>
+                        </div>
+                        )}
+
+                        {credentialMode === 'generated_password' && (
+                            <div className="space-y-2">
+                                <Label htmlFor="generatedPassword">Generated Initial Password</Label>
+                                <div className="flex gap-2">
+                                    <Input id="generatedPassword" readOnly value={generatedPassword} />
+                                    <Button type="button" variant="outline" onClick={() => {
+                                        const generated = generateStrongPassword();
+                                        setGeneratedPassword(generated);
+                                        setPassword(generated);
+                                        setConfirmPassword(generated);
+                                    }}>
+                                        Regenerate
+                                    </Button>
+                                    <Button type="button" variant="outline" onClick={() => navigator.clipboard.writeText(generatedPassword)}>
+                                        Copy
+                                    </Button>
+                                </div>
+                                <p className="text-sm text-muted-foreground">Share this password securely and ask user to change it after first login.</p>
+                            </div>
+                        )}
+
+                        {(credentialMode === 'invite_link' || credentialMode === 'reset_link') && setupLink && (
+                            <div className="space-y-2">
+                                <Label>{credentialMode === 'invite_link' ? 'Tokenized Invite Link' : 'Reset Link'}</Label>
+                                <div className="flex gap-2">
+                                    <Input readOnly value={setupLink} />
+                                    <Button type="button" variant="outline" onClick={() => navigator.clipboard.writeText(setupLink)}>
+                                        Copy
+                                    </Button>
+                                </div>
+                            </div>
+                        )}
 
                         <div className="flex items-center space-x-2 pt-2">
                             <Checkbox

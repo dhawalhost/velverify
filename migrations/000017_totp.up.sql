@@ -2,7 +2,7 @@
 CREATE TABLE IF NOT EXISTS totp_secrets (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     identity_id VARCHAR(255) NOT NULL,  -- Email or username
-    tenant_id UUID NOT NULL,
+    tenant_id VARCHAR(255) NOT NULL,
     secret VARCHAR(64) NOT NULL,
     verified BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),

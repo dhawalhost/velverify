@@ -129,3 +129,7 @@ type fakeDirClient struct{}
 func (f *fakeDirClient) AddUserToGroup(ctx context.Context, tenantID, userID, groupID string) error {
 	return nil
 }
+
+func (f *fakeDirClient) RemoveUserFromGroup(ctx context.Context, tenantID, userID, groupID string) error {
+	return nil
+}

@@ -6,16 +6,28 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { User, Mail, Shield, Key } from "lucide-react";
 import { useAuth } from '../hooks/useAuth';
+import { api } from '../api';
 
 const PortalProfile = () => {
     const { user } = useAuth();
     const [isSaving, setIsSaving] = useState(false);
+    const [newPassword, setNewPassword] = useState('');
+    const [saveMessage, setSaveMessage] = useState('');
 
     const handleSaveProfile = async () => {
+        setSaveMessage('');
+        if (!newPassword) {
+            setSaveMessage('Enter a new password to save changes.');
+            return;
+        }
+
         setIsSaving(true);
         try {
-            // TODO: Implement profile update API call
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            await api.post('/api/v1/user/profile', { password: newPassword });
+            setNewPassword('');
+            setSaveMessage('Profile updated successfully.');
+        } catch (error: any) {
+            setSaveMessage(error?.response?.data?.error || 'Failed to update profile.');
         } finally {
             setIsSaving(false);
         }
@@ -70,6 +82,9 @@ const PortalProfile = () => {
                     <Button onClick={handleSaveProfile} disabled={isSaving}>
                         {isSaving ? 'Saving...' : 'Save Changes'}
                     </Button>
+                    {saveMessage && (
+                        <p className="text-xs text-muted-foreground">{saveMessage}</p>
+                    )}
                 </CardContent>
             </Card>
 
@@ -95,9 +110,14 @@ const PortalProfile = () => {
                                 <p className="text-sm text-muted-foreground">Change your account password</p>
                             </div>
                         </div>
-                        <Button variant="outline" size="sm">
-                            Change Password
-                        </Button>
+                        <div className="w-full max-w-xs ml-4 flex gap-2">
+                            <Input
+                                type="password"
+                                placeholder="New password"
+                                value={newPassword}
+                                onChange={(e) => setNewPassword(e.target.value)}
+                            />
+                        </div>
                     </div>
                     <div className="flex items-center justify-between p-4 border rounded-lg">
                         <div className="flex items-center gap-3">
