@@ -27,7 +27,9 @@ func (h *HTTPHandler) RegisterRoutes(router *gin.Engine) {
 	router.GET("/health", h.healthCheck)
 
 	tenantGroup := router.Group("/api/v1")
-	tenantGroup.Use(middleware.TenantExtractor(middleware.TenantConfig{}))
+	tenantGroup.Use(middleware.TenantExtractor(middleware.TenantConfig{
+		SlugResolver: h.svc.ResolveTenantSlug,
+	}))
 	clients := tenantGroup.Group("/oauth/clients")
 	{
 		clients.GET("", h.listOAuthClients)

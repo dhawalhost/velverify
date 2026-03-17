@@ -54,7 +54,7 @@ func main() {
 	reqStore := governance.NewStore(db)
 
 	dirSvcURL := cfg.Governance.DirectoryServiceURL
-	dirClient := governance.NewDirectoryClient(dirSvcURL)
+	dirClient := governance.NewDirectoryClient(dirSvcURL, cfg.Directory.ServiceAuthHeader, cfg.Directory.ServiceAuthToken)
 
 	policyEngine := policy.NewSimpleEngine()
 	svc := governance.NewService(clientRepo, reqStore, dirClient, policyEngine)
@@ -166,10 +166,7 @@ func main() {
 
 	apiGroup := router.Group("/api/v1")
 	apiGroup.Use(middleware.TenantExtractor(middleware.TenantConfig{
-		SlugResolver: func(_ context.Context, tenant string) (string, error) {
-			// In local/dev, we allow slugs like 'admin-system' directly
-			return tenant, nil
-		},
+		SlugResolver: dirClient.ResolveTenantSlug,
 	}))
 	campaignHandlers.RegisterRoutes(apiGroup)
 

@@ -70,17 +70,17 @@ const Layout: React.FC = () => {
     return (
         <div className="flex min-h-screen font-sans bg-muted/20 text-foreground">
             {/* Sidebar */}
-            <aside className="w-72 border-r bg-card flex flex-col fixed inset-y-0 z-50 transition-all duration-300">
-                <div className="h-16 flex items-center px-6 border-b shrink-0 bg-background/50 backdrop-blur-md">
+            <aside className="w-72 border-r bg-card/60 backdrop-blur-xl flex flex-col fixed inset-y-0 z-50 transition-all duration-300 shadow-[20px_0_50px_-20px_rgba(0,0,0,0.5)]">
+                <div className="h-16 flex items-center px-6 border-b shrink-0 bg-background/20">
                     <div className="flex items-center gap-3 font-semibold text-xl tracking-tight text-foreground">
                         <div className="w-8 h-8 flex items-center justify-center">
                             <img src="/wardseal.svg" alt="WardSeal" className="w-8 h-8 object-contain" />
                         </div>
-                        <span className="bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">WardSeal</span>
+                        <span className="bg-gradient-to-r from-blue-400 via-indigo-400 to-purple-400 bg-clip-text text-transparent font-bold">WardSeal</span>
                     </div>
                 </div>
 
-                <nav className="flex-1 overflow-y-auto py-6 px-4 space-y-1">
+                <nav className="flex-1 overflow-y-auto py-8 px-4 space-y-1.5">
                     <div className="text-xs font-semibold text-muted-foreground mb-4 px-2 tracking-wider uppercase">Platform</div>
                     {menuItems.slice(0, 5).map((item) => {
                         const isActive = location.pathname.startsWith(item.path);
@@ -155,16 +155,17 @@ const Layout: React.FC = () => {
 
             {/* Main Content */}
             <main className="flex-1 ml-72 min-h-screen flex flex-col">
-                <header className="h-16 border-b bg-background/80 backdrop-blur-md sticky top-0 z-40 flex items-center justify-between px-8 shadow-sm">
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <header className="h-16 border-b bg-background/60 backdrop-blur-xl sticky top-0 z-40 flex items-center justify-between px-8 shadow-sm">
+                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
                         <span className="hover:text-foreground transition-colors cursor-pointer">WardSeal</span>
                         <ChevronRight className="w-4 h-4" />
-                        <span className="font-medium text-foreground bg-muted/50 px-2 py-0.5 rounded-md">
+                        <span className="font-medium text-foreground bg-primary/10 border border-primary/20 px-3 py-1 rounded-full flex items-center gap-2">
                             {activeItem?.label || 'Dashboard'}
+                            <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
                         </span>
                     </div>
                     <div className="flex items-center gap-4">
-                        <div className="relative w-64 hidden md:block">
+                        <div className="relative w-96 hidden md:block">
                             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                             <Input
                                 type="search"
@@ -172,9 +173,13 @@ const Layout: React.FC = () => {
                                 className="w-full bg-muted/40 pl-9 h-9 text-sm focus-visible:ring-primary/20"
                             />
                         </div>
+                        <div className="flex items-center bg-green-500/10 border border-green-500/20 px-3 py-1 rounded-full text-xs font-bold text-green-500 tracking-wide">
+                            PUBLIC BETA — FREE FOREVER
+                        </div>
                         <ModeToggle />
-                        <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground rounded-full">
+                        <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground rounded-full relative">
                             <Bell className="w-5 h-5" />
+                            <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-background" />
                         </Button>
                     </div>
                 </header>
@@ -184,7 +189,7 @@ const Layout: React.FC = () => {
                 <footer className="border-t py-4 px-8 text-xs text-muted-foreground">
                     <div className="max-w-[1600px] mx-auto w-full flex flex-wrap items-center justify-between gap-2">
                         <span>Powered by WardSeal Identity</span>
-                        <span className="flex items-center gap-3">
+                        <span className="flex items-center gap-6">
                             <a href={`${policyBaseUrl}/policies#privacy`} target="_blank" rel="noreferrer" className="hover:text-foreground">Privacy</a>
                             <a href={`${policyBaseUrl}/policies#privacy`} target="_blank" rel="noreferrer" className="hover:text-foreground">Terms</a>
                             <a href={`${policyBaseUrl}/policies`} target="_blank" rel="noreferrer" className="hover:text-foreground">Policies</a>

@@ -11,7 +11,7 @@ GOMOD=$(GOCMD) mod
 BINARY_NAME=identity-platform
 
 # Services
-SERVICES=authsvc dirsvc govsvc policysvc provsvc
+SERVICES=authsvc dirsvc govsvc policysvc provsvc wardseal
 
 # Migration parameters
 MIGRATE_VERSION = v4.15.2
@@ -57,6 +57,11 @@ build: ## Build all service binaries
 		echo "Building $$svc..."; \
 		$(GOBUILD) -o bin/$$svc ./cmd/$$svc; \
 	done
+
+build-cli: ## Build the wardseal CLI binary
+	@echo "Building wardseal CLI..."
+	@mkdir -p bin
+	$(GOBUILD) -o bin/wardseal ./cmd/wardseal
 
 clean: ## Clean build artifacts
 	$(GOCLEAN)

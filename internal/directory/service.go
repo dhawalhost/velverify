@@ -41,6 +41,7 @@ type Service interface {
 
 	// Tenant Management
 	CreateTenant(ctx context.Context, id, name, slug, plan string) error
+	GetTenantIDBySlug(ctx context.Context, slug string) (string, error)
 }
 
 type directoryService struct {
@@ -281,4 +282,16 @@ func (s *directoryService) CreateTenant(ctx context.Context, id, name, slug, pla
 		return err
 	}
 	return nil
+}
+
+func (s *directoryService) GetTenantIDBySlug(ctx context.Context, slug string) (string, error) {
+	var id string
+	err := s.db.GetContext(ctx, &id, `SELECT id FROM tenants WHERE slug = $1`, slug)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return "", nil // Not found, could be a UUID already
+		}
+		return "", err
+	}
+	return id, nil
 }

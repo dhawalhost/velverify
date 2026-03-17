@@ -26,8 +26,8 @@ const pricing = {
 
 const faqItems = [
   {
-    q: 'Can I self-host WardSeal?',
-    a: 'Yes — WardSeal is fully open source (MIT). Deploy it on any Kubernetes cluster, VM, or bare metal using the Helm chart or Docker Compose. The self-host version includes all platform features.',
+    q: 'How can I participate in the Public Beta?',
+    a: 'Simply create an account via our Cloud Managed portal. During the beta period, you can test all platform features including SSO, MFA, and Identity Governance at no cost.',
   },
   {
     q: 'How does MAU pricing work?',
@@ -40,30 +40,64 @@ const faqItems = [
 ]
 
 const features = [
-  { icon: <Lock className="w-8 h-8 text-blue-400" />, title: 'Enterprise SSO', desc: 'OIDC & SAML 2.0 federation with any IdP — Okta, Azure AD, Google Workspace, and more.' },
-  { icon: <ShieldCheck className="w-8 h-8 text-green-400" />, title: 'Adaptive MFA', desc: 'TOTP, WebAuthn passkeys, magic links, and risk-based step-up auth to stop account takeovers.' },
-  { icon: <Users className="w-8 h-8 text-purple-400" />, title: 'Directory & SCIM', desc: 'Full user lifecycle management with SCIM 2.0 provisioning. Auto-sync in real time.' },
-  { icon: <Target className="w-8 h-8 text-red-400" />, title: 'Identity Governance', desc: 'Automated access reviews, certification campaigns, and approval workflows.' },
-  { icon: <Settings className="w-8 h-8 text-orange-400" />, title: 'Fine-grained RBAC', desc: 'Roles, policies, and resource-level permissions managed through API or visual console.' },
-  { icon: <Building2 className="w-8 h-8 text-cyan-400" />, title: 'Multi-tenancy', desc: 'Isolated namespaces, branding, and SSO for thousands of customer orgs from one deployment.' },
+  { icon: <Lock className="w-8 h-8 text-blue-400" />, title: 'Enterprise SSO', desc: 'Secure OIDC & SAML 2.0 federation with any IdP — Okta, Azure AD, Google Workspace, and more.' },
+  { icon: <ShieldCheck className="w-8 h-8 text-green-400" />, title: 'Adaptive MFA', desc: 'TOTP, WebAuthn passkeys, and risk-based step-up auth.' },
+  { icon: <Building2 className="w-8 h-8 text-cyan-400" />, title: 'B2B Multi-tenancy', desc: 'Isolated namespaces, branding, and SSO for each of your customer organizations from one deployment.' },
+  { icon: <Users className="w-8 h-8 text-purple-400" />, title: 'Directory & SCIM', desc: 'Full user lifecycle management with SCIM 2.0 provisioning.' },
+  { icon: <Target className="w-8 h-8 text-red-400" />, title: 'Identity Governance', desc: 'Automated access reviews and certification campaigns.' },
+  { icon: <Settings className="w-8 h-8 text-orange-400" />, title: 'Fine-grained RBAC', desc: 'Roles, policies, and resource-level permissions managed through API.' },
 ]
 
-const testimonials = [
-  { quote: "WardSeal's SCIM provisioning cut our onboarding time from hours to minutes.", author: "Priya S.", role: "Head of Platform, FinStack" },
-  { quote: "Self-hosting on k8s was trivial. We had SSO working with Azure AD in under 30 minutes.", author: "Marcus R.", role: "CTO, Datawave" },
-  { quote: "The multi-tenant support is first-class. Each customer gets an isolated identity namespace.", author: "Chen W.", role: "Engineering Manager, SaaSly" },
-]
+
 
 
 
 export default function HomePage() {
+  const [activeStep, setActiveStep] = useState(1);
   const [yearly, setYearly] = useState(false)
   const [openFaq, setOpenFaq] = useState(0)
 
   const proPrice = yearly ? pricing.yearly.pro : pricing.monthly.pro
   const teamPrice = yearly ? pricing.yearly.team : pricing.monthly.team
 
+  const codeSnippets = {
+    1: {
+      comment: "# Initialize Cloud Tenant",
+      commands: [
+        { cmd: "wardseal", text: "login --domain cloud.wardseal.com" },
+        { cmd: "wardseal", text: 'tenant create --name "HighGrowth Inc"' }
+      ]
+    },
+    2: {
+      comment: "# Register OIDC Application",
+      commands: [
+        { cmd: "wardseal", text: 'apps create --name "Production App" \\' },
+        { cmd: "", text: '  --type "oidc" --redirect-uri "https://app.com/callback"' }
+      ]
+    },
+    3: {
+      comment: "# Configuration & Discovery",
+      commands: [
+        { cmd: "curl", text: "https://cloud.wardseal.com/auth/.well-known/openid-configuration" },
+        { cmd: "wardseal", text: "policies create --file prod-security.yaml" }
+      ]
+    }
+  };
+
   useEffect(() => {
+    const handleMouseMove = (e) => {
+      const cards = document.querySelectorAll('.feature-card');
+      cards.forEach(card => {
+        const rect = card.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        card.style.setProperty('--mouse-x', `${x}px`);
+        card.style.setProperty('--mouse-y', `${y}px`);
+      });
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+
     const observer = new IntersectionObserver((entries) => {
       entries.forEach(e => { 
         if (e.isIntersecting) { 
@@ -74,7 +108,10 @@ export default function HomePage() {
     }, { threshold: 0.1 });
 
     document.querySelectorAll('.animate-on-scroll').forEach(el => observer.observe(el));
-    return () => observer.disconnect();
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('mousemove', handleMouseMove);
+    };
   }, []);
 
   return (
@@ -82,36 +119,51 @@ export default function HomePage() {
       <section className="hero">
         <div className="container hero-content fade-up">
           <div className="hero-text">
-            <span className="tag"><Zap className="w-3 h-3" /> v1.0 — Enterprise Ready</span>
-            <h1>
-              Identity Infrastructure for the <span className="gradient-text">Modern Cloud</span>
+            <span className="tag"><Zap className="w-3 h-3" /> Public Beta — Cloud Managed</span>
+            <h1 style={{ marginTop: '24px' }}>
+              Identity Infrastructure for <br/>
+              <span className="gradient-text">Cloud-Native Teams</span>
             </h1>
-            <p>
-              Open-source IAM that ships SSO, Adaptive MFA, and Zero Trust access control in minutes — self-host or cloud.
+            <p style={{ fontSize: '1.4rem', marginTop: '32px' }}>
+              The modern standard for AuthN, AuthZ, and Governance. <br/>
+              Built for performance. Designed for developers.
             </p>
-            <div className="hero-cta">
-              <a className="btn btn-primary" href={`${consoleBaseUrl}/signup?plan=free`}>
-                Start for Free <ArrowRight className="w-4 h-4 ml-2" />
+            <div className="hero-cta" style={{ justifyContent: 'flex-start', marginTop: '40px' }}>
+              <a className="btn btn-primary btn-lg" href={`${consoleBaseUrl}/signup?plan=free`}>
+                Start Building Free <ArrowRight className="w-4 h-4 ml-2" />
               </a>
-              <a className="btn btn-outline" href="https://github.com/dhawalhost/wardseal" target="_blank" rel="noreferrer">
-                <Star className="w-4 h-4 mr-2" /> Star on GitHub
+              <a className="btn btn-outline btn-lg" href="https://github.com/dhawalhost/wardseal" target="_blank" rel="noreferrer">
+                <Star className="w-4 h-4 mr-2" /> GitHub
               </a>
+            </div>
+            
+            <div className="hero-trust mt-12 flex items-center gap-6 opacity-60 grayscale hover:grayscale-0 transition-all duration-500" style={{ marginTop: '64px', display: 'flex', alignItems: 'center', gap: '32px' }}>
+              <span style={{ fontSize: '0.8rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Secure by Default</span>
+              <div style={{ display: 'flex', gap: '24px', alignItems: 'center' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.9rem' }}><Lock className="w-4 h-4" /> SHA-256</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.9rem' }}><ShieldCheck className="w-4 h-4" /> OIDC/SAML</div>
+              </div>
             </div>
           </div>
           <div className="hero-mockup">
-            <img src="/console-preview.png" alt="WardSeal Console Preview" className="mockup-img" />
+            <div className="mockup-container glass" style={{ padding: '8px', borderRadius: 'var(--r-lg)', background: 'rgba(255,255,255,0.05)' }}>
+               <img src="/console-preview.png" alt="WardSeal Console Preview" className="mockup-img" style={{ transform: 'none', borderRadius: 'var(--r)' }} />
+               <div className="absolute -bottom-6 -left-6 glass p-4 rounded-xl hidden lg:block" style={{ position: 'absolute', bottom: '-24px', left: '-24px', padding: '16px', borderRadius: 'var(--r)' }}>
+                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                   <div style={{ width: '40px', height: '40px', background: 'var(--primary)', borderRadius: 'var(--r)', display: 'flex', alignItems: 'center', justifyItems: 'center', justifyContent: 'center' }}>
+                     <Fingerprint className="text-white w-6 h-6" />
+                   </div>
+                   <div>
+                     <div style={{ fontSize: '0.8rem', fontWeight: 700 }}>Passkey Active</div>
+                     <div style={{ fontSize: '0.7rem', opacity: 0.6 }}>Biometric verified</div>
+                   </div>
+                 </div>
+               </div>
+            </div>
           </div>
         </div>
       </section>
 
-      <section className="stats-bar">
-        <div className="container stats-grid">
-          <div className="stat"><div className="stat-value">10k+</div><div className="stat-label"><Users className="w-3 h-3 mr-1 inline" /> Developers</div></div>
-          <div className="stat"><div className="stat-value">500+</div><div className="stat-label"><Building2 className="w-3 h-3 mr-1 inline" /> Companies</div></div>
-          <div className="stat"><div className="stat-value">99.99%</div><div className="stat-label"><ShieldCheck className="w-3 h-3 mr-1 inline" /> Uptime SLA</div></div>
-          <div className="stat"><div className="stat-value">&lt;50ms</div><div className="stat-label"><Activity className="w-3 h-3 mr-1 inline" /> Auth latency</div></div>
-        </div>
-      </section>
 
       <section className="section" id="features">
         <div className="container">
@@ -124,8 +176,8 @@ export default function HomePage() {
             {features.map((f, i) => (
               <article className="feature-card animate-on-scroll" key={i}>
                 <div className="feature-icon">{f.icon}</div>
-                <h3>{f.title}</h3>
-                <p>{f.desc}</p>
+                <h3 style={{ fontSize: '1.5rem', marginBottom: '16px' }}>{f.title}</h3>
+                <p style={{ fontSize: '1rem', lineHeight: '1.7' }}>{f.desc}</p>
               </article>
             ))}
           </div>
@@ -134,120 +186,84 @@ export default function HomePage() {
 
       <section className="section section-muted">
         <div className="container">
-          <div className="how-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '60px', alignItems: 'center' }}>
-            <div>
-              <span className="tag" style={{ marginBottom: '24px' }}>Quick Start</span>
-              <h2 style={{ marginBottom: '32px' }}>Up and running in minutes</h2>
-              <div className="steps" style={{ display: 'grid', gap: '32px' }}>
+          <div className="how-grid">
+            <div className="how-text">
+              <span className="tag mb-4">Quick Start</span>
+              <h2 className="mb-8">Up and running in minutes</h2>
+              <div className="steps">
                 {[
                   { n: 1, t: 'Create your account', d: 'Sign up for free. Your tenant is provisioned instantly.' },
                   { n: 2, t: 'Connect your app', d: 'Register an OIDC/OAuth app. Copy the client ID.' },
                   { n: 3, t: 'Configure SSO & MFA', d: 'Enable social login or passkeys in a few clicks.' }
                 ].map(s => (
-                  <div className="step" key={s.n} style={{ display: 'flex', gap: '20px' }}>
-                    <div className="step-num" style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'var(--primary)', display: 'flex', alignItems: 'center', justifyCenter: 'center', flexShrink: 0, fontWeight: 'bold' }}>{s.n}</div>
-                    <div>
-                      <h3 style={{ fontSize: '1.1rem', marginBottom: '4px' }}>{s.t}</h3>
-                      <p style={{ fontSize: '0.95rem' }}>{s.d}</p>
+                  <div 
+                    className={`step cursor-pointer transition-all duration-300 ${activeStep === s.n ? 'opacity-100 scale-105' : 'opacity-50'}`} 
+                    key={s.n}
+                    onMouseEnter={() => setActiveStep(s.n)}
+                    style={{ cursor: 'pointer' }}
+                  >
+                    <div className={`step-num ${activeStep === s.n ? 'glow-blue' : ''}`}>{s.n}</div>
+                    <div className="step-content">
+                      <h3 className="step-title" style={{ color: activeStep === s.n ? 'var(--text)' : 'var(--text-muted)' }}>{s.t}</h3>
+                      <p className="step-desc" style={{ display: activeStep === s.n ? 'block' : 'none' }}>{s.d}</p>
                     </div>
                   </div>
                 ))}
               </div>
             </div>
-            <div className="code-box animate-on-scroll">
-              <span className="comment"># Install via Helm</span><br />
-              <span className="cmd">helm</span> repo add wardseal https://charts.wardseal.com<br />
-              <span className="cmd">helm</span> install wardseal wardseal/wardseal \<br />
-              &nbsp;&nbsp;--set auth.domain=auth.example.com<br /><br />
-              <span className="comment"># OIDC discovery</span><br />
-              <span className="cmd">curl</span> https://auth.example.com/.well-known/openid-configuration<br /><br />
-              <span className="ok">✓ Issuer live</span><br />
-              <span className="ok">✓ JWKS ready</span><br />
-              <span className="ok">✓ MFA active</span>
+            <div className="code-box animate-on-scroll glass" style={{ minHeight: '300px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+              <div className="code-content fade-up" key={activeStep}>
+                <span className="comment">{codeSnippets[activeStep].comment}</span><br />
+                {codeSnippets[activeStep].commands.map((c, i) => (
+                  <div key={i} style={{ marginTop: '8px' }}>
+                    <span className="cmd">{c.cmd}</span> {c.text}
+                  </div>
+                ))}
+                <div style={{ marginTop: '32px' }}>
+                  <span className="ok" style={{ opacity: 0.8 }}>✓ Step {activeStep} validated</span><br />
+                  <span className="ok" style={{ opacity: 0.8 }}>✓ Environment ready</span>
+                </div>
+              </div>
             </div>
           </div>
         </div>
       </section>
 
-      <section className="section">
-        <div className="container">
-          <div className="section-header align-center">
-            <span className="tag">Testimonials</span>
-            <h2>Trusted by engineering teams</h2>
-          </div>
-          <div className="features-grid" style={{ marginTop: '40px' }}>
-            {testimonials.map((t, i) => (
-              <div className="feature-card animate-on-scroll" key={i} style={{ borderLeft: '4px solid var(--primary)' }}>
-                <p style={{ fontStyle: 'italic', marginBottom: '24px', fontSize: '1rem', color: '#fff' }}>"{t.quote}"</p>
-                <div>
-                  <div style={{ fontWeight: 'bold' }}>{t.author}</div>
-                  <div style={{ fontSize: '0.85rem', color: 'var(--text-dim)' }}>{t.role}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
 
       <section className="section section-muted" id="pricing">
         <div className="container">
           <div className="section-header align-center">
-            <span className="tag">Pricing</span>
+            <span className="tag">Public Beta</span>
             <h2>Simple, transparent pricing</h2>
+            <p>During our public beta, all cloud features are free to use.</p>
           </div>
 
-          <div className="pricing-toggle">
-            <span style={{ color: !yearly ? 'var(--text)' : 'var(--text-dim)' }}>Monthly</span>
-            <button
-              type="button"
-              className={`toggle-wrap ${yearly ? 'active' : ''}`}
-              onClick={() => setYearly((v) => !v)}
-            >
-              <div className="toggle-knob" />
-            </button>
-            <span style={{ color: yearly ? 'var(--text)' : 'var(--text-dim)' }}>Yearly</span>
-            <span className="tag" style={{ background: 'rgba(34, 197, 94, 0.1)', color: '#22c55e', borderColor: 'rgba(34, 197, 94, 0.2)' }}>Save 20%</span>
-          </div>
-
-          <div className="pricing-grid">
-            <article className="plan-card animate-on-scroll">
-              <h3 className="plan-name">Community</h3>
-              <p className="plan-desc">Self-hosted Open Source</p>
-              <div className="plan-price"><span className="plan-amount">$0</span><span className="plan-per">/forever</span></div>
-              <ul className="plan-features">
-                <li className="plan-feature"><span className="check">✓</span> Core Identity Engine</li>
-                <li className="plan-feature"><span className="check">✓</span> Unlimited self-hosted MAUs</li>
-                <li className="plan-feature"><span className="check">✓</span> Community Support</li>
-                <li className="plan-feature disabled"><span className="cross">✗</span> Managed Cloud Hosting</li>
-              </ul>
-              <a className="btn btn-outline" style={{ width: '100%' }} href="/docs/deployment/self-hosting">Self-Host Now</a>
-            </article>
-
+          <div className="pricing-grid" style={{ marginTop: '60px' }}>
             <article className="plan-card popular animate-on-scroll">
-              <span className="plan-badge">SaaS Managed</span>
-              <h3 className="plan-name">Pro Cloud</h3>
+              <span className="plan-badge">Public Beta</span>
+              <h3 className="plan-name">Cloud Beta</h3>
               <p className="plan-desc">Fully managed by WardSeal</p>
-              <div className="plan-price"><span className="plan-amount">${proPrice}</span><span className="plan-per">/mo</span></div>
+              <div className="plan-price"><span className="plan-amount">Free</span><span className="plan-per">/for beta testers</span></div>
               <ul className="plan-features">
-                <li className="plan-feature"><span className="check">✓</span> Up to 10,000 MAUs</li>
+                <li className="plan-feature"><span className="check">✓</span> Full SaaS Platform Access</li>
                 <li className="plan-feature"><span className="check">✓</span> Automated Backups & HA</li>
-                <li className="plan-feature"><span className="check">✓</span> Priority Support</li>
-                <li className="plan-feature"><span className="check">✓</span> Custom Domain Support</li>
+                <li className="plan-feature"><span className="check">✓</span> **Unlimited System-Admins**</li>
+                <li className="plan-feature"><span className="check">✓</span> **No limits during testing phase**</li>
               </ul>
-              <a className="btn btn-primary" style={{ width: '100%' }} href={`${consoleBaseUrl}/signup?plan=pro`}>Start Cloud Trial</a>
+              <a className="btn btn-primary w-full" href={`${consoleBaseUrl}/signup?plan=beta`}>Get Started for Free</a>
             </article>
 
             <article className="plan-card animate-on-scroll">
               <h3 className="plan-name">Enterprise</h3>
-              <p className="plan-desc">For large platforms</p>
-              <div className="plan-price"><span className="plan-amount">Custom</span></div>
+              <p className="plan-desc">For large-scale platforms</p>
+              <div className="plan-price"><span className="plan-amount">Coming Soon</span></div>
               <ul className="plan-features">
-                <li className="plan-feature"><span className="check">✓</span> Unlimited MAUs</li>
-                <li className="plan-feature"><span className="check">✓</span> Dedicated Support</li>
-                <li className="plan-feature"><span className="check">✓</span> Custom SLAs & Compliance</li>
-                <li className="plan-feature"><span className="check">✓</span> Shared-Success Program</li>
+                <li className="plan-feature"><span className="check">✓</span> Managed VPC Deployment</li>
+                <li className="plan-feature"><span className="check">✓</span> Custom SLAs & 24/7 Support</li>
+                <li className="plan-feature"><span className="check">✓</span> Advanced Identity Governance</li>
+                <li className="plan-feature"><span className="check">✓</span> **On-prem / Hybrid Options**</li>
               </ul>
-              <a className="btn btn-outline" style={{ width: '100%' }} href="mailto:sales@wardseal.com">Contact Sales</a>
+              <a className="btn btn-outline w-full" href="mailto:sales@wardseal.com">Contact for Early Access</a>
             </article>
           </div>
         </div>
@@ -259,7 +275,7 @@ export default function HomePage() {
             <span className="tag">FAQ</span>
             <h2>Frequently asked questions</h2>
           </div>
-          <div style={{ marginTop: '40px' }}>
+          <div className="faq-list">
             {faqItems.map((item, idx) => (
               <div className={`faq-item ${openFaq === idx ? 'open' : ''}`} key={item.q}>
                 <button className="faq-q" onClick={() => setOpenFaq(openFaq === idx ? -1 : idx)}>
@@ -273,14 +289,13 @@ export default function HomePage() {
         </div>
       </section>
 
-
       <section className="section">
-        <div className="container" style={{ textAlign: 'center' }}>
-          <div className="glass" style={{ padding: '80px', borderRadius: 'var(--r-lg)', background: 'radial-gradient(circle at top right, var(--primary-surface), transparent)' }}>
-            <span className="tag" style={{ marginBottom: '24px' }}>Get Started</span>
-            <h2 style={{ marginBottom: '24px' }}>Secure your application today</h2>
-            <p style={{ maxWidth: '600px', margin: '0 auto 40px' }}>Free forever for small projects. No credit card. No lock-in.</p>
-            <div className="hero-cta">
+        <div className="container text-center">
+          <div className="cta-glass glass" style={{ padding: '80px 48px', borderRadius: 'var(--r-lg)' }}>
+            <span className="tag mb-4">Get Started</span>
+            <h2 className="mb-4">Secure your application today</h2>
+            <p className="cta-desc">Join the managed cloud beta today. No credit card. No complications.</p>
+            <div className="hero-cta" style={{ marginTop: '32px' }}>
               <a className="btn btn-primary" href={`${consoleBaseUrl}/signup`}>Create Free Account &rarr;</a>
               <a className="btn btn-outline" href="https://github.com/dhawalhost/wardseal">Read the Docs</a>
             </div>

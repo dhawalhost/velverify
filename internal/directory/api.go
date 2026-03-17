@@ -1,7 +1,6 @@
 package directory
 
 import (
-	"context"
 	"errors"
 	"net/http"
 
@@ -41,17 +40,13 @@ func (h *HTTPHandler) RegisterRoutes(router *gin.Engine) {
 
 	tenantProtected := router.Group("/")
 	tenantProtected.Use(middleware.TenantExtractor(middleware.TenantConfig{
-		SlugResolver: func(_ context.Context, tenant string) (string, error) {
-			return tenant, nil
-		},
+		SlugResolver: h.svc.GetTenantIDBySlug,
 	}))
 
 	internalRoutes := router.Group("/internal")
 	internalRoutes.Use(middleware.ServiceAuthenticator(h.serviceAuth))
 	internalRoutes.Use(middleware.TenantExtractor(middleware.TenantConfig{
-		SlugResolver: func(_ context.Context, tenant string) (string, error) {
-			return tenant, nil
-		},
+		SlugResolver: h.svc.GetTenantIDBySlug,
 	}))
 	internalRoutes.POST("/credentials/verify", h.verifyCredentials)
 
@@ -59,6 +54,7 @@ func (h *HTTPHandler) RegisterRoutes(router *gin.Engine) {
 	globalInternalRoutes := router.Group("/internal")
 	globalInternalRoutes.Use(middleware.ServiceAuthenticator(h.serviceAuth))
 	globalInternalRoutes.GET("/discover", h.discoverTenant)
+	globalInternalRoutes.GET("/tenants/resolve", h.resolveTenantSlug)
 
 	// Tenant Management
 	router.POST("/tenants", h.createTenant)
@@ -491,4 +487,23 @@ func (h *HTTPHandler) createTenant(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusCreated, gin.H{"message": "tenant created successfully"})
+}
+
+func (h *HTTPHandler) resolveTenantSlug(c *gin.Context) {
+	slug := c.Query("slug")
+	if slug == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "slug is required"})
+		return
+	}
+	tenantID, err := h.svc.GetTenantIDBySlug(c.Request.Context(), slug)
+	if err != nil {
+		h.logger.Error("Failed to resolve tenant slug", zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to resolve tenant slug"})
+		return
+	}
+	if tenantID == "" {
+		c.JSON(http.StatusNotFound, gin.H{"error": "tenant not found"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"tenant_id": tenantID})
 }

@@ -26,6 +26,8 @@ type Service interface {
 	ListAccessRequests(ctx context.Context, tenantID, status string) ([]AccessRequest, error)
 	ApproveAccessRequest(ctx context.Context, tenantID, requestID, approverID, comment string) error
 	RejectAccessRequest(ctx context.Context, tenantID, requestID, approverID, comment string) error
+
+	ResolveTenantSlug(ctx context.Context, slug string) (string, error)
 }
 
 type CreateOAuthClientInput struct {
@@ -242,6 +244,10 @@ func (s *governanceService) RejectAccessRequest(ctx context.Context, tenantID, r
 		return err
 	}
 	return s.reqStore.UpdateRequestStatus(ctx, requestID, "rejected")
+}
+
+func (s *governanceService) ResolveTenantSlug(ctx context.Context, slug string) (string, error) {
+	return s.dirClient.ResolveTenantSlug(ctx, slug)
 }
 
 func requireTenant(tenantID string) error {
