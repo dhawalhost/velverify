@@ -14,6 +14,11 @@ type DirectoryClient interface {
 	AddUserToGroup(ctx context.Context, tenantID, userID, groupID string) error
 	RemoveUserFromGroup(ctx context.Context, tenantID, userID, groupID string) error
 	ResolveTenantSlug(ctx context.Context, slug string) (string, error)
+
+	// Organization mapping
+	AddUserToOrganization(ctx context.Context, tenantID, userID, orgID, role string) error
+	RemoveUserFromOrganization(ctx context.Context, tenantID, userID, orgID string) error
+	ListUserOrganizations(ctx context.Context, tenantID, userID string) ([]string, error)
 }
 
 type directoryHTTPClient struct {
@@ -121,4 +126,75 @@ func (c *directoryHTTPClient) ResolveTenantSlug(ctx context.Context, slug string
 	}
 
 	return res.TenantID, nil
+}
+
+func (c *directoryHTTPClient) AddUserToOrganization(ctx context.Context, tenantID, userID, orgID, role string) error {
+	url := fmt.Sprintf("%s/users/%s/organizations/%s", c.baseURL, userID, orgID)
+	body, _ := json.Marshal(map[string]string{"role": role})
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Tenant-ID", tenantID)
+	if c.authToken != "" {
+		req.Header.Set(c.authHeader, c.authToken)
+	}
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 300 {
+		return fmt.Errorf("dirsvc returned status %d", resp.StatusCode)
+	}
+	return nil
+}
+
+func (c *directoryHTTPClient) RemoveUserFromOrganization(ctx context.Context, tenantID, userID, orgID string) error {
+	url := fmt.Sprintf("%s/users/%s/organizations/%s", c.baseURL, userID, orgID)
+	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, url, nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("X-Tenant-ID", tenantID)
+	if c.authToken != "" {
+		req.Header.Set(c.authHeader, c.authToken)
+	}
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 300 {
+		return fmt.Errorf("dirsvc returned status %d", resp.StatusCode)
+	}
+	return nil
+}
+
+func (c *directoryHTTPClient) ListUserOrganizations(ctx context.Context, tenantID, userID string) ([]string, error) {
+	url := fmt.Sprintf("%s/users/%s/organizations", c.baseURL, userID)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("X-Tenant-ID", tenantID)
+	if c.authToken != "" {
+		req.Header.Set(c.authHeader, c.authToken)
+	}
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("dirsvc returned status %d", resp.StatusCode)
+	}
+	var res struct {
+		OrganizationIDs []string `json:"organization_ids"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
+		return nil, err
+	}
+	return res.OrganizationIDs, nil
 }

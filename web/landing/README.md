@@ -59,7 +59,6 @@ Optional Vite build variables:
 VITE_ENVIRONMENT=staging
 VITE_SITE_BASE_URL=https://staging.wardseal.com
 VITE_CONSOLE_BASE_URL=https://console-staging.wardseal.com
-VITE_HELP_BASE_URL=https://help-staging.wardseal.com
 VITE_SUPPORT_EMAIL=support@wardseal.com
 ```
 

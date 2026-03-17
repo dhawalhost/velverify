@@ -38,7 +38,7 @@ CREATE TABLE IF NOT EXISTS user_roles (
 );
 
 -- Indexes
-CREATE INDEX idx_roles_tenant ON roles(tenant_id);
-CREATE INDEX idx_permissions_tenant ON permissions(tenant_id);
-CREATE INDEX idx_user_roles_user ON user_roles(user_id);
-CREATE INDEX idx_user_roles_role ON user_roles(role_id);
+CREATE INDEX IF NOT EXISTS idx_roles_tenant ON roles(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_permissions_tenant ON permissions(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_user_roles_user ON user_roles(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_roles_role ON user_roles(role_id);

@@ -28,8 +28,8 @@ CREATE TABLE IF NOT EXISTS certification_items (
 );
 
 -- Indexes for efficient queries
-CREATE INDEX idx_campaigns_tenant ON certification_campaigns(tenant_id);
-CREATE INDEX idx_campaigns_status ON certification_campaigns(status);
-CREATE INDEX idx_campaigns_reviewer ON certification_campaigns(reviewer_id);
-CREATE INDEX idx_items_campaign ON certification_items(campaign_id);
-CREATE INDEX idx_items_decision ON certification_items(decision);
+CREATE INDEX IF NOT EXISTS idx_campaigns_tenant ON certification_campaigns(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_campaigns_status ON certification_campaigns(status);
+CREATE INDEX IF NOT EXISTS idx_campaigns_reviewer ON certification_campaigns(reviewer_id);
+CREATE INDEX IF NOT EXISTS idx_items_campaign ON certification_items(campaign_id);
+CREATE INDEX IF NOT EXISTS idx_items_decision ON certification_items(decision);

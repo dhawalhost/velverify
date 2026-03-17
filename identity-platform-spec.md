@@ -274,7 +274,7 @@ X-Tenant-ID: acme-prod
   "client_id": "admin-portal",
   "name": "Admin Portal",
   "client_type": "confidential",
-  "redirect_uris": ["https://console.wardseal.com/callback"],
+  "redirect_uris": ["https://manage.wardseal.com/callback"],
   "allowed_scopes": ["openid", "profile"],
   "client_secret": "replace-me"
 }
@@ -288,7 +288,7 @@ X-Tenant-ID: acme-prod
   "tenant_id": "acme-prod",
   "client_type": "confidential",
   "name": "Admin Portal",
-  "redirect_uris": ["https://console.wardseal.com/callback"],
+  "redirect_uris": ["https://manage.wardseal.com/callback"],
   "allowed_scopes": ["openid", "profile"]
 }
 ```

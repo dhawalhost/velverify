@@ -67,7 +67,7 @@ export default function PoliciesPage() {
         <div className="container">
           <div className="section-header align-center" style={{ marginBottom: '80px' }}>
             <span className="tag">Compliance Center</span>
-            <h1>Trust & <span className="gradient-text">Legal Center</span></h1>
+            <h1 style={{ maxWidth: '660px', margin: '24px auto 0' }}>Trust & <span className="gradient-text">Legal Center</span></h1>
             <p style={{ maxWidth: '600px', margin: '24px auto 0' }}>
               We are committed to transparency, security, and the protection of your data. 
               Find all our legal agreements, privacy commitments, and security policies below.

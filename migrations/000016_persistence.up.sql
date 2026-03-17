@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS authorization_codes (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
-CREATE INDEX idx_auth_codes_expires ON authorization_codes(expires_at);
+CREATE INDEX IF NOT EXISTS idx_auth_codes_expires ON authorization_codes(expires_at);
 
 CREATE TABLE IF NOT EXISTS refresh_tokens (
     token VARCHAR(255) PRIMARY KEY,
@@ -25,12 +25,12 @@ CREATE TABLE IF NOT EXISTS refresh_tokens (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
-CREATE INDEX idx_refresh_tokens_expires ON refresh_tokens(expires_at);
-CREATE INDEX idx_refresh_tokens_client ON refresh_tokens(client_id);
+CREATE INDEX IF NOT EXISTS idx_refresh_tokens_expires ON refresh_tokens(expires_at);
+CREATE INDEX IF NOT EXISTS idx_refresh_tokens_client ON refresh_tokens(client_id);
 
 CREATE TABLE IF NOT EXISTS revoked_tokens (
     token_hash VARCHAR(64) PRIMARY KEY,
     revoked_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
-CREATE INDEX idx_revoked_tokens_revoked_at ON revoked_tokens(revoked_at);
+CREATE INDEX IF NOT EXISTS idx_revoked_tokens_revoked_at ON revoked_tokens(revoked_at);

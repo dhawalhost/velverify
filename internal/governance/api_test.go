@@ -186,6 +186,16 @@ type stubService struct {
 	listAccessRequestsFn   func(ctx context.Context, tenantID, status string) ([]AccessRequest, error)
 	approveAccessRequestFn func(ctx context.Context, tenantID, requestID, approverID, comment string) error
 	rejectAccessRequestFn  func(ctx context.Context, tenantID, requestID, approverID, comment string) error
+	resolveTenantSlugFn    func(ctx context.Context, slug string) (string, error)
+	listOrganizationsFn    func(ctx context.Context, tenantID string, limit, offset int) ([]Organization, error)
+	createOrganizationFn   func(ctx context.Context, org *Organization) error
+	getOrganizationFn      func(ctx context.Context, tenantID, orgID string) (*Organization, error)
+	getOrganizationByNameFn func(ctx context.Context, tenantID, name string) (*Organization, error)
+	updateOrganizationFn   func(ctx context.Context, org *Organization) error
+	deleteOrganizationFn   func(ctx context.Context, tenantID, orgID string) error
+	addUserToOrgFn         func(ctx context.Context, tenantID, userID, orgID, role string) error
+	removeUserFromOrgFn    func(ctx context.Context, tenantID, userID, orgID string) error
+	listUserOrgsFn         func(ctx context.Context, tenantID, userID string) ([]string, error)
 }
 
 func (s *stubService) HealthCheck(ctx context.Context) (bool, error) {
@@ -256,4 +266,74 @@ func (s *stubService) RejectAccessRequest(ctx context.Context, tenantID, request
 		panic("RejectAccessRequest called unexpectedly")
 	}
 	return s.rejectAccessRequestFn(ctx, tenantID, requestID, approverID, comment)
+}
+
+func (s *stubService) ResolveTenantSlug(ctx context.Context, slug string) (string, error) {
+	if s.resolveTenantSlugFn != nil {
+		return s.resolveTenantSlugFn(ctx, slug)
+	}
+	return slug, nil
+}
+
+func (s *stubService) ListOrganizations(ctx context.Context, tenantID string, limit, offset int) ([]Organization, error) {
+	if s.listOrganizationsFn != nil {
+		return s.listOrganizationsFn(ctx, tenantID, limit, offset)
+	}
+	return nil, nil
+}
+
+func (s *stubService) CreateOrganization(ctx context.Context, org *Organization) error {
+	if s.createOrganizationFn != nil {
+		return s.createOrganizationFn(ctx, org)
+	}
+	return nil
+}
+
+func (s *stubService) GetOrganization(ctx context.Context, tenantID, orgID string) (*Organization, error) {
+	if s.getOrganizationFn != nil {
+		return s.getOrganizationFn(ctx, tenantID, orgID)
+	}
+	return nil, nil
+}
+
+func (s *stubService) GetOrganizationByName(ctx context.Context, tenantID, name string) (*Organization, error) {
+	if s.getOrganizationByNameFn != nil {
+		return s.getOrganizationByNameFn(ctx, tenantID, name)
+	}
+	return nil, nil
+}
+
+func (s *stubService) UpdateOrganization(ctx context.Context, org *Organization) error {
+	if s.updateOrganizationFn != nil {
+		return s.updateOrganizationFn(ctx, org)
+	}
+	return nil
+}
+
+func (s *stubService) DeleteOrganization(ctx context.Context, tenantID, orgID string) error {
+	if s.deleteOrganizationFn != nil {
+		return s.deleteOrganizationFn(ctx, tenantID, orgID)
+	}
+	return nil
+}
+
+func (s *stubService) AddUserToOrganization(ctx context.Context, tenantID, userID, orgID, role string) error {
+	if s.addUserToOrgFn != nil {
+		return s.addUserToOrgFn(ctx, tenantID, userID, orgID, role)
+	}
+	return nil
+}
+
+func (s *stubService) RemoveUserFromOrganization(ctx context.Context, tenantID, userID, orgID string) error {
+	if s.removeUserFromOrgFn != nil {
+		return s.removeUserFromOrgFn(ctx, tenantID, userID, orgID)
+	}
+	return nil
+}
+
+func (s *stubService) ListUserOrganizations(ctx context.Context, tenantID, userID string) ([]string, error) {
+	if s.listUserOrgsFn != nil {
+		return s.listUserOrgsFn(ctx, tenantID, userID)
+	}
+	return nil, nil
 }

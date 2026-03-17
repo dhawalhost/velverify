@@ -33,19 +33,13 @@ http:
     adminui:
       entryPoints:
         - web
-      rule: Host(`console.wardseal.local`)
+      rule: Host(`manage.wardseal.local`)
       service: adminui
 
     landingui-site:
       entryPoints:
         - web
       rule: Host(`wardseal.local`)
-      service: landingui
-
-    landingui-help:
-      entryPoints:
-        - web
-      rule: Host(`help.wardseal.local`)
       service: landingui
 
   services:

@@ -98,8 +98,20 @@ func (f *fakeDirectoryService) VerifyCredentials(context.Context, string, string
 func (f *fakeDirectoryService) GetTenantByEmail(context.Context, string) (string, error) {
 	return "", nil
 }
+func (f *fakeDirectoryService) GetTenantIDBySlug(context.Context, string) (string, error) {
+	return "tenant-1", nil
+}
 func (f *fakeDirectoryService) CreateTenant(context.Context, string, string, string, string) error {
 	return nil
+}
+func (f *fakeDirectoryService) AddUserToOrganization(ctx context.Context, tenantID, userID, orgID, role string) error {
+	return nil
+}
+func (f *fakeDirectoryService) RemoveUserFromOrganization(ctx context.Context, tenantID, userID, orgID string) error {
+	return nil
+}
+func (f *fakeDirectoryService) ListUserOrganizations(ctx context.Context, tenantID, userID string) ([]string, error) {
+	return nil, nil
 }
 
 func TestCreateUserPrefersPrimaryEmail(t *testing.T) {

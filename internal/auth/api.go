@@ -161,11 +161,14 @@ func (h *HTTPHandler) RegisterRoutes(router *gin.Engine) {
 	// Social Login
 	tenantProtected.POST("/social/login", h.socialLogin)
 
+	// API v1 group
+	apiV1 := tenantProtected.Group("/api/v1")
+
 	// MFA WebAuthn
-	h.registerWebAuthnRoutes(tenantProtected)
+	h.registerWebAuthnRoutes(apiV1)
 
 	// MFA TOTP
-	h.RegisterTOTPRoutes(tenantProtected.Group("/api/v1"))
+	h.RegisterTOTPRoutes(apiV1)
 
 	if samlProvider := h.svc.SAML(); samlProvider != nil {
 		samlHandler := gin.WrapH(samlProvider)

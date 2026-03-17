@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS connectors (
 );
 
 -- Indexes
-CREATE INDEX idx_tasks_tenant_status ON provisioning_tasks(tenant_id, status);
-CREATE INDEX idx_tasks_scheduled ON provisioning_tasks(scheduled_at) WHERE status = 'pending';
-CREATE INDEX idx_connectors_tenant ON connectors(tenant_id);
-CREATE INDEX idx_connectors_type ON connectors(type);
+CREATE INDEX IF NOT EXISTS idx_tasks_tenant_status ON provisioning_tasks(tenant_id, status);
+CREATE INDEX IF NOT EXISTS idx_tasks_scheduled ON provisioning_tasks(scheduled_at) WHERE status = 'pending';
+CREATE INDEX IF NOT EXISTS idx_connectors_tenant ON connectors(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_connectors_type ON connectors(type);

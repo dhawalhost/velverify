@@ -10,7 +10,8 @@ CREATE TABLE IF NOT EXISTS tenants (
 -- Backfill existing tenants from identities
 INSERT INTO tenants (id, created_at, updated_at)
 SELECT DISTINCT tenant_id, NOW(), NOW()
-FROM identities;
+FROM identities
+ON CONFLICT (id) DO NOTHING;
 
 -- Optional: Add FK constraint now that we have the parent table
 -- ALTER TABLE identities ADD CONSTRAINT fk_identities_tenant_id FOREIGN KEY (tenant_id) REFERENCES tenants(id);

@@ -10,5 +10,5 @@ CREATE TABLE IF NOT EXISTS totp_secrets (
     UNIQUE(identity_id, tenant_id)
 );
 
-CREATE INDEX idx_totp_secrets_identity ON totp_secrets(identity_id);
-CREATE INDEX idx_totp_secrets_tenant ON totp_secrets(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_totp_secrets_identity ON totp_secrets(identity_id);
+CREATE INDEX IF NOT EXISTS idx_totp_secrets_tenant ON totp_secrets(tenant_id);

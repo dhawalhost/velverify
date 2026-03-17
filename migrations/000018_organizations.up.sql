@@ -14,8 +14,8 @@ CREATE TABLE IF NOT EXISTS organizations (
     UNIQUE(tenant_id, name)
 );
 
-CREATE INDEX idx_organizations_tenant ON organizations(tenant_id);
-CREATE INDEX idx_organizations_domain ON organizations(domain) WHERE domain IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_organizations_tenant ON organizations(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_organizations_domain ON organizations(domain) WHERE domain IS NOT NULL;
 
 -- Add org_id to existing tables for org-scoping (optional, for future use)
 -- This can be added later to users, saml_providers, etc.

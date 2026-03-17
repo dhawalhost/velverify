@@ -94,12 +94,12 @@ docker compose up -d traefik adminui landingui
 Make sure your `/etc/hosts` contains:
 
 ```text
-127.0.0.1 wardseal.local help.wardseal.local console.wardseal.local auth.wardseal.local api.wardseal.local
+127.0.0.1 wardseal.local help.wardseal.local manage.wardseal.local auth.wardseal.local api.wardseal.local
 ```
 
 Then use:
 
-- Admin Console: <http://console.wardseal.local>
+- Admin Console: <http://manage.wardseal.local>
 - Landing Site: <http://wardseal.local>
 - Help Portal: <http://help.wardseal.local>
 

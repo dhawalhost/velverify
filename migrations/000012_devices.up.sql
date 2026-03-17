@@ -14,5 +14,5 @@ CREATE TABLE IF NOT EXISTS devices (
     UNIQUE(tenant_id, device_identifier)
 );
 
-CREATE INDEX idx_devices_user_id ON devices(user_id);
-CREATE INDEX idx_devices_tenant_id ON devices(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_devices_user_id ON devices(user_id);
+CREATE INDEX IF NOT EXISTS idx_devices_tenant_id ON devices(tenant_id);

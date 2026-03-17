@@ -64,7 +64,7 @@ docker compose up --build traefik postgres redis dirsvc authsvc govsvc policysvc
 
 - Landing Site: <http://wardseal.local>
 - Help Portal: <http://help.wardseal.local>
-- Admin Console: <http://console.wardseal.local>
+- Admin Console: <http://manage.wardseal.local>
 - Auth Service: <http://auth.wardseal.local>
 - API Gateway Host: <http://api.wardseal.local>
 - Traefik Dashboard: <http://localhost:8088>
@@ -72,7 +72,7 @@ docker compose up --build traefik postgres redis dirsvc authsvc govsvc policysvc
 Add these entries to `/etc/hosts` if they are not already present:
 
 ```text
-127.0.0.1 wardseal.local help.wardseal.local console.wardseal.local auth.wardseal.local api.wardseal.local
+127.0.0.1 wardseal.local help.wardseal.local manage.wardseal.local auth.wardseal.local api.wardseal.local
 ```
 
 When running the stack locally, the services honor `CORS_ALLOWED_ORIGINS` env vars that are aligned to those hostnames by default.
@@ -184,7 +184,7 @@ curl -X POST http://localhost:8082/api/v1/oauth/clients \
         "client_id": "admin-portal",
         "name": "Admin Portal",
         "client_type": "confidential",
-        "redirect_uris": ["https://console.wardseal.com/callback"],
+        "redirect_uris": ["https://manage.wardseal.com/callback"],
         "allowed_scopes": ["openid", "profile"],
         "client_secret": "replace-me"
     }'
@@ -205,7 +205,7 @@ go run ./cmd/admincli create \
     -client-id admin-portal \
     -name "Admin Portal" \
     -type confidential \
-    -redirects https://console.wardseal.com/callback \
+    -redirects https://manage.wardseal.com/callback \
     -scopes openid,profile \
     -secret super-secret
 ```

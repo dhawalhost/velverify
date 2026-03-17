@@ -5,12 +5,13 @@ import (
 	"testing"
 
 	"github.com/dhawalhost/wardseal/internal/oauthclient"
+	"github.com/dhawalhost/wardseal/internal/policy"
 )
 
 var ctx = context.Background()
 
 func TestCreateOAuthClientValidatesRedirects(t *testing.T) {
-	svc := NewService(&fakeStore{}, nil, &fakeDirClient{}, nil)
+	svc := NewService(&fakeStore{}, nil, &fakeOrgStore{}, &fakeDirClient{}, &fakePolicyEngine{})
 	_, err := svc.CreateOAuthClient(ctx, "11111111-1111-1111-1111-111111111111", CreateOAuthClientInput{
 		ClientID:      "client-a",
 		Name:          "Client A",
@@ -24,7 +25,7 @@ func TestCreateOAuthClientValidatesRedirects(t *testing.T) {
 
 func TestCreateOAuthClientHashesSecret(t *testing.T) {
 	store := &fakeStore{}
-	svc := NewService(store, nil, &fakeDirClient{}, nil)
+	svc := NewService(store, nil, &fakeOrgStore{}, &fakeDirClient{}, &fakePolicyEngine{})
 	secret := "super-secret"
 	client, err := svc.CreateOAuthClient(ctx, "11111111-1111-1111-1111-111111111111", CreateOAuthClientInput{
 		ClientID:      "client-b",
@@ -47,7 +48,7 @@ func TestCreateOAuthClientHashesSecret(t *testing.T) {
 
 func TestUpdateOAuthClientValidatesRedirects(t *testing.T) {
 	store := &fakeStore{}
-	svc := NewService(store, nil, &fakeDirClient{}, nil)
+	svc := NewService(store, nil, &fakeOrgStore{}, &fakeDirClient{}, &fakePolicyEngine{})
 	_, err := svc.UpdateOAuthClient(ctx, "11111111-1111-1111-1111-111111111111", "client-x", UpdateOAuthClientInput{
 		RedirectURIs: []string{"http://localhost:bad"},
 	})
@@ -132,4 +133,41 @@ func (f *fakeDirClient) AddUserToGroup(ctx context.Context, tenantID, userID, gr
 
 func (f *fakeDirClient) RemoveUserFromGroup(ctx context.Context, tenantID, userID, groupID string) error {
 	return nil
+}
+
+func (f *fakeDirClient) ResolveTenantSlug(ctx context.Context, slug string) (string, error) {
+	return slug, nil
+}
+
+func (f *fakeDirClient) AddUserToOrganization(ctx context.Context, tenantID, userID, orgID, role string) error {
+	return nil
+}
+
+func (f *fakeDirClient) RemoveUserFromOrganization(ctx context.Context, tenantID, userID, orgID string) error {
+	return nil
+}
+
+func (f *fakeDirClient) ListUserOrganizations(ctx context.Context, tenantID, userID string) ([]string, error) {
+	return nil, nil
+}
+
+type fakeOrgStore struct{}
+
+func (f *fakeOrgStore) Create(ctx context.Context, org *Organization) error { return nil }
+func (f *fakeOrgStore) Get(ctx context.Context, tenantID, orgID string) (*Organization, error) {
+	return nil, nil
+}
+func (f *fakeOrgStore) GetByName(ctx context.Context, tenantID, name string) (*Organization, error) {
+	return nil, nil
+}
+func (f *fakeOrgStore) List(ctx context.Context, tenantID string, limit, offset int) ([]Organization, error) {
+	return nil, nil
+}
+func (f *fakeOrgStore) Update(ctx context.Context, org *Organization) error { return nil }
+func (f *fakeOrgStore) Delete(ctx context.Context, tenantID, orgID string) error { return nil }
+
+type fakePolicyEngine struct{}
+
+func (f *fakePolicyEngine) Evaluate(ctx context.Context, input policy.Input) (bool, string, error) {
+	return true, "Allowed", nil
 }

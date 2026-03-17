@@ -55,7 +55,7 @@ authsvc:
     REDIS_DB: "0"
     REDIS_ENABLED: "true"
     WEBAUTHN_SESSION_TTL_SECONDS: "600"
-    CORS_ALLOWED_ORIGINS: "http://auth.wardseal.local,http://console.wardseal.local,http://wardseal.local,http://help.wardseal.local"
+    CORS_ALLOWED_ORIGINS: "http://auth.wardseal.local,http://manage.wardseal.local,http://wardseal.local"
     RATE_LIMIT_USE_TENANT: "true"
     RATE_LIMIT_KEY_PREFIX: "wardseal:ratelimit"
 
@@ -105,7 +105,7 @@ dirsvc:
     LOG_LEVEL: debug
     REDIS_ADDR: redis.wardseal-local.svc.cluster.local:6379
     REDIS_ENABLED: "true"
-    CORS_ALLOWED_ORIGINS: "http://auth.wardseal.local,http://console.wardseal.local,http://wardseal.local,http://help.wardseal.local"
+    CORS_ALLOWED_ORIGINS: "http://auth.wardseal.local,http://manage.wardseal.local,http://wardseal.local"
 
   database:
     existingSecret: wardseal-db-credentials
@@ -140,7 +140,7 @@ govsvc:
     DIRECTORY_SERVICE_URL: http://wardseal-dirsvc.wardseal-local.svc.cluster.local:8081
     REDIS_ADDR: redis.wardseal-local.svc.cluster.local:6379
     REDIS_ENABLED: "true"
-    CORS_ALLOWED_ORIGINS: "http://auth.wardseal.local,http://console.wardseal.local,http://wardseal.local,http://help.wardseal.local"
+    CORS_ALLOWED_ORIGINS: "http://auth.wardseal.local,http://manage.wardseal.local,http://wardseal.local"
 
   database:
     existingSecret: wardseal-db-credentials
@@ -202,7 +202,7 @@ provsvc:
   env:
     ENVIRONMENT: local
     LOG_LEVEL: debug
-    CORS_ALLOWED_ORIGINS: "http://auth.wardseal.local,http://console.wardseal.local,http://wardseal.local,http://help.wardseal.local"
+    CORS_ALLOWED_ORIGINS: "http://auth.wardseal.local,http://manage.wardseal.local,http://wardseal.local"
 
   database:
     existingSecret: wardseal-db-credentials
@@ -351,7 +351,7 @@ ingress:
           pathType: Prefix
           service: govsvc
           port: 8082
-    - host: console.wardseal.local
+    - host: manage.wardseal.local
       paths:
         - path: /
           pathType: Prefix
@@ -363,36 +363,6 @@ ingress:
           pathType: Prefix
           service: landingui
           port: 80
-    - host: help.wardseal.local
-      paths:
-        - path: /
-          pathType: Prefix
-          service: landingui
-          port: 80
-    - host: docs.wardseal.local
-      paths:
-        - path: /
-          pathType: Prefix
-          service: docs
-          port: 80
   tls: []   # No TLS locally
 
-# =====================
-# Docs Site
-# =====================
-docs:
-  enabled: true
-  replicaCount: 1
-
-  image:
-    repository: wardseal-docs
-    tag: "local"
-    pullPolicy: IfNotPresent
-
-  resources:
-    limits:
-      cpu: 100m
-      memory: 128Mi
-    requests:
-      cpu: 20m
-      memory: 64Mi
+  tls: []   # No TLS locally

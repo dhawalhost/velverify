@@ -20,6 +20,6 @@ CREATE TABLE IF NOT EXISTS developer_apps (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
-CREATE INDEX idx_developer_apps_tenant ON developer_apps(tenant_id);
-CREATE INDEX idx_developer_apps_owner ON developer_apps(tenant_id, owner_id);
-CREATE INDEX idx_developer_apps_client_id ON developer_apps(client_id);
+CREATE INDEX IF NOT EXISTS idx_developer_apps_tenant ON developer_apps(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_developer_apps_owner ON developer_apps(tenant_id, owner_id);
+CREATE INDEX IF NOT EXISTS idx_developer_apps_client_id ON developer_apps(client_id);

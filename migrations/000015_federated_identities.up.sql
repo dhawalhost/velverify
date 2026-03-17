@@ -10,5 +10,5 @@ CREATE TABLE IF NOT EXISTS federated_identities (
     UNIQUE(tenant_id, provider, external_id)
 );
 
-CREATE INDEX idx_federated_identities_lookup ON federated_identities(tenant_id, provider, external_id);
-CREATE INDEX idx_federated_identities_user ON federated_identities(identity_id);
+CREATE INDEX IF NOT EXISTS idx_federated_identities_lookup ON federated_identities(tenant_id, provider, external_id);
+CREATE INDEX IF NOT EXISTS idx_federated_identities_user ON federated_identities(identity_id);

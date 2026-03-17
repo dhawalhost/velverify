@@ -11,10 +11,9 @@ fi
 
 LOCAL_HOSTS=(
 	"wardseal.local"
-	"help.wardseal.local"
 	"auth.wardseal.local"
 	"api.wardseal.local"
-	"console.wardseal.local"
+	"manage.wardseal.local"
 )
 
 GREEN='\033[0;32m'; YELLOW='\033[1;33m'; BLUE='\033[0;34m'; NC='\033[0m'
@@ -28,6 +27,15 @@ done
 
 if ! kubectl cluster-info >/dev/null 2>&1; then
 	warn "Kubernetes cluster is not reachable. Attempting best-effort local cleanup only."
+fi
+
+section "DANGER ZONE"
+warn "This will DELETE the entire $NAMESPACE namespace, including all PERSISTENT DATA (Postgres passwords, users, etc.)."
+read -p "Are you sure you want to proceed? (y/N) " -n 1 -r
+echo
+if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+    echo "Aborting teardown."
+    exit 1
 fi
 
 section "Removing Helm Release"

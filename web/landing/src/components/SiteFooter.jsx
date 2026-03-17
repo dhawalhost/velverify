@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
 import siteConfig from '../siteConfig'
 
-const { helpBaseUrl } = siteConfig
+const { consoleBaseUrl } = siteConfig
 
 export default function SiteFooter() {
   return (
@@ -9,7 +9,9 @@ export default function SiteFooter() {
       <div className="container">
         <div className="footer-grid">
           <div>
-            <Link to="/" className="footer-logo"><div className="logo-dot">⚔️</div> WardSeal</Link>
+            <Link className="logo-dot" to="/">
+              <img src="/wardseal.svg" alt="WardSeal Logo" className="logo-img" />
+            </Link>
             <div className="footer-tagline">Open-source Identity &amp; Access Management for the modern cloud.</div>
           </div>
           <div className="footer-col">

@@ -8,4 +8,4 @@ CREATE TABLE IF NOT EXISTS saml_providers (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
-CREATE INDEX idx_saml_providers_tenant_id ON saml_providers(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_saml_providers_tenant_id ON saml_providers(tenant_id);

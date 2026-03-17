@@ -40,8 +40,3 @@ dependencies:
     version: "0.1.0"
     repository: "file://../landingui"
     condition: landingui.enabled
-
-  - name: docs
-    version: "0.1.0"
-    repository: "file://../docs"
-    condition: docs.enabled

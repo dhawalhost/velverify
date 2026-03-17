@@ -39,6 +39,11 @@ type Service interface {
 	// Discovery
 	GetTenantByEmail(ctx context.Context, email string) (string, error)
 
+	// User-Organization mapping
+	AddUserToOrganization(ctx context.Context, tenantID, userID, orgID, role string) error
+	RemoveUserFromOrganization(ctx context.Context, tenantID, userID, orgID string) error
+	ListUserOrganizations(ctx context.Context, tenantID, userID string) ([]string, error)
+
 	// Tenant Management
 	CreateTenant(ctx context.Context, id, name, slug, plan string) error
 	GetTenantIDBySlug(ctx context.Context, slug string) (string, error)
@@ -50,6 +55,7 @@ type directoryService struct {
 
 var ErrInvalidCredentials = errors.New("invalid credentials")
 var ErrAlreadyExists = errors.New("already exists")
+var ErrEmailAlreadyExistsGlobally = errors.New("email already in use globally")
 
 // NewService creates a new directory service.
 func NewService(db *sqlx.DB) Service { // Use sqlx.DB
@@ -88,6 +94,9 @@ func (s *directoryService) CreateUser(ctx context.Context, tenantID string, user
 		`INSERT INTO accounts (identity_id, tenant_id, login, password_hash) VALUES ($1, $2, $3, $4)`,
 		userID, tenantID, user.Email, string(hashedPassword))
 	if err != nil {
+		if strings.Contains(err.Error(), "unique constraint") && strings.Contains(err.Error(), "accounts_login_key") {
+			return "", ErrEmailAlreadyExistsGlobally
+		}
 		return "", err
 	}
 
@@ -294,4 +303,30 @@ func (s *directoryService) GetTenantIDBySlug(ctx context.Context, slug string) (
 		return "", err
 	}
 	return id, nil
+}
+
+func (s *directoryService) AddUserToOrganization(ctx context.Context, tenantID, userID, orgID, role string) error {
+	if role == "" {
+		role = "member"
+	}
+	_, err := s.db.ExecContext(ctx,
+		`INSERT INTO user_organizations (tenant_id, user_id, org_id, role) VALUES ($1, $2, $3, $4)
+		 ON CONFLICT (tenant_id, user_id, org_id) DO UPDATE SET role = EXCLUDED.role, updated_at = NOW()`,
+		tenantID, userID, orgID, role)
+	return err
+}
+
+func (s *directoryService) RemoveUserFromOrganization(ctx context.Context, tenantID, userID, orgID string) error {
+	_, err := s.db.ExecContext(ctx,
+		`DELETE FROM user_organizations WHERE tenant_id = $1 AND user_id = $2 AND org_id = $3`,
+		tenantID, userID, orgID)
+	return err
+}
+
+func (s *directoryService) ListUserOrganizations(ctx context.Context, tenantID, userID string) ([]string, error) {
+	var orgIDs []string
+	err := s.db.SelectContext(ctx, &orgIDs,
+		`SELECT org_id FROM user_organizations WHERE tenant_id = $1 AND user_id = $2`,
+		tenantID, userID)
+	return orgIDs, err
 }

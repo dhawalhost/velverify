@@ -13,7 +13,7 @@ import { Badge } from '@/components/ui/badge';
 const Branding: React.FC = () => {
     const [config, setConfig] = useState<BrandingConfig>({
         tenant_id: '',
-        logo_url: '/logo.png', // Default
+        logo_url: '/wardseal.svg', // Default
         primary_color: '#0e1c3a', // Default Navy
         background_color: '#F4F7FB', // Default Light Gray
         css_override: '',

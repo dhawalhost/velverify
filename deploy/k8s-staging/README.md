@@ -174,8 +174,7 @@ VAULT_ADDR=https://vault.example.com:8200 ./scripts/deploy_wardseal_staging.sh
 
 If ingress is configured in `values-staging.yaml`, services will be accessible at:
 - Landing Site: https://staging.wardseal.com
-- Help Portal: https://help-staging.wardseal.com
-- Console UI: https://console-staging.wardseal.com
+- Console UI: https://manage-staging.wardseal.com
 - Auth Service: https://auth-staging.wardseal.com
 - API Service: https://api-staging.wardseal.com
 

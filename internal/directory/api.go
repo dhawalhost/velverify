@@ -84,6 +84,14 @@ func (h *HTTPHandler) RegisterRoutes(router *gin.Engine) {
 		groupMembership.POST("", h.addUserToGroup)
 		groupMembership.DELETE("/:userID", h.removeUserFromGroup)
 	}
+
+	// User-Organization mappings (within a tenant)
+	userOrgs := tenantProtected.Group("/users/:id/organizations")
+	{
+		userOrgs.POST("/:orgID", h.addUserToOrganization)
+		userOrgs.DELETE("/:orgID", h.removeUserFromOrganization)
+		userOrgs.GET("", h.listUserOrganizations)
+	}
 }
 
 func (h *HTTPHandler) healthCheck(c *gin.Context) {
@@ -118,6 +126,10 @@ func (h *HTTPHandler) createUser(c *gin.Context) {
 	userID, err := h.svc.CreateUser(c.Request.Context(), tenantID, req.User)
 	if err != nil {
 		h.logger.Error("Create user failed", zap.Error(err))
+		if errors.Is(err, ErrEmailAlreadyExistsGlobally) {
+			c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -506,4 +518,46 @@ func (h *HTTPHandler) resolveTenantSlug(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"tenant_id": tenantID})
+}
+func (h *HTTPHandler) addUserToOrganization(c *gin.Context) {
+	tenantID, _ := h.tenantID(c)
+	userID := c.Param("id")
+	orgID := c.Param("orgID")
+	var req struct {
+		Role string `json:"role"`
+	}
+	_ = c.ShouldBindJSON(&req)
+
+	if err := h.svc.AddUserToOrganization(c.Request.Context(), tenantID, userID, orgID, req.Role); err != nil {
+		h.logger.Error("Add user to organization failed", zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to add user to organization"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "user added to organization"})
+}
+
+func (h *HTTPHandler) removeUserFromOrganization(c *gin.Context) {
+	tenantID, _ := h.tenantID(c)
+	userID := c.Param("id")
+	orgID := c.Param("orgID")
+
+	if err := h.svc.RemoveUserFromOrganization(c.Request.Context(), tenantID, userID, orgID); err != nil {
+		h.logger.Error("Remove user from organization failed", zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to remove user from organization"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "user removed from organization"})
+}
+
+func (h *HTTPHandler) listUserOrganizations(c *gin.Context) {
+	tenantID, _ := h.tenantID(c)
+	userID := c.Param("id")
+
+	orgIDs, err := h.svc.ListUserOrganizations(c.Request.Context(), tenantID, userID)
+	if err != nil {
+		h.logger.Error("List user organizations failed", zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to list user organizations"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"organization_ids": orgIDs})
 }

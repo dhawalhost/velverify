@@ -31,5 +31,5 @@ CREATE TABLE IF NOT EXISTS sso_providers (
     UNIQUE(tenant_id, name)
 );
 
-CREATE INDEX idx_sso_providers_tenant ON sso_providers(tenant_id);
-CREATE INDEX idx_sso_providers_type ON sso_providers(type);
+CREATE INDEX IF NOT EXISTS idx_sso_providers_tenant ON sso_providers(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_sso_providers_type ON sso_providers(type);

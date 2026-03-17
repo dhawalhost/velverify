@@ -254,6 +254,22 @@ func (m *mockDirectoryService) GetTenantByEmail(context.Context, string) (string
 	return "22222222-2222-2222-2222-222222222222", nil
 }
 
+func (m *mockDirectoryService) GetTenantIDBySlug(context.Context, string) (string, error) {
+	return "22222222-2222-2222-2222-222222222222", nil
+}
+
 func (m *mockDirectoryService) CreateTenant(context.Context, string, string, string, string) error {
 	return nil
+}
+
+func (m *mockDirectoryService) AddUserToOrganization(ctx context.Context, tenantID, userID, orgID, role string) error {
+	return nil
+}
+
+func (m *mockDirectoryService) RemoveUserFromOrganization(ctx context.Context, tenantID, userID, orgID string) error {
+	return nil
+}
+
+func (m *mockDirectoryService) ListUserOrganizations(ctx context.Context, tenantID, userID string) ([]string, error) {
+	return nil, nil
 }

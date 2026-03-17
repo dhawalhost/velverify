@@ -52,12 +52,13 @@ func main() {
 	}
 	clientRepo := oauthclient.NewRepository(db)
 	reqStore := governance.NewStore(db)
+	orgStore := governance.NewOrganizationStore(db)
 
 	dirSvcURL := cfg.Governance.DirectoryServiceURL
 	dirClient := governance.NewDirectoryClient(dirSvcURL, cfg.Directory.ServiceAuthHeader, cfg.Directory.ServiceAuthToken)
 
 	policyEngine := policy.NewSimpleEngine()
-	svc := governance.NewService(clientRepo, reqStore, dirClient, policyEngine)
+	svc := governance.NewService(clientRepo, reqStore, orgStore, dirClient, policyEngine)
 
 	// Initialize metrics
 	metrics := observability.NewMetrics()
@@ -183,8 +184,7 @@ func main() {
 	auditHandlers.RegisterRoutes(apiGroup)
 
 	// Organization handlers
-	orgStore := governance.NewOrganizationStore(db)
-	orgHandlers := governance.NewOrganizationHandler(orgStore, log)
+	orgHandlers := governance.NewOrganizationHandler(svc, log)
 	orgHandlers.RegisterRoutes(apiGroup)
 
 	// Domain verification handlers

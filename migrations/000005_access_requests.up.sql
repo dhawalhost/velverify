@@ -19,6 +19,6 @@ CREATE TABLE IF NOT EXISTS approvals (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
-CREATE INDEX idx_access_requests_tenant ON access_requests(tenant_id);
-CREATE INDEX idx_access_requests_requester ON access_requests(requester_id);
-CREATE INDEX idx_access_requests_status ON access_requests(status);
+CREATE INDEX IF NOT EXISTS idx_access_requests_tenant ON access_requests(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_access_requests_requester ON access_requests(requester_id);
+CREATE INDEX IF NOT EXISTS idx_access_requests_status ON access_requests(status);

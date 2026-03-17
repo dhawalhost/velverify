@@ -63,7 +63,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-LOCAL_HOSTS=("wardseal.local" "help.wardseal.local" "auth.wardseal.local" "api.wardseal.local" "console.wardseal.local")
+LOCAL_HOSTS=("wardseal.local" "auth.wardseal.local" "api.wardseal.local" "manage.wardseal.local")
 
 DB_USER="${DB_USER:-user}"
 DB_PASS="${DB_PASS:-password}"
@@ -234,8 +234,7 @@ if [[ "$DEPLOY_LANDING" == "true" && -d "web/landing" ]]; then
   docker build --load \
     --build-arg VITE_ENVIRONMENT="local" \
     --build-arg VITE_SITE_BASE_URL="http://wardseal.local" \
-    --build-arg VITE_CONSOLE_BASE_URL="http://console.wardseal.local" \
-    --build-arg VITE_HELP_BASE_URL="http://help.wardseal.local" \
+    --build-arg VITE_CONSOLE_BASE_URL="http://manage.wardseal.local" \
     --build-arg VITE_SUPPORT_EMAIL="support@wardseal.com" \
     -t "wardseal-landingui:$IMAGE_TAG" \
     -f "web/landing/Dockerfile" \
@@ -245,6 +244,10 @@ if [[ "$DEPLOY_LANDING" == "true" && -d "web/landing" ]]; then
 else
   [[ -d "web/landing" ]] && warn "Skipping landingui build (set DEPLOY_LANDING=true to include)"
 fi
+
+  warn "wardseal-docs directory not found at ../wardseal-docs — skipping"
+fi
+
 fi # end --skip-build
 
 # If using native containerd (not cri-dockerd), import images into k8s.io namespace
@@ -428,10 +431,9 @@ echo ""
 echo -e "${GREEN}══ Local deployment complete! ══${NC}"
 echo ""
 echo "  Landing Site   : http://wardseal.local"
-echo "  Help Portal    : http://help.wardseal.local"
 echo "  Auth Service   : http://auth.wardseal.local"
 echo "  API Service    : http://api.wardseal.local"
-echo "  Console UI     : http://console.wardseal.local"
+echo "  Console UI     : http://manage.wardseal.local"
 echo "  OpenID Config  : http://auth.wardseal.local/t/admin-system/.well-known/openid-configuration"
 echo ""
 echo "  View logs      : kubectl logs -n $NAMESPACE -l app=wardseal-authsvc -f"

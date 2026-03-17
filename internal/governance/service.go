@@ -28,6 +28,19 @@ type Service interface {
 	RejectAccessRequest(ctx context.Context, tenantID, requestID, approverID, comment string) error
 
 	ResolveTenantSlug(ctx context.Context, slug string) (string, error)
+
+	// Organizations
+	ListOrganizations(ctx context.Context, tenantID string, limit, offset int) ([]Organization, error)
+	CreateOrganization(ctx context.Context, org *Organization) error
+	GetOrganization(ctx context.Context, tenantID, orgID string) (*Organization, error)
+	GetOrganizationByName(ctx context.Context, tenantID, name string) (*Organization, error)
+	UpdateOrganization(ctx context.Context, org *Organization) error
+	DeleteOrganization(ctx context.Context, tenantID, orgID string) error
+
+	// Organization memberships
+	AddUserToOrganization(ctx context.Context, tenantID, userID, orgID, role string) error
+	RemoveUserFromOrganization(ctx context.Context, tenantID, userID, orgID string) error
+	ListUserOrganizations(ctx context.Context, tenantID, userID string) ([]string, error)
 }
 
 type CreateOAuthClientInput struct {
@@ -52,15 +65,17 @@ type UpdateOAuthClientInput struct {
 type governanceService struct {
 	clientStore  oauthclient.Store
 	reqStore     Store
+	orgStore     OrganizationStore
 	dirClient    DirectoryClient
 	policyEngine policy.Engine
 }
 
 // NewService creates a new governance service.
-func NewService(clientStore oauthclient.Store, reqStore Store, dirClient DirectoryClient, policyEngine policy.Engine) Service {
+func NewService(clientStore oauthclient.Store, reqStore Store, orgStore OrganizationStore, dirClient DirectoryClient, policyEngine policy.Engine) Service {
 	return &governanceService{
 		clientStore:  clientStore,
 		reqStore:     reqStore,
+		orgStore:     orgStore,
 		dirClient:    dirClient,
 		policyEngine: policyEngine,
 	}
@@ -246,8 +261,71 @@ func (s *governanceService) RejectAccessRequest(ctx context.Context, tenantID, r
 	return s.reqStore.UpdateRequestStatus(ctx, requestID, "rejected")
 }
 
+func (s *governanceService) ListOrganizations(ctx context.Context, tenantID string, limit, offset int) ([]Organization, error) {
+	if err := requireTenant(tenantID); err != nil {
+		return nil, err
+	}
+	return s.orgStore.List(ctx, tenantID, limit, offset)
+}
+
+func (s *governanceService) CreateOrganization(ctx context.Context, org *Organization) error {
+	if err := requireTenant(org.TenantID); err != nil {
+		return err
+	}
+	return s.orgStore.Create(ctx, org)
+}
+
+func (s *governanceService) GetOrganization(ctx context.Context, tenantID, orgID string) (*Organization, error) {
+	if err := requireTenant(tenantID); err != nil {
+		return nil, err
+	}
+	return s.orgStore.Get(ctx, tenantID, orgID)
+}
+
+func (s *governanceService) GetOrganizationByName(ctx context.Context, tenantID, name string) (*Organization, error) {
+	if err := requireTenant(tenantID); err != nil {
+		return nil, err
+	}
+	return s.orgStore.GetByName(ctx, tenantID, name)
+}
+
+func (s *governanceService) UpdateOrganization(ctx context.Context, org *Organization) error {
+	if err := requireTenant(org.TenantID); err != nil {
+		return err
+	}
+	return s.orgStore.Update(ctx, org)
+}
+
+func (s *governanceService) DeleteOrganization(ctx context.Context, tenantID, orgID string) error {
+	if err := requireTenant(tenantID); err != nil {
+		return err
+	}
+	return s.orgStore.Delete(ctx, tenantID, orgID)
+}
+
 func (s *governanceService) ResolveTenantSlug(ctx context.Context, slug string) (string, error) {
 	return s.dirClient.ResolveTenantSlug(ctx, slug)
+}
+
+func (s *governanceService) AddUserToOrganization(ctx context.Context, tenantID, userID, orgID, role string) error {
+	if err := requireTenant(tenantID); err != nil {
+		return err
+	}
+	return s.dirClient.AddUserToOrganization(ctx, tenantID, userID, orgID, role)
+}
+
+func (s *governanceService) RemoveUserFromOrganization(ctx context.Context, tenantID, userID, orgID string) error {
+	if err := requireTenant(tenantID); err != nil {
+		return err
+	}
+	return s.dirClient.RemoveUserFromOrganization(ctx, tenantID, userID, orgID)
+}
+
+func (s *governanceService) ListUserOrganizations(ctx context.Context, tenantID, userID string) ([]string, error) {
+	if err := requireTenant(tenantID); err != nil {
+		return nil, err
+	}
+	return s.dirClient.ListUserOrganizations(ctx, tenantID, userID)
 }
 
 func requireTenant(tenantID string) error {

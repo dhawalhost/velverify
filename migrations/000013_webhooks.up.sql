@@ -9,4 +9,4 @@ CREATE TABLE IF NOT EXISTS webhooks (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_webhooks_tenant_id ON webhooks(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_webhooks_tenant_id ON webhooks(tenant_id);

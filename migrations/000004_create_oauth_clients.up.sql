@@ -15,7 +15,11 @@ CREATE TABLE IF NOT EXISTS oauth_clients (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-ALTER TABLE oauth_clients
-    ADD CONSTRAINT oauth_clients_tenant_client_id_key UNIQUE (tenant_id, client_id);
+DO $$ 
+BEGIN 
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'oauth_clients_tenant_client_id_key') THEN 
+        ALTER TABLE oauth_clients ADD CONSTRAINT oauth_clients_tenant_client_id_key UNIQUE (tenant_id, client_id); 
+    END IF; 
+END $$;
 
 CREATE INDEX IF NOT EXISTS idx_oauth_clients_tenant_id ON oauth_clients(tenant_id);

@@ -9,8 +9,8 @@ CREATE TABLE IF NOT EXISTS login_attempts (
     UNIQUE(tenant_id, username, attempted_at)
 );
 
-CREATE INDEX idx_login_attempts_lookup ON login_attempts(tenant_id, username, attempted_at DESC);
-CREATE INDEX idx_login_attempts_ip ON login_attempts(ip_address, attempted_at DESC);
+CREATE INDEX IF NOT EXISTS idx_login_attempts_lookup ON login_attempts(tenant_id, username, attempted_at DESC);
+CREATE INDEX IF NOT EXISTS idx_login_attempts_ip ON login_attempts(ip_address, attempted_at DESC);
 
 -- Account lockout status
 CREATE TABLE IF NOT EXISTS account_lockouts (
@@ -23,4 +23,4 @@ CREATE TABLE IF NOT EXISTS account_lockouts (
     UNIQUE(tenant_id, username)
 );
 
-CREATE INDEX idx_account_lockouts_lookup ON account_lockouts(tenant_id, username);
+CREATE INDEX IF NOT EXISTS idx_account_lockouts_lookup ON account_lockouts(tenant_id, username);

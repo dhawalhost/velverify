@@ -262,6 +262,36 @@ p {
   transform: translateY(-2px);
 }
 
+.btn-sm {
+  padding: 8px 16px;
+  font-size: 0.85rem;
+  min-width: 100px;
+}
+
+.btn-lg {
+  padding: 16px 32px;
+  font-size: 1.05rem;
+  min-width: 180px;
+}
+
+.w-full {
+  width: 100%;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.header-actions .btn {
+  min-width: 110px;
+}
+
+.hero-cta .btn {
+  min-width: 180px;
+}
+
 /* Site Header */
 .site-header {
   position: fixed;

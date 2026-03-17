@@ -1403,6 +1403,15 @@ func (s *authService) SignUp(ctx context.Context, email, password, companyName, 
 		return "", "", "", errors.New("public signup is disabled in this deployment mode")
 	}
 
+	// 0.1 Check if email already exists globally
+	respDisc, err := s.httpClient.Get(fmt.Sprintf("%s/internal/discover?email=%s", s.directoryServiceURL, url.QueryEscape(email)))
+	if err == nil {
+		defer respDisc.Body.Close()
+		if respDisc.StatusCode == http.StatusOK {
+			return "", "", "", errors.New("an account with this email already exists; please log in to your existing organization")
+		}
+	}
+
 	// 1. Generate & Create Tenant in Directory Service (with retry for collisions)
 	var tenantID string
 	baseSlug := slugifyTenantName(companyName)

@@ -53,7 +53,7 @@ The Kubernetes clusters resolve configuration from Git.
 3. Update the `A` or `CNAME` records for the unified endpoints to point to the DR region's load balancer:
    * `auth.wardseal.com`
    * `api.wardseal.com`
-   * `console.wardseal.com`
+   * `manage.wardseal.com`
 4. Time to live (TTL) expiry will enforce the traffic swap to the new region. 
 
 ## Phase 5: Verification

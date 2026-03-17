@@ -16,11 +16,11 @@ CREATE TABLE IF NOT EXISTS audit_logs (
 );
 
 -- Partitioning-ready indexes for efficient querying
-CREATE INDEX idx_audit_tenant_time ON audit_logs(tenant_id, timestamp DESC);
-CREATE INDEX idx_audit_actor ON audit_logs(actor_id);
-CREATE INDEX idx_audit_action ON audit_logs(action);
-CREATE INDEX idx_audit_resource ON audit_logs(resource_type, resource_id);
-CREATE INDEX idx_audit_outcome ON audit_logs(outcome);
+CREATE INDEX IF NOT EXISTS idx_audit_tenant_time ON audit_logs(tenant_id, timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_audit_actor ON audit_logs(actor_id);
+CREATE INDEX IF NOT EXISTS idx_audit_action ON audit_logs(action);
+CREATE INDEX IF NOT EXISTS idx_audit_resource ON audit_logs(resource_type, resource_id);
+CREATE INDEX IF NOT EXISTS idx_audit_outcome ON audit_logs(outcome);
 
 -- GIN index for JSONB details queries
-CREATE INDEX idx_audit_details ON audit_logs USING GIN(details);
+CREATE INDEX IF NOT EXISTS idx_audit_details ON audit_logs USING GIN(details);

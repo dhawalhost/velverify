@@ -264,7 +264,7 @@ ingress:
           pathType: Prefix
           service: provsvc
           port: 8084
-    - host: console.wardseal.com
+    - host: manage.wardseal.com
       paths:
         - path: /
           pathType: Prefix
@@ -275,4 +275,4 @@ ingress:
       hosts:
         - auth.wardseal.com
         - api.wardseal.com
-        - console.wardseal.com
+        - manage.wardseal.com

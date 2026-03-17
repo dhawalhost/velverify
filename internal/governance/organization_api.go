@@ -11,13 +11,13 @@ import (
 
 // OrganizationHandler handles organization API requests.
 type OrganizationHandler struct {
-	store  OrganizationStore
+	svc    Service
 	logger *zap.Logger
 }
 
 // NewOrganizationHandler creates a new organization handler.
-func NewOrganizationHandler(store OrganizationStore, logger *zap.Logger) *OrganizationHandler {
-	return &OrganizationHandler{store: store, logger: logger}
+func NewOrganizationHandler(svc Service, logger *zap.Logger) *OrganizationHandler {
+	return &OrganizationHandler{svc: svc, logger: logger}
 }
 
 // RegisterRoutes registers organization routes.
@@ -29,6 +29,11 @@ func (h *OrganizationHandler) RegisterRoutes(rg *gin.RouterGroup) {
 		orgs.GET("/:id", h.getOrganization)
 		orgs.PUT("/:id", h.updateOrganization)
 		orgs.DELETE("/:id", h.deleteOrganization)
+
+		// User assignments
+		orgs.POST("/:id/users", h.addUserToOrganization)
+		orgs.DELETE("/:id/users/:userID", h.removeUserFromOrganization)
+		orgs.GET("/users/:userID", h.listUserOrganizations)
 	}
 }
 
@@ -63,7 +68,7 @@ func (h *OrganizationHandler) listOrganizations(c *gin.Context) {
 	limit, _ := strconv.Atoi(limitStr)
 	offset, _ := strconv.Atoi(offsetStr)
 
-	orgs, err := h.store.List(c.Request.Context(), tenantID, limit, offset)
+	orgs, err := h.svc.ListOrganizations(c.Request.Context(), tenantID, limit, offset)
 	if err != nil {
 		h.logger.Error("Failed to list organizations", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to list organizations"})
@@ -87,7 +92,7 @@ func (h *OrganizationHandler) createOrganization(c *gin.Context) {
 	}
 
 	// Check if org with same name exists
-	existing, _ := h.store.GetByName(c.Request.Context(), tenantID, req.Name)
+	existing, _ := h.svc.GetOrganizationByName(c.Request.Context(), tenantID, req.Name)
 	if existing != nil {
 		c.JSON(http.StatusConflict, gin.H{"error": "organization with this name already exists"})
 		return
@@ -102,7 +107,7 @@ func (h *OrganizationHandler) createOrganization(c *gin.Context) {
 		Settings:    req.Settings,
 	}
 
-	if err := h.store.Create(c.Request.Context(), org); err != nil {
+	if err := h.svc.CreateOrganization(c.Request.Context(), org); err != nil {
 		h.logger.Error("Failed to create organization", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create organization"})
 		return
@@ -119,7 +124,7 @@ func (h *OrganizationHandler) getOrganization(c *gin.Context) {
 	}
 
 	orgID := c.Param("id")
-	org, err := h.store.Get(c.Request.Context(), tenantID, orgID)
+	org, err := h.svc.GetOrganization(c.Request.Context(), tenantID, orgID)
 	if err != nil {
 		h.logger.Error("Failed to get organization", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get organization"})
@@ -141,7 +146,7 @@ func (h *OrganizationHandler) updateOrganization(c *gin.Context) {
 	}
 
 	orgID := c.Param("id")
-	existing, err := h.store.Get(c.Request.Context(), tenantID, orgID)
+	existing, err := h.svc.GetOrganization(c.Request.Context(), tenantID, orgID)
 	if err != nil {
 		h.logger.Error("Failed to get organization", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get organization"})
@@ -178,7 +183,7 @@ func (h *OrganizationHandler) updateOrganization(c *gin.Context) {
 		existing.Settings = req.Settings
 	}
 
-	if err := h.store.Update(c.Request.Context(), existing); err != nil {
+	if err := h.svc.UpdateOrganization(c.Request.Context(), existing); err != nil {
 		h.logger.Error("Failed to update organization", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update organization"})
 		return
@@ -195,11 +200,59 @@ func (h *OrganizationHandler) deleteOrganization(c *gin.Context) {
 	}
 
 	orgID := c.Param("id")
-	if err := h.store.Delete(c.Request.Context(), tenantID, orgID); err != nil {
+	if err := h.svc.DeleteOrganization(c.Request.Context(), tenantID, orgID); err != nil {
 		h.logger.Error("Failed to delete organization", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete organization"})
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "organization deleted"})
+}
+func (h *OrganizationHandler) addUserToOrganization(c *gin.Context) {
+	tenantID := c.GetHeader("X-Tenant-ID")
+	orgID := c.Param("id")
+	var req struct {
+		UserID string `json:"user_id" binding:"required"`
+		Role   string `json:"role"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if err := h.svc.AddUserToOrganization(c.Request.Context(), tenantID, req.UserID, orgID, req.Role); err != nil {
+		h.logger.Error("Failed to add user to organization", zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to add user to organization"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "user added to organization"})
+}
+
+func (h *OrganizationHandler) removeUserFromOrganization(c *gin.Context) {
+	tenantID := c.GetHeader("X-Tenant-ID")
+	orgID := c.Param("id")
+	userID := c.Param("userID")
+
+	if err := h.svc.RemoveUserFromOrganization(c.Request.Context(), tenantID, userID, orgID); err != nil {
+		h.logger.Error("Failed to remove user from organization", zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to remove user from organization"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "user removed from organization"})
+}
+
+func (h *OrganizationHandler) listUserOrganizations(c *gin.Context) {
+	tenantID := c.GetHeader("X-Tenant-ID")
+	userID := c.Param("userID")
+
+	orgIDs, err := h.svc.ListUserOrganizations(c.Request.Context(), tenantID, userID)
+	if err != nil {
+		h.logger.Error("Failed to list user organizations", zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to list user organizations"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"organization_ids": orgIDs})
 }

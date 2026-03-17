@@ -132,9 +132,9 @@ export default function HomePage() {
               <a className="btn btn-primary btn-lg" href={`${consoleBaseUrl}/signup?plan=free`}>
                 Start Building Free <ArrowRight className="w-4 h-4 ml-2" />
               </a>
-              <a className="btn btn-outline btn-lg" href="https://github.com/dhawalhost/wardseal" target="_blank" rel="noreferrer">
+              {/* <a className="btn btn-outline btn-lg" href="https://github.com/dhawalhost/wardseal" target="_blank" rel="noreferrer">
                 <Star className="w-4 h-4 mr-2" /> GitHub
-              </a>
+              </a> */}
             </div>
             
             <div className="hero-trust mt-12 flex items-center gap-6 opacity-60 grayscale hover:grayscale-0 transition-all duration-500" style={{ marginTop: '64px', display: 'flex', alignItems: 'center', gap: '32px' }}>
