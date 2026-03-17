@@ -1,0 +1,30 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: wardseal-docs
+  namespace: argocd
+  labels:
+    environment: staging
+    component: documentation
+spec:
+  project: default
+
+  source:
+    repoURL: https://github.com/dhawalhost/wardseal-docs.git
+    targetRevision: main
+    path: deploy/charts/docs
+    
+    helm:
+      releaseName: wardseal-docs
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: docs-system
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - PruneLast=true
