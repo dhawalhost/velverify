@@ -1,6 +1,9 @@
 package auth
 
-import "testing"
+import (
+	"context"
+	"testing"
+)
 
 func TestSocialTokenClientIDPrefersOIDCClientID(t *testing.T) {
 	got := socialTokenClientID("google", "oidc-client-123")
@@ -25,8 +28,10 @@ func TestSocialTokenClientIDFallsBackToUnknown(t *testing.T) {
 
 func TestIssueTokensWithoutRefreshIncludesIDToken(t *testing.T) {
 	svc := newTestService(t)
+	ctx := context.Background() // Define context
 
 	resp, err := svc.issueTokensWithoutRefresh(
+		ctx, // Add context
 		"11111111-1111-1111-1111-111111111111",
 		"social:google",
 		"openid profile email",
@@ -51,6 +56,7 @@ func TestIssueTokensWithoutRefreshSkipsIDTokenWithoutOpenID(t *testing.T) {
 	svc := newTestService(t)
 
 	resp, err := svc.issueTokensWithoutRefresh(
+		context.Background(),
 		"11111111-1111-1111-1111-111111111111",
 		"social:google",
 		"profile email",

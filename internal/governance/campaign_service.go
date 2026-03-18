@@ -24,12 +24,12 @@ type CampaignService interface {
 }
 
 type campaignService struct {
-	store     CampaignStore
+	store     CampaignRepository
 	dirClient DirectoryClient
 }
 
 // NewCampaignService creates a new campaign service.
-func NewCampaignService(store CampaignStore, dirClient DirectoryClient) CampaignService {
+func NewCampaignService(store CampaignRepository, dirClient DirectoryClient) CampaignService {
 	return &campaignService{store: store, dirClient: dirClient}
 }
 

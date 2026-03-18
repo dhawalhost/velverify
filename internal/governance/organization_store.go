@@ -26,8 +26,8 @@ type Organization struct {
 	UpdatedAt                   time.Time       `db:"updated_at" json:"updated_at"`
 }
 
-// OrganizationStore defines the interface for organization storage.
-type OrganizationStore interface {
+// OrganizationRepository defines the interface for organization storage.
+type OrganizationRepository interface {
 	Create(ctx context.Context, org *Organization) error
 	Get(ctx context.Context, tenantID, orgID string) (*Organization, error)
 	GetByName(ctx context.Context, tenantID, name string) (*Organization, error)
@@ -36,16 +36,16 @@ type OrganizationStore interface {
 	Delete(ctx context.Context, tenantID, orgID string) error
 }
 
-type orgRepo struct {
+type sqlOrganizationRepository struct {
 	db *sqlx.DB
 }
 
-// NewOrganizationStore creates a new organization store.
-func NewOrganizationStore(db *sqlx.DB) OrganizationStore {
-	return &orgRepo{db: db}
+// NewOrganizationRepository creates a new organization repository.
+func NewOrganizationRepository(db *sqlx.DB) OrganizationRepository {
+	return &sqlOrganizationRepository{db: db}
 }
 
-func (r *orgRepo) Create(ctx context.Context, org *Organization) error {
+func (r *sqlOrganizationRepository) Create(ctx context.Context, org *Organization) error {
 	query := `
 		INSERT INTO organizations (tenant_id, name, display_name, domain, domain_verified, metadata, settings)
 		VALUES ($1, $2, $3, $4, $5, $6, $7)
@@ -65,7 +65,7 @@ func (r *orgRepo) Create(ctx context.Context, org *Organization) error {
 	).Scan(&org.ID, &org.CreatedAt, &org.UpdatedAt)
 }
 
-func (r *orgRepo) Get(ctx context.Context, tenantID, orgID string) (*Organization, error) {
+func (r *sqlOrganizationRepository) Get(ctx context.Context, tenantID, orgID string) (*Organization, error) {
 	var org Organization
 	query := `SELECT * FROM organizations WHERE tenant_id = $1 AND id = $2`
 	err := r.db.GetContext(ctx, &org, query, tenantID, orgID)
@@ -78,7 +78,7 @@ func (r *orgRepo) Get(ctx context.Context, tenantID, orgID string) (*Organizatio
 	return &org, nil
 }
 
-func (r *orgRepo) GetByName(ctx context.Context, tenantID, name string) (*Organization, error) {
+func (r *sqlOrganizationRepository) GetByName(ctx context.Context, tenantID, name string) (*Organization, error) {
 	var org Organization
 	query := `SELECT * FROM organizations WHERE tenant_id = $1 AND name = $2`
 	err := r.db.GetContext(ctx, &org, query, tenantID, name)
@@ -91,7 +91,7 @@ func (r *orgRepo) GetByName(ctx context.Context, tenantID, name string) (*Organi
 	return &org, nil
 }
 
-func (r *orgRepo) List(ctx context.Context, tenantID string, limit, offset int) ([]Organization, error) {
+func (r *sqlOrganizationRepository) List(ctx context.Context, tenantID string, limit, offset int) ([]Organization, error) {
 	if limit <= 0 {
 		limit = 50
 	}
@@ -104,7 +104,7 @@ func (r *orgRepo) List(ctx context.Context, tenantID string, limit, offset int) 
 	return orgs, nil
 }
 
-func (r *orgRepo) Update(ctx context.Context, org *Organization) error {
+func (r *sqlOrganizationRepository) Update(ctx context.Context, org *Organization) error {
 	query := `
 		UPDATE organizations 
 		SET name = $1, display_name = $2, domain = $3, domain_verified = $4, 
@@ -118,7 +118,7 @@ func (r *orgRepo) Update(ctx context.Context, org *Organization) error {
 	return err
 }
 
-func (r *orgRepo) Delete(ctx context.Context, tenantID, orgID string) error {
+func (r *sqlOrganizationRepository) Delete(ctx context.Context, tenantID, orgID string) error {
 	query := `DELETE FROM organizations WHERE tenant_id = $1 AND id = $2`
 	_, err := r.db.ExecContext(ctx, query, tenantID, orgID)
 	return err

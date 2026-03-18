@@ -196,6 +196,9 @@ type stubService struct {
 	addUserToOrgFn         func(ctx context.Context, tenantID, userID, orgID, role string) error
 	removeUserFromOrgFn    func(ctx context.Context, tenantID, userID, orgID string) error
 	listUserOrgsFn         func(ctx context.Context, tenantID, userID string) ([]string, error)
+	createIPPolicyFn       func(ctx context.Context, tenantID string, req CreateIPPolicyRequest) (IPPolicy, error)
+	listIPPoliciesFn       func(ctx context.Context, tenantID string) ([]IPPolicy, error)
+	deleteIPPolicyFn       func(ctx context.Context, tenantID, ipPolicyID string) error
 }
 
 func (s *stubService) HealthCheck(ctx context.Context) (bool, error) {
@@ -336,4 +339,25 @@ func (s *stubService) ListUserOrganizations(ctx context.Context, tenantID, userI
 		return s.listUserOrgsFn(ctx, tenantID, userID)
 	}
 	return nil, nil
+}
+
+func (s *stubService) CreateIPPolicy(ctx context.Context, tenantID string, req CreateIPPolicyRequest) (IPPolicy, error) {
+	if s.createIPPolicyFn != nil {
+		return s.createIPPolicyFn(ctx, tenantID, req)
+	}
+	return IPPolicy{}, nil
+}
+
+func (s *stubService) ListIPPolicies(ctx context.Context, tenantID string) ([]IPPolicy, error) {
+	if s.listIPPoliciesFn != nil {
+		return s.listIPPoliciesFn(ctx, tenantID)
+	}
+	return nil, nil
+}
+
+func (s *stubService) DeleteIPPolicy(ctx context.Context, tenantID, ipPolicyID string) error {
+	if s.deleteIPPolicyFn != nil {
+		return s.deleteIPPolicyFn(ctx, tenantID, ipPolicyID)
+	}
+	return nil
 }

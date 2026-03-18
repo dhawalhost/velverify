@@ -54,23 +54,23 @@ type QueryParams struct {
 	Offset       int
 }
 
-// Store defines audit log storage operations.
-type Store interface {
+// Repository defines audit log storage operations.
+type Repository interface {
 	Log(ctx context.Context, e Event) (string, error)
 	Query(ctx context.Context, params QueryParams) ([]Event, int, error)
 	GetEvent(ctx context.Context, tenantID, id string) (Event, error)
 }
 
-type store struct {
+type sqlRepository struct {
 	db *sqlx.DB
 }
 
-// NewStore creates a new audit store.
-func NewStore(db *sqlx.DB) Store {
-	return &store{db: db}
+// NewRepository creates a new audit repository.
+func NewRepository(db *sqlx.DB) Repository {
+	return &sqlRepository{db: db}
 }
 
-func (s *store) Log(ctx context.Context, e Event) (string, error) {
+func (s *sqlRepository) Log(ctx context.Context, e Event) (string, error) {
 	var id string
 	err := s.db.QueryRowxContext(ctx,
 		`INSERT INTO audit_logs (tenant_id, actor_id, actor_type, action, resource_type, resource_id, resource_name, details, ip_address, user_agent, outcome)
@@ -80,7 +80,7 @@ func (s *store) Log(ctx context.Context, e Event) (string, error) {
 	return id, err
 }
 
-func (s *store) Query(ctx context.Context, params QueryParams) ([]Event, int, error) {
+func (s *sqlRepository) Query(ctx context.Context, params QueryParams) ([]Event, int, error) {
 	// Build query dynamically
 	query := `SELECT * FROM audit_logs WHERE tenant_id = $1`
 	countQuery := `SELECT COUNT(*) FROM audit_logs WHERE tenant_id = $1`
@@ -155,7 +155,7 @@ func (s *store) Query(ctx context.Context, params QueryParams) ([]Event, int, er
 	return events, total, nil
 }
 
-func (s *store) GetEvent(ctx context.Context, tenantID, id string) (Event, error) {
+func (s *sqlRepository) GetEvent(ctx context.Context, tenantID, id string) (Event, error) {
 	var e Event
 	err := s.db.GetContext(ctx, &e, `SELECT * FROM audit_logs WHERE id = $1 AND tenant_id = $2`, id, tenantID)
 	return e, err

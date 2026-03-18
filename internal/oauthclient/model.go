@@ -27,8 +27,8 @@ type Client struct {
 // ErrNotFound indicates the requested client does not exist.
 var ErrNotFound = errors.New("oauth client not found")
 
-// Store defines the repository contract for OAuth clients.
-type Store interface {
+// Repository defines the repository contract for OAuth clients.
+type Repository interface {
 	ListClients(ctx context.Context) ([]Client, error)
 	ListClientsByTenant(ctx context.Context, tenantID string) ([]Client, error)
 	GetClient(ctx context.Context, tenantID, clientID string) (Client, error)

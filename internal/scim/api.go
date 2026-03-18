@@ -5,9 +5,9 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/dhawalhost/wardseal/internal/directory"
 	"github.com/dhawalhost/wardseal/pkg/middleware"
 	"github.com/gin-gonic/gin"
-	"github.com/jmoiron/sqlx"
 	"go.uber.org/zap"
 )
 
@@ -15,13 +15,13 @@ import (
 type HTTPHandler struct {
 	svc              *Service
 	logger           *zap.Logger
-	db               *sqlx.DB
+	repo             directory.Repository
 	serviceAuthToken string // internal service token
 }
 
 // NewHTTPHandler creates a new SCIM HTTP handler.
-func NewHTTPHandler(svc *Service, db *sqlx.DB, serviceAuthToken string, logger *zap.Logger) *HTTPHandler {
-	return &HTTPHandler{svc: svc, db: db, serviceAuthToken: serviceAuthToken, logger: logger}
+func NewHTTPHandler(svc *Service, repo directory.Repository, serviceAuthToken string, logger *zap.Logger) *HTTPHandler {
+	return &HTTPHandler{svc: svc, repo: repo, serviceAuthToken: serviceAuthToken, logger: logger}
 }
 
 // RegisterRoutes registers SCIM endpoints.
@@ -29,7 +29,7 @@ func (h *HTTPHandler) RegisterRoutes(router *gin.Engine) {
 	group := router.Group("/scim/v2")
 
 	// Apply SCIM specific Bearer token authentication
-	group.Use(middleware.RequireSCIMBearerToken(h.db, h.logger, h.serviceAuthToken))
+	group.Use(directory.RequireSCIMBearerToken(h.repo, h.logger, h.serviceAuthToken))
 	group.Use(scimContentType())
 
 	group.GET("/Users", h.listUsers)

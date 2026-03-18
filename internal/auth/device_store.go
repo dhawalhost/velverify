@@ -26,8 +26,8 @@ type Device struct {
 	UpdatedAt        time.Time `db:"updated_at" json:"updated_at"`
 }
 
-// DeviceStore defines the interface for storing and retrieving devices.
-type DeviceStore interface {
+// DeviceRepository defines the interface for storing and retrieving devices.
+type DeviceRepository interface {
 	Register(ctx context.Context, device *Device) error
 	GetByID(ctx context.Context, id string) (*Device, error)
 	GetByIdentifier(ctx context.Context, tenantID, identifier string) (*Device, error)
@@ -37,17 +37,17 @@ type DeviceStore interface {
 	Delete(ctx context.Context, id string) error
 }
 
-// deviceRepo implements DeviceStore using sqlx.
-type deviceRepo struct {
+// sqlDeviceRepository implements DeviceRepository using sqlx.
+type sqlDeviceRepository struct {
 	db *sqlx.DB
 }
 
-// NewDeviceStore creates a new DeviceStore backed by sqlx.
-func NewDeviceStore(db *sqlx.DB) DeviceStore {
-	return &deviceRepo{db: db}
+// NewDeviceRepository creates a new DeviceRepository backed by sqlx.
+func NewDeviceRepository(db *sqlx.DB) DeviceRepository {
+	return &sqlDeviceRepository{db: db}
 }
 
-func (r *deviceRepo) Register(ctx context.Context, device *Device) error {
+func (r *sqlDeviceRepository) Register(ctx context.Context, device *Device) error {
 	if device.ID == "" {
 		device.ID = uuid.New().String()
 	}
@@ -68,7 +68,7 @@ func (r *deviceRepo) Register(ctx context.Context, device *Device) error {
 	return err
 }
 
-func (r *deviceRepo) GetByID(ctx context.Context, id string) (*Device, error) {
+func (r *sqlDeviceRepository) GetByID(ctx context.Context, id string) (*Device, error) {
 	var device Device
 	query := `SELECT * FROM devices WHERE id = $1`
 	err := r.db.GetContext(ctx, &device, query, id)
@@ -81,7 +81,7 @@ func (r *deviceRepo) GetByID(ctx context.Context, id string) (*Device, error) {
 	return &device, nil
 }
 
-func (r *deviceRepo) GetByIdentifier(ctx context.Context, tenantID, identifier string) (*Device, error) {
+func (r *sqlDeviceRepository) GetByIdentifier(ctx context.Context, tenantID, identifier string) (*Device, error) {
 	var device Device
 	query := `SELECT * FROM devices WHERE tenant_id = $1 AND device_identifier = $2`
 	err := r.db.GetContext(ctx, &device, query, tenantID, identifier)
@@ -94,7 +94,7 @@ func (r *deviceRepo) GetByIdentifier(ctx context.Context, tenantID, identifier s
 	return &device, nil
 }
 
-func (r *deviceRepo) UpdatePosture(ctx context.Context, id string, isCompliant bool, riskScore int) error {
+func (r *sqlDeviceRepository) UpdatePosture(ctx context.Context, id string, isCompliant bool, riskScore int) error {
 	query := `
 		UPDATE devices 
 		SET is_compliant = $1, risk_score = $2, updated_at = $3 
@@ -104,21 +104,21 @@ func (r *deviceRepo) UpdatePosture(ctx context.Context, id string, isCompliant b
 	return err
 }
 
-func (r *deviceRepo) ListByUser(ctx context.Context, userID string) ([]Device, error) {
+func (r *sqlDeviceRepository) ListByUser(ctx context.Context, userID string) ([]Device, error) {
 	devices := []Device{}
 	query := `SELECT * FROM devices WHERE user_id = $1`
 	err := r.db.SelectContext(ctx, &devices, query, userID)
 	return devices, err
 }
 
-func (r *deviceRepo) List(ctx context.Context, tenantID string) ([]Device, error) {
+func (r *sqlDeviceRepository) List(ctx context.Context, tenantID string) ([]Device, error) {
 	devices := []Device{}
 	query := `SELECT * FROM devices WHERE tenant_id = $1 ORDER BY last_seen_at DESC`
 	err := r.db.SelectContext(ctx, &devices, query, tenantID)
 	return devices, err
 }
 
-func (r *deviceRepo) Delete(ctx context.Context, id string) error {
+func (r *sqlDeviceRepository) Delete(ctx context.Context, id string) error {
 	query := `DELETE FROM devices WHERE id = $1`
 	_, err := r.db.ExecContext(ctx, query, id)
 	return err

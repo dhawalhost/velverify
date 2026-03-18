@@ -16,11 +16,11 @@ type Service interface {
 }
 
 type service struct {
-	store Store
+	store Repository
 }
 
 // NewService creates a new SSO service.
-func NewService(store Store) Service {
+func NewService(store Repository) Service {
 	return &service{store: store}
 }
 

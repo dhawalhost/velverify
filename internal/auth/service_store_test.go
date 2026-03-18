@@ -110,7 +110,7 @@ func TestAuthorizeRejectsUnknownClientFromStore(t *testing.T) {
 	}
 }
 
-func newServiceWithStore(t *testing.T, store oauthclient.Store) Service {
+func newServiceWithStore(t *testing.T, store oauthclient.Repository) Service {
 	t.Helper()
 	svc, err := NewService(Config{
 		BaseURL:             "http://wardseal.com",

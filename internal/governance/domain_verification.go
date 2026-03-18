@@ -18,12 +18,12 @@ import (
 // DomainVerificationHandler handles domain verification API requests.
 type DomainVerificationHandler struct {
 	db     *sqlx.DB
-	store  OrganizationStore
+	store  OrganizationRepository
 	logger *zap.Logger
 }
 
 // NewDomainVerificationHandler creates a new domain verification handler.
-func NewDomainVerificationHandler(db *sqlx.DB, store OrganizationStore, logger *zap.Logger) *DomainVerificationHandler {
+func NewDomainVerificationHandler(db *sqlx.DB, store OrganizationRepository, logger *zap.Logger) *DomainVerificationHandler {
 	return &DomainVerificationHandler{db: db, store: store, logger: logger}
 }
 

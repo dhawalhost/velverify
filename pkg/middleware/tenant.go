@@ -100,9 +100,7 @@ func TenantIDFromGinContext(c *gin.Context) (string, error) {
 	return "", errors.New("tenant id not found in context")
 }
 
-// TenantIDFromContext extracts the tenant identifier from a standard context, typically
-// populated by TenantExtractor. It is useful in service/business layers where only
-// context.Context is available.
+// TenantIDFromContext extracts the tenant identifier from a standard context.
 func TenantIDFromContext(ctx context.Context) (string, error) {
 	if value := ctx.Value(tenantIDContextKey); value != nil {
 		if tenantID, ok := value.(string); ok && tenantID != "" {
@@ -110,4 +108,9 @@ func TenantIDFromContext(ctx context.Context) (string, error) {
 		}
 	}
 	return "", errors.New("tenant id not found in context")
+}
+
+// InjectTenantID injects the tenant identifier into a standard context.
+func InjectTenantID(ctx context.Context, tenantID string) context.Context {
+	return context.WithValue(ctx, tenantIDContextKey, tenantID)
 }

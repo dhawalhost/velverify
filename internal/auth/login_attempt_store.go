@@ -15,8 +15,8 @@ const (
 	AttemptWindow     = 15 * time.Minute
 )
 
-// LoginAttemptStore handles tracking login attempts and lockouts.
-type LoginAttemptStore interface {
+// LoginAttemptRepository handles tracking login attempts and lockouts.
+type LoginAttemptRepository interface {
 	RecordAttempt(ctx context.Context, tenantID, username, ip string, success bool) error
 	GetRecentFailures(ctx context.Context, tenantID, username string) (int, error)
 	IsLocked(ctx context.Context, tenantID, username string) (bool, time.Time, error)
@@ -24,22 +24,22 @@ type LoginAttemptStore interface {
 	UnlockAccount(ctx context.Context, tenantID, username string) error
 }
 
-type loginAttemptRepo struct {
+type sqlLoginAttemptRepository struct {
 	db *sqlx.DB
 }
 
-// NewLoginAttemptStore creates a new login attempt store.
-func NewLoginAttemptStore(db *sqlx.DB) LoginAttemptStore {
-	return &loginAttemptRepo{db: db}
+// NewLoginAttemptRepository creates a new login attempt repository.
+func NewLoginAttemptRepository(db *sqlx.DB) LoginAttemptRepository {
+	return &sqlLoginAttemptRepository{db: db}
 }
 
-func (r *loginAttemptRepo) RecordAttempt(ctx context.Context, tenantID, username, ip string, success bool) error {
+func (r *sqlLoginAttemptRepository) RecordAttempt(ctx context.Context, tenantID, username, ip string, success bool) error {
 	query := `INSERT INTO login_attempts (tenant_id, username, ip_address, success) VALUES ($1, $2, $3, $4)`
 	_, err := r.db.ExecContext(ctx, query, tenantID, username, ip, success)
 	return err
 }
 
-func (r *loginAttemptRepo) GetRecentFailures(ctx context.Context, tenantID, username string) (int, error) {
+func (r *sqlLoginAttemptRepository) GetRecentFailures(ctx context.Context, tenantID, username string) (int, error) {
 	var count int
 	query := `
 		SELECT COUNT(*) FROM login_attempts 
@@ -50,7 +50,7 @@ func (r *loginAttemptRepo) GetRecentFailures(ctx context.Context, tenantID, user
 	return count, err
 }
 
-func (r *loginAttemptRepo) IsLocked(ctx context.Context, tenantID, username string) (bool, time.Time, error) {
+func (r *sqlLoginAttemptRepository) IsLocked(ctx context.Context, tenantID, username string) (bool, time.Time, error) {
 	var lockedUntil time.Time
 	query := `SELECT locked_until FROM account_lockouts WHERE tenant_id = $1 AND username = $2`
 	err := r.db.GetContext(ctx, &lockedUntil, query, tenantID, username)
@@ -70,7 +70,7 @@ func (r *loginAttemptRepo) IsLocked(ctx context.Context, tenantID, username stri
 	return true, lockedUntil, nil
 }
 
-func (r *loginAttemptRepo) LockAccount(ctx context.Context, tenantID, username string) error {
+func (r *sqlLoginAttemptRepository) LockAccount(ctx context.Context, tenantID, username string) error {
 	lockedUntil := time.Now().Add(LockoutDuration)
 	query := `
 		INSERT INTO account_lockouts (tenant_id, username, locked_until)
@@ -82,7 +82,7 @@ func (r *loginAttemptRepo) LockAccount(ctx context.Context, tenantID, username s
 	return err
 }
 
-func (r *loginAttemptRepo) UnlockAccount(ctx context.Context, tenantID, username string) error {
+func (r *sqlLoginAttemptRepository) UnlockAccount(ctx context.Context, tenantID, username string) error {
 	query := `DELETE FROM account_lockouts WHERE tenant_id = $1 AND username = $2`
 	_, err := r.db.ExecContext(ctx, query, tenantID, username)
 	return err

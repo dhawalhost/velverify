@@ -36,8 +36,8 @@ type UserRole struct {
 	AssignedBy *string   `json:"assigned_by,omitempty" db:"assigned_by"`
 }
 
-// Store defines RBAC storage operations.
-type Store interface {
+// Repository defines RBAC storage operations.
+type Repository interface {
 	// Roles
 	CreateRole(ctx context.Context, r Role) (string, error)
 	GetRole(ctx context.Context, tenantID, id string) (Role, error)
@@ -62,16 +62,16 @@ type Store interface {
 	GetUserPermissions(ctx context.Context, tenantID, userID string) ([]Permission, error)
 }
 
-type store struct {
+type sqlRepository struct {
 	db *sqlx.DB
 }
 
-// NewStore creates a new RBAC store.
-func NewStore(db *sqlx.DB) Store {
-	return &store{db: db}
+// NewRepository creates a new RBAC repository.
+func NewRepository(db *sqlx.DB) Repository {
+	return &sqlRepository{db: db}
 }
 
-func (s *store) CreateRole(ctx context.Context, r Role) (string, error) {
+func (s *sqlRepository) CreateRole(ctx context.Context, r Role) (string, error) {
 	var id string
 	err := s.db.QueryRowxContext(ctx,
 		`INSERT INTO roles (tenant_id, name, description) VALUES ($1, $2, $3) RETURNING id`,
@@ -80,37 +80,37 @@ func (s *store) CreateRole(ctx context.Context, r Role) (string, error) {
 	return id, err
 }
 
-func (s *store) GetRole(ctx context.Context, tenantID, id string) (Role, error) {
+func (s *sqlRepository) GetRole(ctx context.Context, tenantID, id string) (Role, error) {
 	var r Role
 	err := s.db.GetContext(ctx, &r, `SELECT * FROM roles WHERE id = $1 AND tenant_id = $2`, id, tenantID)
 	return r, err
 }
 
-func (s *store) GetRoleByName(ctx context.Context, tenantID, name string) (Role, error) {
+func (s *sqlRepository) GetRoleByName(ctx context.Context, tenantID, name string) (Role, error) {
 	var r Role
 	err := s.db.GetContext(ctx, &r, `SELECT * FROM roles WHERE name = $1 AND tenant_id = $2`, name, tenantID)
 	return r, err
 }
 
-func (s *store) ListRoles(ctx context.Context, tenantID string) ([]Role, error) {
+func (s *sqlRepository) ListRoles(ctx context.Context, tenantID string) ([]Role, error) {
 	var roles []Role
 	err := s.db.SelectContext(ctx, &roles, `SELECT * FROM roles WHERE tenant_id = $1 ORDER BY name`, tenantID)
 	return roles, err
 }
 
-func (s *store) UpdateRole(ctx context.Context, id string, r Role) error {
+func (s *sqlRepository) UpdateRole(ctx context.Context, id string, r Role) error {
 	_, err := s.db.ExecContext(ctx,
 		`UPDATE roles SET name = $1, description = $2, updated_at = NOW() WHERE id = $3`,
 		r.Name, r.Description, id)
 	return err
 }
 
-func (s *store) DeleteRole(ctx context.Context, tenantID, id string) error {
+func (s *sqlRepository) DeleteRole(ctx context.Context, tenantID, id string) error {
 	_, err := s.db.ExecContext(ctx, `DELETE FROM roles WHERE id = $1 AND tenant_id = $2`, id, tenantID)
 	return err
 }
 
-func (s *store) CreatePermission(ctx context.Context, p Permission) (string, error) {
+func (s *sqlRepository) CreatePermission(ctx context.Context, p Permission) (string, error) {
 	var id string
 	err := s.db.QueryRowxContext(ctx,
 		`INSERT INTO permissions (tenant_id, resource, action, description) 
@@ -120,14 +120,14 @@ func (s *store) CreatePermission(ctx context.Context, p Permission) (string, err
 	return id, err
 }
 
-func (s *store) ListPermissions(ctx context.Context, tenantID string) ([]Permission, error) {
+func (s *sqlRepository) ListPermissions(ctx context.Context, tenantID string) ([]Permission, error) {
 	var perms []Permission
 	err := s.db.SelectContext(ctx, &perms,
 		`SELECT * FROM permissions WHERE tenant_id = $1 ORDER BY resource, action`, tenantID)
 	return perms, err
 }
 
-func (s *store) GetPermissionsByRole(ctx context.Context, roleID string) ([]Permission, error) {
+func (s *sqlRepository) GetPermissionsByRole(ctx context.Context, roleID string) ([]Permission, error) {
 	var perms []Permission
 	err := s.db.SelectContext(ctx, &perms,
 		`SELECT p.* FROM permissions p 
@@ -136,21 +136,21 @@ func (s *store) GetPermissionsByRole(ctx context.Context, roleID string) ([]Perm
 	return perms, err
 }
 
-func (s *store) AssignPermissionToRole(ctx context.Context, roleID, permissionID string) error {
+func (s *sqlRepository) AssignPermissionToRole(ctx context.Context, roleID, permissionID string) error {
 	_, err := s.db.ExecContext(ctx,
 		`INSERT INTO role_permissions (role_id, permission_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
 		roleID, permissionID)
 	return err
 }
 
-func (s *store) RemovePermissionFromRole(ctx context.Context, roleID, permissionID string) error {
+func (s *sqlRepository) RemovePermissionFromRole(ctx context.Context, roleID, permissionID string) error {
 	_, err := s.db.ExecContext(ctx,
 		`DELETE FROM role_permissions WHERE role_id = $1 AND permission_id = $2`,
 		roleID, permissionID)
 	return err
 }
 
-func (s *store) AssignRoleToUser(ctx context.Context, tenantID, userID, roleID string, assignedBy *string) error {
+func (s *sqlRepository) AssignRoleToUser(ctx context.Context, tenantID, userID, roleID string, assignedBy *string) error {
 	_, err := s.db.ExecContext(ctx,
 		`INSERT INTO user_roles (user_id, role_id, tenant_id, assigned_by) 
 		 VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING`,
@@ -158,14 +158,14 @@ func (s *store) AssignRoleToUser(ctx context.Context, tenantID, userID, roleID s
 	return err
 }
 
-func (s *store) RemoveRoleFromUser(ctx context.Context, userID, roleID string) error {
+func (s *sqlRepository) RemoveRoleFromUser(ctx context.Context, userID, roleID string) error {
 	_, err := s.db.ExecContext(ctx,
 		`DELETE FROM user_roles WHERE user_id = $1 AND role_id = $2`,
 		userID, roleID)
 	return err
 }
 
-func (s *store) GetUserRoles(ctx context.Context, tenantID, userID string) ([]Role, error) {
+func (s *sqlRepository) GetUserRoles(ctx context.Context, tenantID, userID string) ([]Role, error) {
 	var roles []Role
 	err := s.db.SelectContext(ctx, &roles,
 		`SELECT r.* FROM roles r 
@@ -174,7 +174,7 @@ func (s *store) GetUserRoles(ctx context.Context, tenantID, userID string) ([]Ro
 	return roles, err
 }
 
-func (s *store) GetUserPermissions(ctx context.Context, tenantID, userID string) ([]Permission, error) {
+func (s *sqlRepository) GetUserPermissions(ctx context.Context, tenantID, userID string) ([]Permission, error) {
 	var perms []Permission
 	err := s.db.SelectContext(ctx, &perms,
 		`SELECT DISTINCT p.* FROM permissions p

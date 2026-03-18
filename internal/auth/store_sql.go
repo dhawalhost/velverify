@@ -13,17 +13,17 @@ import (
 
 // ========== Authorization Code Store ==========
 
-// SQLAuthorizationCodeStore implements persistent storage for authorization codes.
-type SQLAuthorizationCodeStore struct {
+// sqlAuthorizationCodeRepository implements persistent storage for authorization codes.
+type sqlAuthorizationCodeRepository struct {
 	db *sqlx.DB
 }
 
-// NewSQLAuthorizationCodeStore creates a new SQL-backed authorization code store.
-func NewSQLAuthorizationCodeStore(db *sqlx.DB) *SQLAuthorizationCodeStore {
-	return &SQLAuthorizationCodeStore{db: db}
+// NewAuthorizationCodeRepository creates a new SQL-backed authorization code repository.
+func NewAuthorizationCodeRepository(db *sqlx.DB) AuthorizationCodeRepository {
+	return &sqlAuthorizationCodeRepository{db: db}
 }
 
-func (s *SQLAuthorizationCodeStore) Save(ctx context.Context, code authorizationCode) error {
+func (s *sqlAuthorizationCodeRepository) Save(ctx context.Context, code authorizationCode) error {
 	query := `
 		INSERT INTO authorization_codes (code, client_id, redirect_uri, scope, tenant_id, nonce, code_challenge, code_challenge_method, expires_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
@@ -42,7 +42,7 @@ func (s *SQLAuthorizationCodeStore) Save(ctx context.Context, code authorization
 	return err
 }
 
-func (s *SQLAuthorizationCodeStore) Get(ctx context.Context, code string) (authorizationCode, bool, error) {
+func (s *sqlAuthorizationCodeRepository) Get(ctx context.Context, code string) (authorizationCode, bool, error) {
 	var entry authorizationCode
 	query := `SELECT code, client_id, redirect_uri, scope, tenant_id, nonce, code_challenge, code_challenge_method, expires_at FROM authorization_codes WHERE code = $1`
 	err := s.db.GetContext(ctx, &entry, query, code)
@@ -55,14 +55,14 @@ func (s *SQLAuthorizationCodeStore) Get(ctx context.Context, code string) (autho
 	return entry, true, nil
 }
 
-func (s *SQLAuthorizationCodeStore) Delete(ctx context.Context, code string) error {
+func (s *sqlAuthorizationCodeRepository) Delete(ctx context.Context, code string) error {
 	query := `DELETE FROM authorization_codes WHERE code = $1`
 	_, err := s.db.ExecContext(ctx, query, code)
 	return err
 }
 
 // CleanupExpired removes expired codes (can be run periodically).
-func (s *SQLAuthorizationCodeStore) CleanupExpired(ctx context.Context) error {
+func (s *sqlAuthorizationCodeRepository) CleanupExpired(ctx context.Context) error {
 	query := `DELETE FROM authorization_codes WHERE expires_at < $1`
 	_, err := s.db.ExecContext(ctx, query, time.Now())
 	return err
@@ -70,17 +70,17 @@ func (s *SQLAuthorizationCodeStore) CleanupExpired(ctx context.Context) error {
 
 // ========== Refresh Token Store ==========
 
-// SQLRefreshTokenStore implements persistent storage for refresh tokens.
-type SQLRefreshTokenStore struct {
+// sqlRefreshTokenRepository implements persistent storage for refresh tokens.
+type sqlRefreshTokenRepository struct {
 	db *sqlx.DB
 }
 
-// NewSQLRefreshTokenStore creates a new SQL-backed refresh token store.
-func NewSQLRefreshTokenStore(db *sqlx.DB) *SQLRefreshTokenStore {
-	return &SQLRefreshTokenStore{db: db}
+// NewRefreshTokenRepository creates a new SQL-backed refresh token repository.
+func NewRefreshTokenRepository(db *sqlx.DB) RefreshTokenRepository {
+	return &sqlRefreshTokenRepository{db: db}
 }
 
-func (s *SQLRefreshTokenStore) Save(ctx context.Context, entry refreshTokenEntry) error {
+func (s *sqlRefreshTokenRepository) Save(ctx context.Context, entry refreshTokenEntry) error {
 	query := `
 		INSERT INTO refresh_tokens (token, client_id, tenant_id, scope, subject_type, expires_at)
 		VALUES ($1, $2, $3, $4, $5, $6)
@@ -96,7 +96,7 @@ func (s *SQLRefreshTokenStore) Save(ctx context.Context, entry refreshTokenEntry
 	return err
 }
 
-func (s *SQLRefreshTokenStore) Get(ctx context.Context, token string) (refreshTokenEntry, bool, error) {
+func (s *sqlRefreshTokenRepository) Get(ctx context.Context, token string) (refreshTokenEntry, bool, error) {
 	var entry refreshTokenEntry
 	query := `SELECT token, client_id, tenant_id, scope, subject_type, expires_at FROM refresh_tokens WHERE token = $1`
 	err := s.db.GetContext(ctx, &entry, query, token)
@@ -109,14 +109,14 @@ func (s *SQLRefreshTokenStore) Get(ctx context.Context, token string) (refreshTo
 	return entry, true, nil
 }
 
-func (s *SQLRefreshTokenStore) Delete(ctx context.Context, token string) error {
+func (s *sqlRefreshTokenRepository) Delete(ctx context.Context, token string) error {
 	query := `DELETE FROM refresh_tokens WHERE token = $1`
 	_, err := s.db.ExecContext(ctx, query, token)
 	return err
 }
 
 // CleanupExpired removes expired tokens.
-func (s *SQLRefreshTokenStore) CleanupExpired(ctx context.Context) error {
+func (s *sqlRefreshTokenRepository) CleanupExpired(ctx context.Context) error {
 	query := `DELETE FROM refresh_tokens WHERE expires_at < $1`
 	_, err := s.db.ExecContext(ctx, query, time.Now())
 	return err
@@ -124,14 +124,14 @@ func (s *SQLRefreshTokenStore) CleanupExpired(ctx context.Context) error {
 
 // ========== Token Revocation Store ==========
 
-// SQLRevocationStore implements persistent storage for revoked tokens.
-type SQLRevocationStore struct {
+// sqlRevocationRepository implements persistent storage for revoked tokens.
+type sqlRevocationRepository struct {
 	db *sqlx.DB
 }
 
-// NewSQLRevocationStore creates a new SQL-backed revocation store.
-func NewSQLRevocationStore(db *sqlx.DB) *SQLRevocationStore {
-	return &SQLRevocationStore{db: db}
+// NewRevocationRepository creates a new SQL-backed revocation repository.
+func NewRevocationRepository(db *sqlx.DB) RevocationRepository {
+	return &sqlRevocationRepository{db: db}
 }
 
 func hashToken(token string) string {
@@ -139,14 +139,14 @@ func hashToken(token string) string {
 	return hex.EncodeToString(sum[:])
 }
 
-func (s *SQLRevocationStore) Revoke(ctx context.Context, token string) error {
+func (s *sqlRevocationRepository) Revoke(ctx context.Context, token string) error {
 	hash := hashToken(token)
 	query := `INSERT INTO revoked_tokens (token_hash) VALUES ($1) ON CONFLICT DO NOTHING`
 	_, err := s.db.ExecContext(ctx, query, hash)
 	return err
 }
 
-func (s *SQLRevocationStore) IsRevoked(ctx context.Context, token string) (bool, error) {
+func (s *sqlRevocationRepository) IsRevoked(ctx context.Context, token string) (bool, error) {
 	hash := hashToken(token)
 	var exists int
 	query := `SELECT 1 FROM revoked_tokens WHERE token_hash = $1 LIMIT 1`
@@ -161,7 +161,7 @@ func (s *SQLRevocationStore) IsRevoked(ctx context.Context, token string) (bool,
 }
 
 // CleanupOld removes old revocation records (e.g., older than 30 days).
-func (s *SQLRevocationStore) CleanupOld(ctx context.Context, olderThan time.Duration) error {
+func (s *sqlRevocationRepository) CleanupOld(ctx context.Context, olderThan time.Duration) error {
 	cutoff := time.Now().Add(-olderThan)
 	query := `DELETE FROM revoked_tokens WHERE revoked_at < $1`
 	_, err := s.db.ExecContext(ctx, query, cutoff)

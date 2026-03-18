@@ -41,7 +41,8 @@ func main() {
 		os.Exit(1)
 	}
 
-	svc := directory.NewService(db)
+	repo := directory.NewRepository(db)
+	svc := directory.NewService(repo)
 
 	serviceToken := cfg.Directory.ServiceAuthToken
 	if serviceToken == "" {
@@ -157,7 +158,7 @@ func main() {
 
 	// Register SCIM routes
 	scimSvc := scim.NewService(svc)
-	scimHandlers := scim.NewHTTPHandler(scimSvc, db, serviceToken, log)
+	scimHandlers := scim.NewHTTPHandler(scimSvc, repo, serviceToken, log)
 	scimHandlers.RegisterRoutes(router)
 
 	log.Info("HTTP server starting", zap.String("addr", ":8081"))

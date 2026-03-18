@@ -10,24 +10,29 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
-// Store defines database operations for governance.
-type Store interface {
+// Repository defines database operations for governance.
+type Repository interface {
 	CreateRequest(ctx context.Context, req AccessRequest) (string, error)
 	GetRequest(ctx context.Context, tenantID, id string) (AccessRequest, error)
 	ListRequests(ctx context.Context, tenantID, status string) ([]AccessRequest, error)
 	UpdateRequestStatus(ctx context.Context, id, status string) error
+
+	// IP Access Policies
+	CreateIPPolicy(ctx context.Context, p IPPolicy) (string, error)
+	ListIPPolicies(ctx context.Context, tenantID string) ([]IPPolicy, error)
+	DeleteIPPolicy(ctx context.Context, tenantID, id string) error
 }
 
-type sqlStore struct {
+type sqlRepository struct {
 	db *sqlx.DB
 }
 
-// NewStore creates a new governance store.
-func NewStore(db *sqlx.DB) Store {
-	return &sqlStore{db: db}
+// NewRepository creates a new governance repository.
+func NewRepository(db *sqlx.DB) Repository {
+	return &sqlRepository{db: db}
 }
 
-func (s *sqlStore) CreateRequest(ctx context.Context, req AccessRequest) (string, error) {
+func (s *sqlRepository) CreateRequest(ctx context.Context, req AccessRequest) (string, error) {
 	var id string
 	err := s.db.QueryRowContext(ctx,
 		`INSERT INTO access_requests (tenant_id, requester_id, resource_type, resource_id, reason, status)
@@ -39,7 +44,7 @@ func (s *sqlStore) CreateRequest(ctx context.Context, req AccessRequest) (string
 	return id, nil
 }
 
-func (s *sqlStore) GetRequest(ctx context.Context, tenantID, id string) (AccessRequest, error) {
+func (s *sqlRepository) GetRequest(ctx context.Context, tenantID, id string) (AccessRequest, error) {
 	var req AccessRequest
 	// Note: We scan created_at/updated_at as time.Time then format to string in Service if needed,
 	// or scan to string if Postgres driver supports it. Default scanning to struct string requires compatibility.
@@ -63,7 +68,7 @@ func (s *sqlStore) GetRequest(ctx context.Context, tenantID, id string) (AccessR
 	return req, nil
 }
 
-func (s *sqlStore) ListRequests(ctx context.Context, tenantID, status string) ([]AccessRequest, error) {
+func (s *sqlRepository) ListRequests(ctx context.Context, tenantID, status string) ([]AccessRequest, error) {
 	query := `SELECT id, tenant_id, requester_id, resource_type, resource_id, status, reason, created_at, updated_at
 		FROM access_requests WHERE tenant_id = $1`
 	args := []interface{}{tenantID}
@@ -94,7 +99,28 @@ func (s *sqlStore) ListRequests(ctx context.Context, tenantID, status string) ([
 	return requests, nil
 }
 
-func (s *sqlStore) UpdateRequestStatus(ctx context.Context, id, status string) error {
+func (s *sqlRepository) UpdateRequestStatus(ctx context.Context, id, status string) error {
 	_, err := s.db.ExecContext(ctx, `UPDATE access_requests SET status = $1, updated_at = NOW() WHERE id = $2`, status, id)
+	return err
+}
+
+func (s *sqlRepository) CreateIPPolicy(ctx context.Context, p IPPolicy) (string, error) {
+	query := `
+		INSERT INTO ip_policy (id, tenant_id, type, cidr, country, reason)
+		VALUES ($1, $2, $3, $4, $5, $6)
+	`
+	_, err := s.db.ExecContext(ctx, query, p.ID, p.TenantID, p.Type, p.CIDR, p.CountryCode, p.Reason)
+	return p.ID, err
+}
+
+func (s *sqlRepository) ListIPPolicies(ctx context.Context, tenantID string) ([]IPPolicy, error) {
+	var policies []IPPolicy
+	err := s.db.SelectContext(ctx, &policies,
+		`SELECT id, tenant_id, type, cidr, country as country_code, reason, created_at FROM ip_policy WHERE tenant_id = $1 ORDER BY created_at DESC`, tenantID)
+	return policies, err
+}
+
+func (s *sqlRepository) DeleteIPPolicy(ctx context.Context, tenantID, id string) error {
+	_, err := s.db.ExecContext(ctx, `DELETE FROM ip_policy WHERE id = $1 AND tenant_id = $2`, id, tenantID)
 	return err
 }

@@ -54,12 +54,37 @@ This document outlines the high-level roadmap for building the Identity & Govern
 
 ## Phase 5: Zero Trust Capabilities
 
-**Goal:** Implement advanced features to fully align the platform with a Zero Trust security model.
+**Goal:** Implement advanced features to fully align the platform with a Zero Trust security model. Zero Trust means "never trust, always verify" — every access decision is made dynamically based on identity + device + context.
 
-**Key Features:**
+### Pillar 1: Identity (Continuous Verification)
 
-*   **Device Posture Checks:** The ability to assess device health and compliance as part of the authentication and authorization process.
-*   **Continuous Access Evaluation:** Real-time evaluation of access policies based on changes in user, device, or environmental context.
-*   **Micro-segmentation Support:** Tighter integration with service meshes and other network control planes to enforce identity-based micro-segmentation.
-*   **Advanced MFA:** Support for advanced multi-factor authentication methods, such as FIDO2/WebAuthn and certificate-based authentication.
-*   **Risk-Based Authentication:** Dynamic adjustments to authentication requirements based on the risk profile of each login attempt.
+*   **Adaptive MFA Step-Up** *(Quick Win)*: When the risk engine scores a login as MEDIUM risk, return a step-up challenge instead of a session token. The user completes TOTP and receives the full token.
+*   **IP Allow/Block + Geo Policy** *(Quick Win)*: Per-tenant IP CIDR block lists and country-level geo-restrictions enforced at login time via the risk engine.
+*   **RBAC Claims in JWT** *(Quick Win)*: Inject user roles and permissions into access and ID token claims so downstream apps can enforce policy without extra API calls.
+*   **Passwordless Login:** WebAuthn/Passkeys as the primary authentication factor (not just 2nd factor).
+*   **Continuous Access Evaluation (CAE):** Real-time session invalidation via Redis pub/sub when a security event (password change, device compromise) fires after token issuance.
+*   **Per-app Session Policies:** Force re-authentication for sensitive applications (e.g., shorter token TTL, mandatory MFA).
+
+### Pillar 2: Device (Posture Enforcement)
+
+*   **Device Posture Gate:** Require device registration for policy-protected apps; block access from unregistered or unmanaged devices.
+*   **MDM/EDR Integration:** Poll Jamf, Microsoft Intune, or CrowdStrike for real-time device compliance status and incorporate into device risk score.
+*   **mTLS / Device Certificate Issuance:** Integrate Vault PKI to issue short-lived device certificates, enabling certificate-based device authentication.
+
+### Pillar 3: Network (Context-Aware)
+
+*   **IP Allow/Block Lists:** Per-tenant CIDR-level allow and deny policies (part of quick wins above).
+*   **Geo-Restriction Policies:** Block logins originating from high-risk or sanctioned countries.
+*   **Anonymous Proxy / VPN / Tor Detection:** Integrate with an IP intelligence feed (MaxMind GeoIP2) to flag anonymized network access.
+
+### Pillar 4: Application (Least Privilege)
+
+*   **Entitlement-Aware Tokens:** RBAC roles and permissions embedded in JWT claims (quick win above).
+*   **Per-app Re-auth Policies:** App-level session lifetime overrides enforced at the authorization endpoint.
+*   **Just-In-Time Access (JIT):** Temporary, request-based access grants with automatic expiry (governance access request workflow).
+
+### Pillar 5: Visibility & Data
+
+*   **Anomaly Detection:** Rule-based flagging of suspicious login patterns (impossible travel, off-hours access, credential stuffing) from the audit stream.
+*   **SIEM Native Connectors:** Direct push integrations for Splunk, Elastic SIEM, and Microsoft Sentinel beyond the current webhook model.
+*   **Micro-segmentation Support:** Integration with service meshes (Istio, Linkerd) for identity-based network policy enforcement.

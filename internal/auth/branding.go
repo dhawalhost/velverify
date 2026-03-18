@@ -21,21 +21,22 @@ type BrandingConfig struct {
 	UpdatedAt       time.Time `json:"updated_at" db:"updated_at"`
 }
 
-// BrandingStore defines storage operations for branding.
-type BrandingStore interface {
+// BrandingRepository defines storage operations for branding.
+type BrandingRepository interface {
 	Get(ctx context.Context, tenantID string) (BrandingConfig, error)
 	Upsert(ctx context.Context, config BrandingConfig) error
 }
 
-type sqlBrandingStore struct {
+type sqlBrandingRepository struct {
 	db *sqlx.DB
 }
 
-func NewBrandingStore(db *sqlx.DB) BrandingStore {
-	return &sqlBrandingStore{db: db}
+// NewBrandingRepository creates a new BrandingRepository.
+func NewBrandingRepository(db *sqlx.DB) BrandingRepository {
+	return &sqlBrandingRepository{db: db}
 }
 
-func (s *sqlBrandingStore) Get(ctx context.Context, tenantID string) (BrandingConfig, error) {
+func (s *sqlBrandingRepository) Get(ctx context.Context, tenantID string) (BrandingConfig, error) {
 	var b BrandingConfig
 	err := s.db.GetContext(ctx, &b, `SELECT * FROM tenant_branding WHERE tenant_id = $1`, tenantID)
 	if err != nil {
@@ -48,7 +49,7 @@ func (s *sqlBrandingStore) Get(ctx context.Context, tenantID string) (BrandingCo
 	return b, nil
 }
 
-func (s *sqlBrandingStore) Upsert(ctx context.Context, config BrandingConfig) error {
+func (s *sqlBrandingRepository) Upsert(ctx context.Context, config BrandingConfig) error {
 	query := `
 		INSERT INTO tenant_branding (tenant_id, logo_url, primary_color, background_color, css_override, config, updated_at)
 		VALUES (:tenant_id, :logo_url, :primary_color, :background_color, :css_override, :config::jsonb, NOW())

@@ -47,8 +47,8 @@ type Provider struct {
 	UpdatedAt time.Time `json:"updated_at" db:"updated_at"`
 }
 
-// Store defines SSO provider storage operations.
-type Store interface {
+// Repository defines SSO provider storage operations.
+type Repository interface {
 	Create(ctx context.Context, p Provider) (string, error)
 	Get(ctx context.Context, tenantID, id string) (Provider, error)
 	GetByName(ctx context.Context, tenantID, name string) (Provider, error)
@@ -57,16 +57,16 @@ type Store interface {
 	Delete(ctx context.Context, tenantID, id string) error
 }
 
-type store struct {
+type sqlRepository struct {
 	db *sqlx.DB
 }
 
-// NewStore creates a new SSO provider store.
-func NewStore(db *sqlx.DB) Store {
-	return &store{db: db}
+// NewRepository creates a new SSO provider repository.
+func NewRepository(db *sqlx.DB) Repository {
+	return &sqlRepository{db: db}
 }
 
-func (s *store) Create(ctx context.Context, p Provider) (string, error) {
+func (s *sqlRepository) Create(ctx context.Context, p Provider) (string, error) {
 	var id string
 	err := s.db.QueryRowxContext(ctx,
 		`INSERT INTO sso_providers (tenant_id, name, type, enabled, 
@@ -82,21 +82,21 @@ func (s *store) Create(ctx context.Context, p Provider) (string, error) {
 	return id, err
 }
 
-func (s *store) Get(ctx context.Context, tenantID, id string) (Provider, error) {
+func (s *sqlRepository) Get(ctx context.Context, tenantID, id string) (Provider, error) {
 	var p Provider
 	err := s.db.GetContext(ctx, &p,
 		`SELECT * FROM sso_providers WHERE id = $1 AND tenant_id = $2`, id, tenantID)
 	return p, err
 }
 
-func (s *store) GetByName(ctx context.Context, tenantID, name string) (Provider, error) {
+func (s *sqlRepository) GetByName(ctx context.Context, tenantID, name string) (Provider, error) {
 	var p Provider
 	err := s.db.GetContext(ctx, &p,
 		`SELECT * FROM sso_providers WHERE name = $1 AND tenant_id = $2`, name, tenantID)
 	return p, err
 }
 
-func (s *store) List(ctx context.Context, tenantID string, providerType *ProviderType) ([]Provider, error) {
+func (s *sqlRepository) List(ctx context.Context, tenantID string, providerType *ProviderType) ([]Provider, error) {
 	var providers []Provider
 	query := `SELECT * FROM sso_providers WHERE tenant_id = $1`
 	args := []interface{}{tenantID}
@@ -111,7 +111,7 @@ func (s *store) List(ctx context.Context, tenantID string, providerType *Provide
 	return providers, err
 }
 
-func (s *store) Update(ctx context.Context, p Provider) error {
+func (s *sqlRepository) Update(ctx context.Context, p Provider) error {
 	_, err := s.db.ExecContext(ctx,
 		`UPDATE sso_providers SET 
 			name = $1, enabled = $2,
@@ -129,7 +129,7 @@ func (s *store) Update(ctx context.Context, p Provider) error {
 	return err
 }
 
-func (s *store) Delete(ctx context.Context, tenantID, id string) error {
+func (s *sqlRepository) Delete(ctx context.Context, tenantID, id string) error {
 	_, err := s.db.ExecContext(ctx,
 		`DELETE FROM sso_providers WHERE id = $1 AND tenant_id = $2`, id, tenantID)
 	return err

@@ -60,15 +60,15 @@ type WebAuthnRepository interface {
 	UpdateCredential(ctx context.Context, cred *webauthn.Credential) error
 }
 
-type repository struct {
+type sqlWebAuthnRepository struct {
 	db *sqlx.DB
 }
 
 func NewWebAuthnRepository(db *sqlx.DB) WebAuthnRepository {
-	return &repository{db: db}
+	return &sqlWebAuthnRepository{db: db}
 }
 
-func (r *repository) SaveCredential(ctx context.Context, tenantID, userID string, cred *webauthn.Credential) error {
+func (r *sqlWebAuthnRepository) SaveCredential(ctx context.Context, tenantID, userID string, cred *webauthn.Credential) error {
 	query := `
 		INSERT INTO webauthn_credentials (
 			id, tenant_id, user_id, credential_id, public_key, attestation_type, aaguid, sign_count, clone_warning, updated_at
@@ -92,7 +92,7 @@ func (r *repository) SaveCredential(ctx context.Context, tenantID, userID string
 	return err
 }
 
-func (r *repository) ListCredentials(ctx context.Context, userID string) ([]webauthn.Credential, error) {
+func (r *sqlWebAuthnRepository) ListCredentials(ctx context.Context, userID string) ([]webauthn.Credential, error) {
 	var entities []WebAuthnCredentialEntity
 	query := `SELECT * FROM webauthn_credentials WHERE user_id = $1`
 	err := r.db.SelectContext(ctx, &entities, query, userID)
@@ -116,7 +116,7 @@ func (r *repository) ListCredentials(ctx context.Context, userID string) ([]weba
 	return creds, nil
 }
 
-func (r *repository) UpdateCredential(ctx context.Context, cred *webauthn.Credential) error {
+func (r *sqlWebAuthnRepository) UpdateCredential(ctx context.Context, cred *webauthn.Credential) error {
 	query := `
 		UPDATE webauthn_credentials 
 		SET sign_count = :sign_count, clone_warning = :clone_warning, updated_at = :updated_at

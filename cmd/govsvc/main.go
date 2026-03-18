@@ -51,14 +51,14 @@ func main() {
 		os.Exit(1)
 	}
 	clientRepo := oauthclient.NewRepository(db)
-	reqStore := governance.NewStore(db)
-	orgStore := governance.NewOrganizationStore(db)
+	reqRepo := governance.NewRepository(db)
+	orgRepo := governance.NewOrganizationRepository(db)
 
 	dirSvcURL := cfg.Governance.DirectoryServiceURL
 	dirClient := governance.NewDirectoryClient(dirSvcURL, cfg.Directory.ServiceAuthHeader, cfg.Directory.ServiceAuthToken)
 
 	policyEngine := policy.NewSimpleEngine()
-	svc := governance.NewService(clientRepo, reqStore, orgStore, dirClient, policyEngine)
+	svc := governance.NewService(clientRepo, reqRepo, orgRepo, dirClient, policyEngine)
 
 	// Initialize metrics
 	metrics := observability.NewMetrics()
@@ -161,8 +161,8 @@ func main() {
 	govHandlers.RegisterRoutes(router)
 
 	// Campaign handlers
-	campaignStore := governance.NewCampaignStore(db)
-	campaignSvc := governance.NewCampaignService(campaignStore, dirClient)
+	campaignRepo := governance.NewCampaignRepository(db)
+	campaignSvc := governance.NewCampaignService(campaignRepo, dirClient)
 	campaignHandlers := governance.NewCampaignHTTPHandler(campaignSvc, log)
 
 	apiGroup := router.Group("/api/v1")
@@ -172,14 +172,14 @@ func main() {
 	campaignHandlers.RegisterRoutes(apiGroup)
 
 	// RBAC handlers
-	rbacStore := rbac.NewStore(db)
-	rbacSvc := rbac.NewService(rbacStore)
+	rbacRepo := rbac.NewRepository(db)
+	rbacSvc := rbac.NewService(rbacRepo)
 	rbacHandlers := rbac.NewHTTPHandler(rbacSvc, log)
 	rbacHandlers.RegisterRoutes(apiGroup)
 
 	// Audit handlers
-	auditStore := audit.NewStore(db)
-	auditSvc := audit.NewService(auditStore)
+	auditRepo := audit.NewRepository(db)
+	auditSvc := audit.NewService(auditRepo)
 	auditHandlers := audit.NewHTTPHandler(auditSvc, log)
 	auditHandlers.RegisterRoutes(apiGroup)
 
@@ -188,12 +188,12 @@ func main() {
 	orgHandlers.RegisterRoutes(apiGroup)
 
 	// Domain verification handlers
-	domainVerifyHandler := governance.NewDomainVerificationHandler(db, orgStore, log)
+	domainVerifyHandler := governance.NewDomainVerificationHandler(db, orgRepo, log)
 	domainVerifyHandler.RegisterRoutes(apiGroup)
 
 	// SSO handlers
-	ssoStore := sso.NewStore(db)
-	ssoSvc := sso.NewService(ssoStore)
+	ssoRepo := sso.NewRepository(db)
+	ssoSvc := sso.NewService(ssoRepo)
 	ssoHandlers := sso.NewHTTPHandler(ssoSvc, log)
 	ssoHandlers.RegisterRoutes(apiGroup)
 
@@ -204,8 +204,8 @@ func main() {
 	connRegistry.Register("azure-ad", azuread.New)
 	connRegistry.Register("google", google.New)
 
-	connStore := connector.NewStore(db)
-	connSvc := connector.NewService(connStore, connRegistry)
+	connRepo := connector.NewRepository(db)
+	connSvc := connector.NewService(connRepo, connRegistry)
 	connHandlers := connector.NewHTTPHandler(connSvc, log)
 	connHandlers.RegisterRoutes(apiGroup)
 

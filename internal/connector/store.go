@@ -7,8 +7,8 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
-// Store defines connector storage operations.
-type Store interface {
+// Repository defines connector storage operations.
+type Repository interface {
 	Create(ctx context.Context, config Config) (string, error)
 	Get(ctx context.Context, tenantID, id string) (Config, error)
 	List(ctx context.Context, tenantID string) ([]Config, error)
@@ -17,16 +17,16 @@ type Store interface {
 	Toggle(ctx context.Context, tenantID, id string, enabled bool) error
 }
 
-type store struct {
+type sqlRepository struct {
 	db *sqlx.DB
 }
 
-// NewStore creates a new connector store.
-func NewStore(db *sqlx.DB) Store {
-	return &store{db: db}
+// NewRepository creates a new connector repository.
+func NewRepository(db *sqlx.DB) Repository {
+	return &sqlRepository{db: db}
 }
 
-func (s *store) Create(ctx context.Context, config Config) (string, error) {
+func (s *sqlRepository) Create(ctx context.Context, config Config) (string, error) {
 	var id string
 	credentials, _ := json.Marshal(config.Credentials) // Should be encrypted in real app
 	settings, _ := json.Marshal(config.Settings)
@@ -39,7 +39,7 @@ func (s *store) Create(ctx context.Context, config Config) (string, error) {
 	return id, err
 }
 
-func (s *store) Get(ctx context.Context, tenantID, id string) (Config, error) {
+func (s *sqlRepository) Get(ctx context.Context, tenantID, id string) (Config, error) {
 	var c struct {
 		Config
 		CredentialsRaw []byte `db:"credentials"`
@@ -59,7 +59,7 @@ func (s *store) Get(ctx context.Context, tenantID, id string) (Config, error) {
 	return c.Config, nil
 }
 
-func (s *store) List(ctx context.Context, tenantID string) ([]Config, error) {
+func (s *sqlRepository) List(ctx context.Context, tenantID string) ([]Config, error) {
 	var rows []struct {
 		Config
 		CredentialsRaw []byte `db:"credentials"`
@@ -82,7 +82,7 @@ func (s *store) List(ctx context.Context, tenantID string) ([]Config, error) {
 	return configs, nil
 }
 
-func (s *store) Update(ctx context.Context, config Config) error {
+func (s *sqlRepository) Update(ctx context.Context, config Config) error {
 	credentials, _ := json.Marshal(config.Credentials)
 	settings, _ := json.Marshal(config.Settings)
 
@@ -94,13 +94,13 @@ func (s *store) Update(ctx context.Context, config Config) error {
 	return err
 }
 
-func (s *store) Delete(ctx context.Context, tenantID, id string) error {
+func (s *sqlRepository) Delete(ctx context.Context, tenantID, id string) error {
 	_, err := s.db.ExecContext(ctx,
 		`DELETE FROM connectors WHERE id = $1 AND tenant_id = $2`, id, tenantID)
 	return err
 }
 
-func (s *store) Toggle(ctx context.Context, tenantID, id string, enabled bool) error {
+func (s *sqlRepository) Toggle(ctx context.Context, tenantID, id string, enabled bool) error {
 	_, err := s.db.ExecContext(ctx,
 		`UPDATE connectors SET enabled = $1, updated_at = NOW() WHERE id = $2 AND tenant_id = $3`,
 		enabled, id, tenantID)

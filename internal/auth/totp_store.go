@@ -20,24 +20,24 @@ type TOTPSecret struct {
 	VerifiedAt *time.Time `db:"verified_at" json:"verified_at,omitempty"`
 }
 
-// TOTPStore defines the interface for TOTP secret storage.
-type TOTPStore interface {
+// TOTPRepository defines the interface for TOTP secret storage.
+type TOTPRepository interface {
 	Create(ctx context.Context, secret *TOTPSecret) error
 	GetByIdentity(ctx context.Context, tenantID, identityID string) (*TOTPSecret, error)
 	MarkVerified(ctx context.Context, id string) error
 	Delete(ctx context.Context, tenantID, identityID string) error
 }
 
-type totpRepo struct {
+type sqlTOTPRepository struct {
 	db *sqlx.DB
 }
 
-// NewTOTPStore creates a new TOTP store.
-func NewTOTPStore(db *sqlx.DB) TOTPStore {
-	return &totpRepo{db: db}
+// NewTOTPRepository creates a new TOTP repository.
+func NewTOTPRepository(db *sqlx.DB) TOTPRepository {
+	return &sqlTOTPRepository{db: db}
 }
 
-func (r *totpRepo) Create(ctx context.Context, secret *TOTPSecret) error {
+func (r *sqlTOTPRepository) Create(ctx context.Context, secret *TOTPSecret) error {
 	query := `
 		INSERT INTO totp_secrets (identity_id, tenant_id, secret, verified)
 		VALUES ($1, $2, $3, $4)
@@ -53,7 +53,7 @@ func (r *totpRepo) Create(ctx context.Context, secret *TOTPSecret) error {
 	).Scan(&secret.ID, &secret.CreatedAt)
 }
 
-func (r *totpRepo) GetByIdentity(ctx context.Context, tenantID, identityID string) (*TOTPSecret, error) {
+func (r *sqlTOTPRepository) GetByIdentity(ctx context.Context, tenantID, identityID string) (*TOTPSecret, error) {
 	var secret TOTPSecret
 	query := `SELECT id, identity_id, tenant_id, secret, verified, created_at, verified_at FROM totp_secrets WHERE tenant_id = $1 AND identity_id = $2`
 	err := r.db.GetContext(ctx, &secret, query, tenantID, identityID)
@@ -66,13 +66,13 @@ func (r *totpRepo) GetByIdentity(ctx context.Context, tenantID, identityID strin
 	return &secret, nil
 }
 
-func (r *totpRepo) MarkVerified(ctx context.Context, id string) error {
+func (r *sqlTOTPRepository) MarkVerified(ctx context.Context, id string) error {
 	query := `UPDATE totp_secrets SET verified = TRUE, verified_at = NOW() WHERE id = $1`
 	_, err := r.db.ExecContext(ctx, query, id)
 	return err
 }
 
-func (r *totpRepo) Delete(ctx context.Context, tenantID, identityID string) error {
+func (r *sqlTOTPRepository) Delete(ctx context.Context, tenantID, identityID string) error {
 	query := `DELETE FROM totp_secrets WHERE tenant_id = $1 AND identity_id = $2`
 	_, err := r.db.ExecContext(ctx, query, tenantID, identityID)
 	return err

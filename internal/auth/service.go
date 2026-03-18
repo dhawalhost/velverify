@@ -23,12 +23,14 @@ import (
 	"time"
 
 	"github.com/dhawalhost/wardseal/internal/oauthclient"
+	"github.com/dhawalhost/wardseal/internal/rbac"
 	"github.com/dhawalhost/wardseal/internal/saml"
 	"github.com/dhawalhost/wardseal/pkg/kms"
 	"github.com/dhawalhost/wardseal/pkg/middleware"
 	"github.com/go-webauthn/webauthn/protocol"
 	"github.com/go-webauthn/webauthn/webauthn"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/pquerna/otp/totp"
 	"go.uber.org/zap"
 	"golang.org/x/crypto/bcrypt"
 	"gopkg.in/go-jose/go-jose.v2"
@@ -43,8 +45,8 @@ type Service interface {
 	Revoke(ctx context.Context, req RevokeRequest) error
 	SAML() *saml.Provider
 	JWKS() jose.JSONWebKeySet
-	Device() DeviceStore
-	Signal() SignalStore
+	Device() DeviceRepository
+	Signal() SignalRepository
 	WebAuthn() *webauthn.WebAuthn
 	// WebAuthn Methods
 	BeginWebAuthnRegistration(ctx context.Context, userID string) (*protocol.CredentialCreation, *webauthn.SessionData, error)
@@ -57,6 +59,7 @@ type Service interface {
 	GetBranding(ctx context.Context, tenantID string) (BrandingConfig, error)
 	UpdateBranding(ctx context.Context, config BrandingConfig) error
 	GetOIDCConfiguration() OpenIDConfiguration
+	LoginWithMFAStepUp(ctx context.Context, stepUpToken, totpCode string) (string, error)
 
 	// Client Management for Portal
 	ListClients(ctx context.Context, tenantID string) ([]oauthclient.Client, error)
@@ -65,7 +68,7 @@ type Service interface {
 	UpdateUserSelf(ctx context.Context, tenantID, userID string, updates map[string]interface{}) error
 
 	// TOTP MFA
-	TOTP() TOTPStore
+	TOTP() TOTPRepository
 
 	// User Lookup
 	LookupUser(ctx context.Context, tenantID, email string) (LookupResult, error)
@@ -94,44 +97,46 @@ type authService struct {
 	signer              kms.Signer
 	serviceAuthHeader   string
 	serviceAuthToken    string
-	codeStore           AuthorizationCodeStore
-	refreshTokenStore   RefreshTokenStore
-	revokedTokens       RevocationStore
+	codeStore           AuthorizationCodeRepository
+	refreshTokenStore   RefreshTokenRepository
+	revokedTokens       RevocationRepository
 	clients             map[clientKey]ClientConfig
-	clientStore         oauthclient.Store
+	clientStore         oauthclient.Repository
 	samlProvider        *saml.Provider
-	deviceStore         DeviceStore
-	signalStore         SignalStore
+	deviceStore         DeviceRepository
+	signalStore         SignalRepository
 	riskEngine          *RiskEngine
 	webAuthn            *webauthn.WebAuthn
 	webAuthnStore       WebAuthnRepository
-	brandingStore       BrandingStore
-	federationStore     FederationStore
-	totpStore           TOTPStore
-	ssoProviderStore    SSOProviderStore
-	tenantStore         TenantStore
-	appStore            DeveloperAppStore
+	brandingStore       BrandingRepository
+	federationStore     FederationRepository
+	totpStore           TOTPRepository
+	ssoProviderStore    SSOProviderRepository
+	tenantStore         TenantRepository
+	appStore            DeveloperAppRepository
+	rbacStore           rbac.Repository
+	ipPolicyStore       IPPolicyRepository
 	deploymentMode      string
 	baseURL             string
 	uiURL               string
 }
 
-// AuthorizationCodeStore defines the interface for storing authorization codes.
-type AuthorizationCodeStore interface {
+// AuthorizationCodeRepository defines the interface for storing authorization codes.
+type AuthorizationCodeRepository interface {
 	Save(ctx context.Context, code authorizationCode) error
 	Get(ctx context.Context, code string) (authorizationCode, bool, error)
 	Delete(ctx context.Context, code string) error
 }
 
-// RefreshTokenStore defines the interface for storing refresh tokens.
-type RefreshTokenStore interface {
+// RefreshTokenRepository defines the interface for storing refresh tokens.
+type RefreshTokenRepository interface {
 	Save(ctx context.Context, entry refreshTokenEntry) error
 	Get(ctx context.Context, token string) (refreshTokenEntry, bool, error)
 	Delete(ctx context.Context, token string) error
 }
 
-// RevocationStore defines the interface for token revocation.
-type RevocationStore interface {
+// RevocationRepository defines the interface for token revocation.
+type RevocationRepository interface {
 	Revoke(ctx context.Context, token string) error
 	IsRevoked(ctx context.Context, token string) (bool, error)
 }
@@ -142,22 +147,24 @@ type Config struct {
 	ServiceAuthToken    string
 	ServiceAuthHeader   string
 	Clients             []ClientConfig
-	ClientStore         oauthclient.Store
+	ClientStore         oauthclient.Repository
 	SAMLStore           *saml.Store
-	DeviceStore         DeviceStore
-	SignalStore         SignalStore
+	DeviceStore         DeviceRepository
+	SignalStore         SignalRepository
 	WebAuthnStore       WebAuthnRepository
-	BrandingStore       BrandingStore
-	FederationStore     FederationStore
+	BrandingStore       BrandingRepository
+	FederationStore     FederationRepository
 	BaseURL             string
 	// Persistent stores (optional, defaults to in-memory if not provided)
-	CodeStore        AuthorizationCodeStore
-	RefreshStore     RefreshTokenStore
-	RevocationStore  RevocationStore
-	TOTPStore        TOTPStore
-	SSOProviderStore SSOProviderStore
-	TenantStore      TenantStore
-	AppStore         DeveloperAppStore
+	CodeStore        AuthorizationCodeRepository
+	RefreshStore     RefreshTokenRepository
+	RevocationStore  RevocationRepository
+	TOTPStore        TOTPRepository
+	SSOProviderStore SSOProviderRepository
+	TenantStore      TenantRepository
+	AppStore         DeveloperAppRepository
+	IPPolicyStore    IPPolicyRepository
+	RBACStore        rbac.Repository
 	UIURL            string
 	// KMS Signer (optional, defaults to ephemeral local signer)
 	Signer kms.Signer
@@ -245,15 +252,15 @@ func NewService(cfg Config) (Service, error) {
 	}
 
 	// Initialize stores - use SQL if provided, otherwise fall back to in-memory
-	var codeStore AuthorizationCodeStore = newAuthorizationCodeStore()
+	var codeStore AuthorizationCodeRepository = newAuthorizationCodeRepository()
 	if cfg.CodeStore != nil {
 		codeStore = cfg.CodeStore
 	}
-	var refreshStore RefreshTokenStore = newRefreshTokenStore()
+	var refreshStore RefreshTokenRepository = newRefreshTokenRepository()
 	if cfg.RefreshStore != nil {
 		refreshStore = cfg.RefreshStore
 	}
-	var revocationStore RevocationStore = newTokenRevocationStore()
+	var revocationStore RevocationRepository = newTokenRevocationRepository()
 	if cfg.RevocationStore != nil {
 		revocationStore = cfg.RevocationStore
 	}
@@ -287,7 +294,7 @@ func NewService(cfg Config) (Service, error) {
 		samlProvider:        samlProvider,
 		deviceStore:         cfg.DeviceStore,
 		signalStore:         cfg.SignalStore,
-		riskEngine:          NewRiskEngine(cfg.DeviceStore, cfg.SignalStore, zap.L()),
+		riskEngine:          NewRiskEngine(cfg.DeviceStore, cfg.SignalStore, zap.L()).WithIPPolicy(cfg.IPPolicyStore, nil),
 		webAuthn:            w,
 		webAuthnStore:       cfg.WebAuthnStore,
 		federationStore:     cfg.FederationStore,
@@ -295,6 +302,8 @@ func NewService(cfg Config) (Service, error) {
 		ssoProviderStore:    cfg.SSOProviderStore,
 		tenantStore:         cfg.TenantStore,
 		appStore:            cfg.AppStore,
+		rbacStore:           cfg.RBACStore,
+		ipPolicyStore:       cfg.IPPolicyStore,
 		deploymentMode:      deploymentMode,
 		baseURL:             cfg.BaseURL,
 		uiURL:               cfg.UIURL,
@@ -350,8 +359,6 @@ func (s *authService) Login(ctx context.Context, username, password, deviceID, u
 	// 2. Risk Evaluation
 	risk, err := s.riskEngine.Evaluate(ctx, userResp.User.ID, deviceID, ip)
 	if err != nil {
-		// Log error but maybe fail open or closed?
-		// Let's fail open (allow) but log error for MVP, or treat as medium risk.
 		zap.L().Error("Risk evaluation failed", zap.Error(err))
 	} else {
 		if risk.Level == RiskLevelHigh {
@@ -360,6 +367,18 @@ func (s *authService) Login(ctx context.Context, username, password, deviceID, u
 				zap.Int("score", risk.Score),
 				zap.Strings("factors", risk.Factors))
 			return "", &Error{"access_denied", "login blocked due to security risk"}
+		}
+		if risk.Level == RiskLevelMedium {
+			zap.L().Info("MFA step-up required due to medium risk",
+				zap.String("user_id", userResp.User.ID),
+				zap.Int("score", risk.Score),
+				zap.Strings("factors", risk.Factors))
+			// Generate a short-lived step-up token
+			stepUpToken, err := s.generateStepUpToken(tenantID, userResp.User.ID)
+			if err != nil {
+				return "", err
+			}
+			return stepUpToken, ErrMFARequired
 		}
 	}
 
@@ -394,6 +413,26 @@ func (s *authService) Login(ctx context.Context, username, password, deviceID, u
 		"iat":    time.Now().Unix(),
 		"scope":  "openid profile email",
 		"tenant": tenantID,
+	}
+
+	// Add RBAC claims
+	if s.rbacStore != nil {
+		roles, err := s.rbacStore.GetUserRoles(ctx, tenantID, userResp.User.ID)
+		if err == nil {
+			roleNames := make([]string, len(roles))
+			for i, r := range roles {
+				roleNames[i] = r.Name
+			}
+			claims["roles"] = roleNames
+		}
+		perms, err := s.rbacStore.GetUserPermissions(ctx, tenantID, userResp.User.ID)
+		if err == nil {
+			permList := make([]string, len(perms))
+			for i, p := range perms {
+				permList[i] = fmt.Sprintf("%s:%s", p.Resource, p.Action)
+			}
+			claims["permissions"] = permList
+		}
 	}
 
 	signedToken, err := s.signer.Sign(claims)
@@ -765,7 +804,7 @@ func (s *authService) handleClientCredentialsGrant(ctx context.Context, tenantID
 	}
 
 	// Issue access token only (no refresh token for client_credentials per RFC 6749)
-	accessToken, err := s.generateAccessToken(tenantID, req.ClientID, scope, "client")
+	accessToken, err := s.generateAccessToken(ctx, tenantID, req.ClientID, scope, "")
 	if err != nil {
 		return TokenResponse{}, err
 	}
@@ -820,13 +859,13 @@ func (s *authService) handleRefreshTokenGrant(ctx context.Context, tenantID stri
 	return s.issueTokens(ctx, tenantID, stored.ClientID, stored.Scope, stored.SubjectType, "")
 }
 
-func (s *authService) issueTokens(ctx context.Context, tenantID, clientID, scope, subjectType, nonce string) (TokenResponse, error) {
-	accessToken, err := s.generateAccessToken(tenantID, clientID, scope, subjectType)
+func (s *authService) issueTokens(ctx context.Context, tenantID, clientID, scope, userID, nonce string) (TokenResponse, error) {
+	accessToken, err := s.generateAccessToken(ctx, tenantID, clientID, scope, userID)
 	if err != nil {
 		return TokenResponse{}, err
 	}
 
-	refreshToken, err := s.generateRefreshToken(ctx, tenantID, clientID, scope, subjectType)
+	refreshToken, err := s.generateRefreshToken(ctx, tenantID, clientID, scope, userID)
 	if err != nil {
 		return TokenResponse{}, err
 	}
@@ -840,7 +879,7 @@ func (s *authService) issueTokens(ctx context.Context, tenantID, clientID, scope
 	}
 
 	if hasScope(scope, "openid") {
-		idToken, err := s.generateIDToken(tenantID, clientID, subjectType, nonce)
+		idToken, err := s.generateIDToken(ctx, tenantID, clientID, userID, nonce)
 		if err != nil {
 			return TokenResponse{}, err
 		}
@@ -850,8 +889,8 @@ func (s *authService) issueTokens(ctx context.Context, tenantID, clientID, scope
 	return resp, nil
 }
 
-func (s *authService) issueTokensWithoutRefresh(tenantID, clientID, scope, subjectType, nonce string) (TokenResponse, error) {
-	accessToken, err := s.generateAccessToken(tenantID, clientID, scope, subjectType)
+func (s *authService) issueTokensWithoutRefresh(ctx context.Context, tenantID, clientID, scope, userID, nonce string) (TokenResponse, error) {
+	accessToken, err := s.generateAccessToken(ctx, tenantID, clientID, scope, userID)
 	if err != nil {
 		return TokenResponse{}, err
 	}
@@ -864,7 +903,7 @@ func (s *authService) issueTokensWithoutRefresh(tenantID, clientID, scope, subje
 	}
 
 	if hasScope(scope, "openid") {
-		idToken, err := s.generateIDToken(tenantID, clientID, subjectType, nonce)
+		idToken, err := s.generateIDToken(ctx, tenantID, clientID, userID, nonce)
 		if err != nil {
 			return TokenResponse{}, err
 		}
@@ -874,23 +913,36 @@ func (s *authService) issueTokensWithoutRefresh(tenantID, clientID, scope, subje
 	return resp, nil
 }
 
-func (s *authService) generateAccessToken(tenantID, clientID, scope, subjectType string) (string, error) {
+func (s *authService) generateAccessToken(ctx context.Context, tenantID, clientID, scope, userID string) (string, error) {
 	claims := jwt.MapClaims{
-		"sub":          clientID,
-		"iss":          "identity-platform",
-		"aud":          "client-app",
-		"exp":          time.Now().Add(time.Hour * 1).Unix(),
-		"iat":          time.Now().Unix(),
-		"scope":        scope,
-		"tenant":       tenantID,
-		"subject_type": subjectType,
+		"sub":    clientID,
+		"iss":    "identity-platform",
+		"aud":    "client-app",
+		"exp":    time.Now().Add(time.Hour * 1).Unix(),
+		"iat":    time.Now().Unix(),
+		"scope":  scope,
+		"tenant": tenantID,
+	}
+	if userID != "" {
+		claims["user_id"] = userID
+		// Add RBAC claims
+		if s.rbacStore != nil {
+			roles, err := s.rbacStore.GetUserRoles(ctx, tenantID, userID)
+			if err == nil {
+				roleNames := make([]string, len(roles))
+				for i, r := range roles {
+					roleNames[i] = r.Name
+				}
+				claims["roles"] = roleNames
+			}
+		}
 	}
 
 	return s.signer.Sign(claims)
 }
 
-func (s *authService) generateIDToken(tenantID, clientID, subjectType, nonce string) (string, error) {
-	subject := subjectType
+func (s *authService) generateIDToken(ctx context.Context, tenantID, clientID, userID, nonce string) (string, error) {
+	subject := userID
 	if subject == "" {
 		subject = clientID
 	}
@@ -905,6 +957,29 @@ func (s *authService) generateIDToken(tenantID, clientID, subjectType, nonce str
 	}
 	if nonce != "" {
 		claims["nonce"] = nonce
+	}
+
+	// Add RBAC claims for OIDC
+	if userID != "" && s.rbacStore != nil {
+		roles, err := s.rbacStore.GetUserRoles(ctx, tenantID, userID)
+		if err == nil {
+			roleNames := make([]string, len(roles))
+			for i, r := range roles {
+				roleNames[i] = r.Name
+			}
+			claims["roles"] = roleNames
+		}
+
+		// Permissions in ID token if profile scope is requested
+		// Note: nonce check is usually for OIDC flows where scopes were already validated
+		perms, err := s.rbacStore.GetUserPermissions(ctx, tenantID, userID)
+		if err == nil {
+			permList := make([]string, len(perms))
+			for i, p := range perms {
+				permList[i] = fmt.Sprintf("%s:%s", p.Resource, p.Action)
+			}
+			claims["permissions"] = permList
+		}
 	}
 
 	return s.signer.Sign(claims)
@@ -1021,7 +1096,7 @@ func (s *authService) Introspect(ctx context.Context, req IntrospectRequest) (In
 	}, nil
 }
 
-func (s *authService) Signal() SignalStore {
+func (s *authService) Signal() SignalRepository {
 	return s.signalStore
 }
 
@@ -1041,13 +1116,16 @@ func (s *authService) SAML() *saml.Provider {
 	return s.samlProvider
 }
 
-func (s *authService) Device() DeviceStore {
+func (s *authService) Device() DeviceRepository {
 	return s.deviceStore
 }
 
-func (s *authService) TOTP() TOTPStore {
+func (s *authService) TOTP() TOTPRepository {
 	return s.totpStore
 }
+
+// ErrMFARequired is returned when login requires a second factor.
+var ErrMFARequired = &Error{"mfa_required", "additional authentication required"}
 
 // ErrInvalidCredentials is returned when login fails.
 var ErrInvalidCredentials = &Error{"invalid_credentials", "invalid username or password"}
@@ -1092,30 +1170,30 @@ type authorizationCode struct {
 	ExpiresAt           time.Time `db:"expires_at"`
 }
 
-type authorizationCodeStore struct {
+type authorizationCodeRepository struct {
 	mu    sync.RWMutex
 	codes map[string]authorizationCode
 }
 
-func newAuthorizationCodeStore() *authorizationCodeStore {
-	return &authorizationCodeStore{codes: make(map[string]authorizationCode)}
+func newAuthorizationCodeRepository() *authorizationCodeRepository {
+	return &authorizationCodeRepository{codes: make(map[string]authorizationCode)}
 }
 
-func (s *authorizationCodeStore) Save(ctx context.Context, code authorizationCode) error {
+func (s *authorizationCodeRepository) Save(ctx context.Context, code authorizationCode) error {
 	s.mu.Lock()
 	s.codes[code.Code] = code
 	s.mu.Unlock()
 	return nil
 }
 
-func (s *authorizationCodeStore) Get(ctx context.Context, code string) (authorizationCode, bool, error) {
+func (s *authorizationCodeRepository) Get(ctx context.Context, code string) (authorizationCode, bool, error) {
 	s.mu.RLock()
 	entry, ok := s.codes[code]
 	s.mu.RUnlock()
 	return entry, ok, nil
 }
 
-func (s *authorizationCodeStore) Delete(ctx context.Context, code string) error {
+func (s *authorizationCodeRepository) Delete(ctx context.Context, code string) error {
 	s.mu.Lock()
 	delete(s.codes, code)
 	s.mu.Unlock()
@@ -1243,55 +1321,55 @@ type refreshTokenEntry struct {
 	ExpiresAt   time.Time `db:"expires_at"`
 }
 
-// refreshTokenStore provides in-memory storage for refresh tokens.
-type refreshTokenStore struct {
+// refreshTokenRepository provides in-memory storage for refresh tokens.
+type refreshTokenRepository struct {
 	mu     sync.RWMutex
 	tokens map[string]refreshTokenEntry
 }
 
-func newRefreshTokenStore() *refreshTokenStore {
-	return &refreshTokenStore{tokens: make(map[string]refreshTokenEntry)}
+func newRefreshTokenRepository() *refreshTokenRepository {
+	return &refreshTokenRepository{tokens: make(map[string]refreshTokenEntry)}
 }
 
-func (s *refreshTokenStore) Save(ctx context.Context, entry refreshTokenEntry) error {
+func (s *refreshTokenRepository) Save(ctx context.Context, entry refreshTokenEntry) error {
 	s.mu.Lock()
 	s.tokens[entry.Token] = entry
 	s.mu.Unlock()
 	return nil
 }
 
-func (s *refreshTokenStore) Get(ctx context.Context, token string) (refreshTokenEntry, bool, error) {
+func (s *refreshTokenRepository) Get(ctx context.Context, token string) (refreshTokenEntry, bool, error) {
 	s.mu.RLock()
 	entry, ok := s.tokens[token]
 	s.mu.RUnlock()
 	return entry, ok, nil
 }
 
-func (s *refreshTokenStore) Delete(ctx context.Context, token string) error {
+func (s *refreshTokenRepository) Delete(ctx context.Context, token string) error {
 	s.mu.Lock()
 	delete(s.tokens, token)
 	s.mu.Unlock()
 	return nil
 }
 
-// tokenRevocationStore provides in-memory storage for revoked tokens.
-type tokenRevocationStore struct {
+// tokenRevocationRepository provides in-memory storage for revoked tokens.
+type tokenRevocationRepository struct {
 	mu      sync.RWMutex
 	revoked map[string]time.Time
 }
 
-func newTokenRevocationStore() *tokenRevocationStore {
-	return &tokenRevocationStore{revoked: make(map[string]time.Time)}
+func newTokenRevocationRepository() *tokenRevocationRepository {
+	return &tokenRevocationRepository{revoked: make(map[string]time.Time)}
 }
 
-func (s *tokenRevocationStore) Revoke(ctx context.Context, token string) error {
+func (s *tokenRevocationRepository) Revoke(ctx context.Context, token string) error {
 	s.mu.Lock()
 	s.revoked[token] = time.Now()
 	s.mu.Unlock()
 	return nil
 }
 
-func (s *tokenRevocationStore) IsRevoked(ctx context.Context, token string) (bool, error) {
+func (s *tokenRevocationRepository) IsRevoked(ctx context.Context, token string) (bool, error) {
 	s.mu.RLock()
 	_, exists := s.revoked[token]
 	s.mu.RUnlock()
@@ -1384,14 +1462,13 @@ func (s *authService) FinishWebAuthnLogin(ctx context.Context, userID string, se
 	}
 
 	// 3. Issue Token (MFA success)
-	// Retrieve TenantID from... context?
-	// If this is a login flow, we might not have tenant yet if purely public endpoint?
-	// But usually we do.
-	_, _ = middleware.TenantIDFromContext(ctx)
-	tenantID := SystemTenantID
+	tenantID, _ := middleware.TenantIDFromContext(ctx)
+	if tenantID == "" {
+		tenantID = SystemTenantID
+	}
 
 	// Scopes? Default.
-	return s.generateAccessToken(tenantID, userID, "openid", "user")
+	return s.generateAccessToken(ctx, tenantID, "", "openid", userID)
 }
 
 func (s *authService) WebAuthn() *webauthn.WebAuthn {
@@ -1860,4 +1937,60 @@ func (s *authService) ValidateToken(tokenString string) (*middleware.Claims, err
 	}
 
 	return nil, fmt.Errorf("invalid token")
+}
+
+func (s *authService) generateStepUpToken(tenantID, userID string) (string, error) {
+	claims := jwt.MapClaims{
+		"sub":     userID,
+		"iss":     s.baseURL,
+		"aud":     "wardseal-mfa-stepup",
+		"tenant":  tenantID,
+		"purpose": "mfa_stepup",
+		"iat":     time.Now().Unix(),
+		"exp":     time.Now().Add(5 * time.Minute).Unix(),
+	}
+	return s.signer.Sign(claims)
+}
+
+func (s *authService) LoginWithMFAStepUp(ctx context.Context, stepUpToken, totpCode string) (string, error) {
+	token, err := jwt.Parse(stepUpToken, func(token *jwt.Token) (interface{}, error) {
+		if token.Method.Alg() != s.signer.Algorithm() {
+			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+		}
+		return s.signer.PublicKey(), nil
+	})
+	if err != nil || !token.Valid {
+		return "", fmt.Errorf("invalid step-up token")
+	}
+
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		return "", fmt.Errorf("invalid token claims")
+	}
+
+	if purpose, _ := claims["purpose"].(string); purpose != "mfa_stepup" {
+		return "", fmt.Errorf("invalid token purpose")
+	}
+
+	userID, _ := claims["sub"].(string)
+	tenantID, _ := claims["tenant"].(string)
+
+	if userID == "" || tenantID == "" {
+		return "", fmt.Errorf("missing user or tenant in token")
+	}
+
+	// Verify TOTP
+	if s.totpStore == nil {
+		return "", fmt.Errorf("TOTP store not configured")
+	}
+	secret, err := s.totpStore.GetByIdentity(ctx, tenantID, userID)
+	if err != nil || secret == nil {
+		return "", fmt.Errorf("TOTP not enrolled")
+	}
+
+	if !totp.Validate(totpCode, secret.Secret) {
+		return "", fmt.Errorf("invalid TOTP code")
+	}
+
+	return s.generateAccessToken(ctx, tenantID, "", "openid profile email", userID)
 }

@@ -8,23 +8,23 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
-// TenantStore defines the interface for tenant-related database operations.
-type TenantStore interface {
+// TenantRepository defines the interface for tenant-related database operations.
+type TenantRepository interface {
 	GetIDBySlug(ctx context.Context, slug string) (string, error)
 	GetSlugByID(ctx context.Context, id string) (string, error)
 }
 
-// tenantRepo implements TenantStore using sqlx.
-type tenantRepo struct {
+// sqlTenantRepository implements TenantRepository using sqlx.
+type sqlTenantRepository struct {
 	db *sqlx.DB
 }
 
-// NewTenantStore creates a new TenantStore.
-func NewTenantStore(db *sqlx.DB) TenantStore {
-	return &tenantRepo{db: db}
+// NewTenantRepository creates a new TenantRepository.
+func NewTenantRepository(db *sqlx.DB) TenantRepository {
+	return &sqlTenantRepository{db: db}
 }
 
-func (r *tenantRepo) GetIDBySlug(ctx context.Context, slug string) (string, error) {
+func (r *sqlTenantRepository) GetIDBySlug(ctx context.Context, slug string) (string, error) {
 	var id string
 	query := `SELECT id FROM tenants WHERE slug = $1`
 	err := r.db.GetContext(ctx, &id, query, slug)
@@ -37,7 +37,7 @@ func (r *tenantRepo) GetIDBySlug(ctx context.Context, slug string) (string, erro
 	return id, nil
 }
 
-func (r *tenantRepo) GetSlugByID(ctx context.Context, id string) (string, error) {
+func (r *sqlTenantRepository) GetSlugByID(ctx context.Context, id string) (string, error) {
 	var slug string
 	query := `SELECT slug FROM tenants WHERE id = $1`
 	err := r.db.GetContext(ctx, &slug, query, id)

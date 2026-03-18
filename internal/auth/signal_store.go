@@ -20,22 +20,22 @@ type SecurityEvent struct {
 	CreatedAt time.Time `db:"created_at" json:"created_at"`
 }
 
-// SignalStore defines storage for security events.
-type SignalStore interface {
+// SignalRepository defines storage for security events.
+type SignalRepository interface {
 	Ingest(ctx context.Context, event *SecurityEvent) error
 	GetLatestCriticalEvent(ctx context.Context, subjectID string, since time.Time) (*SecurityEvent, error)
 }
 
-type signalRepo struct {
+type sqlSignalRepository struct {
 	db *sqlx.DB
 }
 
-// NewSignalStore creates a new SignalStore.
-func NewSignalStore(db *sqlx.DB) SignalStore {
-	return &signalRepo{db: db}
+// NewSignalRepository creates a new SignalRepository.
+func NewSignalRepository(db *sqlx.DB) SignalRepository {
+	return &sqlSignalRepository{db: db}
 }
 
-func (r *signalRepo) Ingest(ctx context.Context, event *SecurityEvent) error {
+func (r *sqlSignalRepository) Ingest(ctx context.Context, event *SecurityEvent) error {
 	if event.ID == "" {
 		event.ID = uuid.New().String()
 	}
@@ -52,7 +52,7 @@ func (r *signalRepo) Ingest(ctx context.Context, event *SecurityEvent) error {
 	return err
 }
 
-func (r *signalRepo) GetLatestCriticalEvent(ctx context.Context, subjectID string, since time.Time) (*SecurityEvent, error) {
+func (r *sqlSignalRepository) GetLatestCriticalEvent(ctx context.Context, subjectID string, since time.Time) (*SecurityEvent, error) {
 	// Check for events that revoke access (password changes, compromised sessions/devices)
 	// For MVP, we check ANY event in this table for the subject since the time.
 	// In reality, we'd filter by critical types.

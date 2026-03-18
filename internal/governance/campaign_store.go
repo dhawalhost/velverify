@@ -51,8 +51,8 @@ type CampaignList struct {
 	Total     int        `json:"total"`
 }
 
-// CampaignStore defines storage operations for campaigns.
-type CampaignStore interface {
+// CampaignRepository defines storage operations for campaigns.
+type CampaignRepository interface {
 	CreateCampaign(ctx context.Context, c Campaign) (string, error)
 	GetCampaign(ctx context.Context, tenantID, id string) (Campaign, error)
 	ListCampaigns(ctx context.Context, tenantID, status string) ([]Campaign, error)
@@ -67,16 +67,16 @@ type CampaignStore interface {
 	UpdateItemDecision(ctx context.Context, itemID, decision, comment string) error
 }
 
-type campaignStore struct {
+type sqlCampaignRepository struct {
 	db *sqlx.DB
 }
 
-// NewCampaignStore creates a new campaign store.
-func NewCampaignStore(db *sqlx.DB) CampaignStore {
-	return &campaignStore{db: db}
+// NewCampaignRepository creates a new campaign repository.
+func NewCampaignRepository(db *sqlx.DB) CampaignRepository {
+	return &sqlCampaignRepository{db: db}
 }
 
-func (s *campaignStore) CreateCampaign(ctx context.Context, c Campaign) (string, error) {
+func (s *sqlCampaignRepository) CreateCampaign(ctx context.Context, c Campaign) (string, error) {
 	var id string
 	err := s.db.QueryRowxContext(ctx,
 		`INSERT INTO certification_campaigns (tenant_id, name, description, status, reviewer_id, start_date, end_date)
@@ -86,14 +86,14 @@ func (s *campaignStore) CreateCampaign(ctx context.Context, c Campaign) (string,
 	return id, err
 }
 
-func (s *campaignStore) GetCampaign(ctx context.Context, tenantID, id string) (Campaign, error) {
+func (s *sqlCampaignRepository) GetCampaign(ctx context.Context, tenantID, id string) (Campaign, error) {
 	var c Campaign
 	err := s.db.GetContext(ctx, &c,
 		`SELECT * FROM certification_campaigns WHERE id = $1 AND tenant_id = $2`, id, tenantID)
 	return c, err
 }
 
-func (s *campaignStore) ListCampaigns(ctx context.Context, tenantID, status string) ([]Campaign, error) {
+func (s *sqlCampaignRepository) ListCampaigns(ctx context.Context, tenantID, status string) ([]Campaign, error) {
 	var campaigns []Campaign
 	query := `SELECT * FROM certification_campaigns WHERE tenant_id = $1`
 	args := []interface{}{tenantID}
@@ -106,20 +106,20 @@ func (s *campaignStore) ListCampaigns(ctx context.Context, tenantID, status stri
 	return campaigns, err
 }
 
-func (s *campaignStore) UpdateCampaignStatus(ctx context.Context, id, status string) error {
+func (s *sqlCampaignRepository) UpdateCampaignStatus(ctx context.Context, id, status string) error {
 	_, err := s.db.ExecContext(ctx,
 		`UPDATE certification_campaigns SET status = $1, updated_at = NOW() WHERE id = $2`,
 		status, id)
 	return err
 }
 
-func (s *campaignStore) DeleteCampaign(ctx context.Context, tenantID, id string) error {
+func (s *sqlCampaignRepository) DeleteCampaign(ctx context.Context, tenantID, id string) error {
 	_, err := s.db.ExecContext(ctx,
 		`DELETE FROM certification_campaigns WHERE id = $1 AND tenant_id = $2`, id, tenantID)
 	return err
 }
 
-func (s *campaignStore) CreateItem(ctx context.Context, item CertificationItem) (string, error) {
+func (s *sqlCampaignRepository) CreateItem(ctx context.Context, item CertificationItem) (string, error) {
 	var id string
 	err := s.db.QueryRowxContext(ctx,
 		`INSERT INTO certification_items (campaign_id, tenant_id, user_id, resource_type, resource_id, resource_name)
@@ -129,13 +129,13 @@ func (s *campaignStore) CreateItem(ctx context.Context, item CertificationItem) 
 	return id, err
 }
 
-func (s *campaignStore) GetItem(ctx context.Context, itemID string) (CertificationItem, error) {
+func (s *sqlCampaignRepository) GetItem(ctx context.Context, itemID string) (CertificationItem, error) {
 	var item CertificationItem
 	err := s.db.GetContext(ctx, &item, `SELECT * FROM certification_items WHERE id = $1`, itemID)
 	return item, err
 }
 
-func (s *campaignStore) ListItems(ctx context.Context, campaignID, decision string) ([]CertificationItem, error) {
+func (s *sqlCampaignRepository) ListItems(ctx context.Context, campaignID, decision string) ([]CertificationItem, error) {
 	var items []CertificationItem
 	query := `SELECT * FROM certification_items WHERE campaign_id = $1`
 	args := []interface{}{campaignID}
@@ -150,7 +150,7 @@ func (s *campaignStore) ListItems(ctx context.Context, campaignID, decision stri
 	return items, err
 }
 
-func (s *campaignStore) ListItemsByReviewer(ctx context.Context, tenantID, reviewerID string) ([]CertificationItem, error) {
+func (s *sqlCampaignRepository) ListItemsByReviewer(ctx context.Context, tenantID, reviewerID string) ([]CertificationItem, error) {
 	var items []CertificationItem
 	query := `
 		SELECT i.* 
@@ -163,7 +163,7 @@ func (s *campaignStore) ListItemsByReviewer(ctx context.Context, tenantID, revie
 	return items, err
 }
 
-func (s *campaignStore) UpdateItemDecision(ctx context.Context, itemID, decision, comment string) error {
+func (s *sqlCampaignRepository) UpdateItemDecision(ctx context.Context, itemID, decision, comment string) error {
 	_, err := s.db.ExecContext(ctx,
 		`UPDATE certification_items SET decision = $1, decision_comment = $2, decision_at = NOW() WHERE id = $3`,
 		decision, comment, itemID)

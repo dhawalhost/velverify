@@ -9,18 +9,18 @@ import (
 	"github.com/lib/pq"
 )
 
-// Repository provides CRUD helpers for oauth_clients.
-type Repository struct {
+// sqlRepository provides CRUD helpers for oauth_clients.
+type sqlRepository struct {
 	db *sqlx.DB
 }
 
 // NewRepository creates a new Repository instance.
-func NewRepository(db *sqlx.DB) *Repository {
-	return &Repository{db: db}
+func NewRepository(db *sqlx.DB) Repository {
+	return &sqlRepository{db: db}
 }
 
 // ListClients returns all OAuth clients across tenants.
-func (r *Repository) ListClients(ctx context.Context) ([]Client, error) {
+func (r *sqlRepository) ListClients(ctx context.Context) ([]Client, error) {
 	var clients []Client
 	err := r.db.SelectContext(ctx, &clients, `SELECT id, tenant_id, client_id, client_type, name, description,
         redirect_uris, allowed_scopes, client_secret_hash, created_at, updated_at FROM oauth_clients`)
@@ -28,7 +28,7 @@ func (r *Repository) ListClients(ctx context.Context) ([]Client, error) {
 }
 
 // ListClientsByTenant returns all clients for a tenant.
-func (r *Repository) ListClientsByTenant(ctx context.Context, tenantID string) ([]Client, error) {
+func (r *sqlRepository) ListClientsByTenant(ctx context.Context, tenantID string) ([]Client, error) {
 	var clients []Client
 	err := r.db.SelectContext(ctx, &clients, `SELECT id, tenant_id, client_id, client_type, name, description,
         redirect_uris, allowed_scopes, client_secret_hash, created_at, updated_at
@@ -37,7 +37,7 @@ func (r *Repository) ListClientsByTenant(ctx context.Context, tenantID string) (
 }
 
 // GetClient fetches a client by tenant and client_id.
-func (r *Repository) GetClient(ctx context.Context, tenantID, clientID string) (Client, error) {
+func (r *sqlRepository) GetClient(ctx context.Context, tenantID, clientID string) (Client, error) {
 	var client Client
 	err := r.db.GetContext(ctx, &client, `SELECT id, tenant_id, client_id, client_type, name, description,
         redirect_uris, allowed_scopes, client_secret_hash, created_at, updated_at
@@ -52,7 +52,7 @@ func (r *Repository) GetClient(ctx context.Context, tenantID, clientID string) (
 }
 
 // CreateClient inserts a new OAuth client.
-func (r *Repository) CreateClient(ctx context.Context, params CreateClientParams) (Client, error) {
+func (r *sqlRepository) CreateClient(ctx context.Context, params CreateClientParams) (Client, error) {
 	var client Client
 	err := r.db.GetContext(ctx, &client, `INSERT INTO oauth_clients
         (tenant_id, client_id, client_type, name, description, redirect_uris, allowed_scopes, client_secret_hash)
@@ -66,8 +66,7 @@ func (r *Repository) CreateClient(ctx context.Context, params CreateClientParams
 }
 
 // UpdateClient updates mutable fields on an OAuth client.
-
-func (r *Repository) UpdateClient(ctx context.Context, tenantID, clientID string, params UpdateClientParams) (Client, error) {
+func (r *sqlRepository) UpdateClient(ctx context.Context, tenantID, clientID string, params UpdateClientParams) (Client, error) {
 	_, err := r.db.ExecContext(ctx, `UPDATE oauth_clients
         SET name = COALESCE($1, name),
             description = COALESCE($2, description),
@@ -86,7 +85,7 @@ func (r *Repository) UpdateClient(ctx context.Context, tenantID, clientID string
 }
 
 // DeleteClient removes an OAuth client registration.
-func (r *Repository) DeleteClient(ctx context.Context, tenantID, clientID string) error {
+func (r *sqlRepository) DeleteClient(ctx context.Context, tenantID, clientID string) error {
 	result, err := r.db.ExecContext(ctx, `DELETE FROM oauth_clients WHERE tenant_id = $1 AND client_id = $2`, tenantID, clientID)
 	if err != nil {
 		return err

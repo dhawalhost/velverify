@@ -14,7 +14,7 @@ import (
 
 // DeveloperAPIHandler handles developer portal API requests.
 type DeveloperAPIHandler struct {
-	appStore DeveloperAppStore
+	appStore DeveloperAppRepository
 	db       *sqlx.DB
 	logger   *zap.Logger
 }
@@ -22,7 +22,7 @@ type DeveloperAPIHandler struct {
 // NewDeveloperAPIHandler creates a new developer API handler.
 func NewDeveloperAPIHandler(db *sqlx.DB, logger *zap.Logger) *DeveloperAPIHandler {
 	return &DeveloperAPIHandler{
-		appStore: NewDeveloperAppStore(db),
+		appStore: NewDeveloperAppRepository(db),
 		db:       db,
 		logger:   logger,
 	}

@@ -17,12 +17,12 @@ type Service interface {
 }
 
 type service struct {
-	store    Store
+	store    Repository
 	registry Registry
 }
 
 // NewService creates a new connector service.
-func NewService(store Store, registry Registry) Service {
+func NewService(store Repository, registry Registry) Service {
 	return &service{store: store, registry: registry}
 }
 

@@ -53,8 +53,8 @@ func (m *MockService) Introspect(ctx context.Context, req auth.IntrospectRequest
 func (m *MockService) Revoke(ctx context.Context, req auth.RevokeRequest) error { return nil }
 func (m *MockService) SAML() *saml.Provider                                     { return nil }
 func (m *MockService) JWKS() jose.JSONWebKeySet                                 { return jose.JSONWebKeySet{} }
-func (m *MockService) Device() auth.DeviceStore                                 { return nil }
-func (m *MockService) Signal() auth.SignalStore                                 { return nil }
+func (m *MockService) Device() auth.DeviceRepository                                 { return nil }
+func (m *MockService) Signal() auth.SignalRepository                                 { return nil }
 func (m *MockService) WebAuthn() *webauthn.WebAuthn                             { return nil }
 func (m *MockService) BeginWebAuthnRegistration(ctx context.Context, userID string) (*protocol.CredentialCreation, *webauthn.SessionData, error) {
 	return nil, nil, nil
@@ -77,7 +77,7 @@ func (m *MockService) GetBranding(ctx context.Context, tenantID string) (auth.Br
 func (m *MockService) UpdateBranding(ctx context.Context, config auth.BrandingConfig) error {
 	return nil
 }
-func (m *MockService) TOTP() auth.TOTPStore { return nil }
+func (m *MockService) TOTP() auth.TOTPRepository { return nil }
 func (m *MockService) LookupUser(ctx context.Context, tenantID, email string) (auth.LookupResult, error) {
 	return auth.LookupResult{}, nil
 }
@@ -101,6 +101,9 @@ func (m *MockService) UpdateUserSelf(ctx context.Context, tenantID, userID strin
 }
 func (m *MockService) ValidateToken(tokenString string) (*middleware.Claims, error) {
 	return nil, nil
+}
+func (m *MockService) LoginWithMFAStepUp(ctx context.Context, stepUpToken, totpCode string) (string, error) {
+	return "", nil
 }
 
 // Simple test to verify the HTTP wiring for Setup and Login

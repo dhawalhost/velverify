@@ -81,21 +81,22 @@ func main() {
 	}
 	clientStore := oauthclient.NewRepository(db)
 	samlStore := saml.NewStore(db)
-	deviceStore := auth.NewDeviceStore(db)
-	signalStore := auth.NewSignalStore(db)
+	deviceStore := auth.NewDeviceRepository(db)
+	signalStore := auth.NewSignalRepository(db)
 	webauthnStore := auth.NewWebAuthnRepository(db)
-	brandingStore := auth.NewBrandingStore(db)
-	ssoProviderStore := auth.NewSQLSSOProviderStore(db)
-	tenantStore := auth.NewTenantStore(db)
+	brandingStore := auth.NewBrandingRepository(db)
+	ssoProviderStore := auth.NewSSOProviderRepository(db)
+	tenantStore := auth.NewTenantRepository(db)
+	federationStore := auth.NewFederationRepository(db)
 
 	authServiceURL := cfg.Auth.BaseURL
 
-	// Initialize persistent stores for production durability
-	codeStore := auth.NewSQLAuthorizationCodeStore(db)
-	refreshStore := auth.NewSQLRefreshTokenStore(db)
-	revocationStore := auth.NewSQLRevocationStore(db)
-	totpStore := auth.NewTOTPStore(db)
-	appStore := auth.NewDeveloperAppStore(db)
+	// Initialize persistent repositories for production durability
+	codeStore := auth.NewAuthorizationCodeRepository(db)
+	refreshStore := auth.NewRefreshTokenRepository(db)
+	revocationStore := auth.NewRevocationRepository(db)
+	totpStore := auth.NewTOTPRepository(db)
+	appStore := auth.NewDeveloperAppRepository(db)
 
 	// Initialize Key Management Service
 	kmsConfig := kms.Config{
@@ -128,6 +129,7 @@ func main() {
 		SignalStore:         signalStore,
 		WebAuthnStore:       webauthnStore,
 		BrandingStore:       brandingStore,
+		FederationStore:     federationStore,
 		BaseURL:             authServiceURL,
 		Signer:              signer,
 		// Use SQL stores for persistence
@@ -240,12 +242,12 @@ func main() {
 	// API Logger Middleware
 	router.Use(middleware.APILogger(db, log))
 
-	// Initialize login attempt store for brute-force protection
-	loginAttemptStore := auth.NewLoginAttemptStore(db)
+	// Initialize login attempt repository for brute-force protection
+	loginAttemptStore := auth.NewLoginAttemptRepository(db)
 
 	authHandlers := auth.NewHTTPHandler(svc, log, loginAttemptStore, appStore)
 	if cfg.Auth.RedisAddr != "" {
-		webAuthnSessionStore, err := auth.NewRedisWebAuthnSessionStore(auth.RedisWebAuthnSessionStoreConfig{
+		webAuthnSessionStore, err := auth.NewRedisWebAuthnSessionRepository(auth.RedisWebAuthnSessionStoreConfig{
 			Addr:      cfg.Auth.RedisAddr,
 			Password:  cfg.Auth.RedisPassword,
 			DB:        cfg.Auth.RedisDB,
@@ -262,8 +264,8 @@ func main() {
 				zap.Error(err),
 				zap.String("redis_addr", cfg.Auth.RedisAddr))
 		} else {
-			authHandlers.SetWebAuthnSessionStore(webAuthnSessionStore)
-			log.Info("Using Redis-backed WebAuthn session store",
+			authHandlers.SetWebAuthnSessionRepository(webAuthnSessionStore)
+			log.Info("Using Redis-backed WebAuthn session repository",
 				zap.String("redis_addr", cfg.Auth.RedisAddr),
 				zap.Duration("session_ttl", cfg.Auth.WebAuthnSessionTTL))
 		}
@@ -271,7 +273,7 @@ func main() {
 		if cfg.Environment == config.Production {
 			log.Fatal("REDIS_ADDR is required in production for WebAuthn session storage")
 		}
-		log.Warn("REDIS_ADDR not set; using in-memory WebAuthn session store (not suitable for multi-replica authsvc)")
+		log.Warn("REDIS_ADDR not set; using in-memory WebAuthn session repository (not suitable for multi-replica authsvc)")
 	}
 	authHandlers.RegisterRoutes(router)
 	authHandlers.RegisterBrandingRoutes(router.Group("/"))

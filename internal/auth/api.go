@@ -14,7 +14,6 @@ import (
 	"github.com/dhawalhost/wardseal/pkg/middleware"
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
-	"github.com/pquerna/otp/totp"
 	"go.uber.org/zap"
 )
 
@@ -67,25 +66,25 @@ type HTTPHandler struct {
 	svc               Service
 	logger            *zap.Logger
 	validate          *validator.Validate
-	loginAttemptStore LoginAttemptStore
-	appStore          DeveloperAppStore
-	webAuthnSessions  WebAuthnSessionStore
+	loginAttemptStore LoginAttemptRepository
+	appStore          DeveloperAppRepository
+	webAuthnSessions  WebAuthnSessionRepository
 }
 
 // NewHTTPHandler creates a new HTTPHandler.
-func NewHTTPHandler(svc Service, logger *zap.Logger, loginAttemptStore LoginAttemptStore, appStore DeveloperAppStore) *HTTPHandler {
+func NewHTTPHandler(svc Service, logger *zap.Logger, loginAttemptStore LoginAttemptRepository, appStore DeveloperAppRepository) *HTTPHandler {
 	return &HTTPHandler{
 		svc:               svc,
 		logger:            logger,
 		validate:          validator.New(),
 		loginAttemptStore: loginAttemptStore,
 		appStore:          appStore,
-		webAuthnSessions:  newInMemoryWebAuthnSessionStore(),
+		webAuthnSessions:  newInMemoryWebAuthnSessionRepository(),
 	}
 }
 
-// SetWebAuthnSessionStore allows overriding the default in-memory session store.
-func (h *HTTPHandler) SetWebAuthnSessionStore(store WebAuthnSessionStore) {
+// SetWebAuthnSessionRepository allows overriding the default in-memory session repository.
+func (h *HTTPHandler) SetWebAuthnSessionRepository(store WebAuthnSessionRepository) {
 	if store == nil {
 		return
 	}
@@ -125,6 +124,7 @@ func (h *HTTPHandler) RegisterRoutes(router *gin.Engine) {
 	// Protected routes within the tenant group
 	tenantGroup.POST("/login", h.login)
 	tenantGroup.POST("/login/mfa", h.completeMFALogin)
+	tenantGroup.POST("/auth/mfa/step-up", h.completeMFALogin) // Alias for step-up
 	tenantGroup.POST("/logout", h.logout)
 	tenantGroup.GET("/oauth2/authorize", h.authorize)
 	tenantGroup.POST("/oauth2/token", h.token)
@@ -380,6 +380,13 @@ func (h *HTTPHandler) login(c *gin.Context) {
 
 		if errors.Is(err, ErrInvalidCredentials) {
 			h.respondOAuthError(c, ErrInvalidCredentials)
+		} else if errors.Is(err, ErrMFARequired) {
+			c.JSON(http.StatusAccepted, gin.H{
+				"mfa_required":   true,
+				"step_up_token":  token,
+				"error":          "mfa_required",
+				"message":        "Additional authentication required due to risk assessment",
+			})
 		} else {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		}
@@ -471,31 +478,26 @@ func (h *HTTPHandler) completeMFALogin(c *gin.Context) {
 		return
 	}
 
-	// Validate TOTP
-	totpSecret, err := h.svc.TOTP().GetByIdentity(c.Request.Context(), tenantID, req.UserID)
-	if err != nil || totpSecret == nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "TOTP not configured"})
-		return
-	}
-
-	if !totp.Validate(req.TOTPCode, totpSecret.Secret) {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid TOTP code"})
+	// Use the service to complete MFA login
+	finalToken, err := h.svc.LoginWithMFAStepUp(c.Request.Context(), req.PendingToken, req.TOTPCode)
+	if err != nil {
+		h.logger.Error("MFA completion failed", zap.Error(err))
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 		return
 	}
 
 	// Set httpOnly cookies for session security
-	setAuthCookies(c, req.PendingToken, "")
+	setAuthCookies(c, finalToken, "")
 
-	// TOTP verified, return the pending token as the final token
-	// Extract roles
-	claims, _ := h.svc.ValidateToken(req.PendingToken)
+	// Extract roles for the response
+	claims, _ := h.svc.ValidateToken(finalToken)
 	roles := []string{}
 	if claims != nil {
 		roles = claims.Roles
 	}
 
 	c.JSON(http.StatusOK, LoginResponse{
-		Token:      req.PendingToken,
+		Token:      finalToken,
 		Roles:      roles,
 		TenantID:   tenantID,
 		TenantSlug: h.tenantSlugForID(c.Request.Context(), tenantID),

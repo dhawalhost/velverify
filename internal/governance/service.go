@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/dhawalhost/wardseal/internal/oauthclient"
 	"github.com/dhawalhost/wardseal/internal/policy"
@@ -41,6 +42,11 @@ type Service interface {
 	AddUserToOrganization(ctx context.Context, tenantID, userID, orgID, role string) error
 	RemoveUserFromOrganization(ctx context.Context, tenantID, userID, orgID string) error
 	ListUserOrganizations(ctx context.Context, tenantID, userID string) ([]string, error)
+
+	// IP Access Policies
+	CreateIPPolicy(ctx context.Context, tenantID string, req CreateIPPolicyRequest) (IPPolicy, error)
+	ListIPPolicies(ctx context.Context, tenantID string) ([]IPPolicy, error)
+	DeleteIPPolicy(ctx context.Context, tenantID, id string) error
 }
 
 type CreateOAuthClientInput struct {
@@ -63,15 +69,15 @@ type UpdateOAuthClientInput struct {
 }
 
 type governanceService struct {
-	clientStore  oauthclient.Store
-	reqStore     Store
-	orgStore     OrganizationStore
+	clientStore  oauthclient.Repository
+	reqStore     Repository
+	orgStore     OrganizationRepository
 	dirClient    DirectoryClient
 	policyEngine policy.Engine
 }
 
 // NewService creates a new governance service.
-func NewService(clientStore oauthclient.Store, reqStore Store, orgStore OrganizationStore, dirClient DirectoryClient, policyEngine policy.Engine) Service {
+func NewService(clientStore oauthclient.Repository, reqStore Repository, orgStore OrganizationRepository, dirClient DirectoryClient, policyEngine policy.Engine) Service {
 	return &governanceService{
 		clientStore:  clientStore,
 		reqStore:     reqStore,
@@ -425,4 +431,45 @@ func nullableString(value string) *string {
 func IsValidationError(err error) bool {
 	var vErr *validationErr
 	return errors.As(err, &vErr)
+}
+
+func (s *governanceService) CreateIPPolicy(ctx context.Context, tenantID string, req CreateIPPolicyRequest) (IPPolicy, error) {
+	if err := requireTenant(tenantID); err != nil {
+		return IPPolicy{}, err
+	}
+
+	p := IPPolicy{
+		ID:          generateShortID(), // Using a helper or uuid
+		TenantID:    tenantID,
+		Type:        req.Type,
+		CIDR:        req.CIDR,
+		CountryCode: req.CountryCode,
+		Reason:      req.Reason,
+	}
+
+	id, err := s.reqStore.CreateIPPolicy(ctx, p)
+	if err != nil {
+		return IPPolicy{}, err
+	}
+	p.ID = id
+	return p, nil
+}
+
+func (s *governanceService) ListIPPolicies(ctx context.Context, tenantID string) ([]IPPolicy, error) {
+	if err := requireTenant(tenantID); err != nil {
+		return nil, err
+	}
+	return s.reqStore.ListIPPolicies(ctx, tenantID)
+}
+
+func (s *governanceService) DeleteIPPolicy(ctx context.Context, tenantID, id string) error {
+	if err := requireTenant(tenantID); err != nil {
+		return err
+	}
+	return s.reqStore.DeleteIPPolicy(ctx, tenantID, id)
+}
+
+func generateShortID() string {
+	// Simple random ID for internal use if not using UUID
+	return fmt.Sprintf("pol_%d", time.Now().UnixNano())
 }

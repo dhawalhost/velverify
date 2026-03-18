@@ -18,13 +18,13 @@ type RedisWebAuthnSessionStoreConfig struct {
 	KeyPrefix string
 }
 
-type redisWebAuthnSessionStore struct {
+type redisWebAuthnSessionRepository struct {
 	client    *redis.Client
 	ttl       time.Duration
 	keyPrefix string
 }
 
-func NewRedisWebAuthnSessionStore(cfg RedisWebAuthnSessionStoreConfig) (WebAuthnSessionStore, error) {
+func NewRedisWebAuthnSessionRepository(cfg RedisWebAuthnSessionStoreConfig) (WebAuthnSessionRepository, error) {
 	if cfg.Addr == "" {
 		return nil, fmt.Errorf("redis address is required")
 	}
@@ -47,18 +47,18 @@ func NewRedisWebAuthnSessionStore(cfg RedisWebAuthnSessionStoreConfig) (WebAuthn
 		return nil, err
 	}
 
-	return &redisWebAuthnSessionStore{
+	return &redisWebAuthnSessionRepository{
 		client:    client,
 		ttl:       cfg.TTL,
 		keyPrefix: cfg.KeyPrefix,
 	}, nil
 }
 
-func (s *redisWebAuthnSessionStore) key(userID string) string {
+func (s *redisWebAuthnSessionRepository) key(userID string) string {
 	return s.keyPrefix + userID
 }
 
-func (s *redisWebAuthnSessionStore) Set(userID string, session webauthn.SessionData) {
+func (s *redisWebAuthnSessionRepository) Set(userID string, session webauthn.SessionData) {
 	payload, err := json.Marshal(session)
 	if err != nil {
 		return
@@ -66,7 +66,7 @@ func (s *redisWebAuthnSessionStore) Set(userID string, session webauthn.SessionD
 	_ = s.client.Set(context.Background(), s.key(userID), payload, s.ttl).Err()
 }
 
-func (s *redisWebAuthnSessionStore) Get(userID string) (webauthn.SessionData, bool) {
+func (s *redisWebAuthnSessionRepository) Get(userID string) (webauthn.SessionData, bool) {
 	value, err := s.client.Get(context.Background(), s.key(userID)).Bytes()
 	if err != nil {
 		return webauthn.SessionData{}, false
@@ -80,6 +80,6 @@ func (s *redisWebAuthnSessionStore) Get(userID string) (webauthn.SessionData, bo
 	return session, true
 }
 
-func (s *redisWebAuthnSessionStore) Delete(userID string) {
+func (s *redisWebAuthnSessionRepository) Delete(userID string) {
 	_ = s.client.Del(context.Background(), s.key(userID)).Err()
 }

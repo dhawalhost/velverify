@@ -25,20 +25,21 @@ type SSOProvider struct {
 	// SAML Fields (omitted for brevity as we are focusing on OIDC Social Login here)
 }
 
-// SSOProviderStore handles database operations for SSO providers.
-type SSOProviderStore interface {
+// SSOProviderRepository handles database operations for SSO providers.
+type SSOProviderRepository interface {
 	GetByName(ctx context.Context, tenantID, name string) (*SSOProvider, error)
 }
 
-type SQLSSOProviderStore struct {
+type sqlSSOProviderRepository struct {
 	db *sqlx.DB
 }
 
-func NewSQLSSOProviderStore(db *sqlx.DB) *SQLSSOProviderStore {
-	return &SQLSSOProviderStore{db: db}
+// NewSSOProviderRepository creates a new SSO provider repository.
+func NewSSOProviderRepository(db *sqlx.DB) SSOProviderRepository {
+	return &sqlSSOProviderRepository{db: db}
 }
 
-func (s *SQLSSOProviderStore) GetByName(ctx context.Context, tenantID, name string) (*SSOProvider, error) {
+func (s *sqlSSOProviderRepository) GetByName(ctx context.Context, tenantID, name string) (*SSOProvider, error) {
 	var p SSOProvider
 	// We select only relevant fields for OIDC/Social login for now
 	query := `

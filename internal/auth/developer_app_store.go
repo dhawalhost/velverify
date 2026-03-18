@@ -35,8 +35,8 @@ type DeveloperApp struct {
 	UpdatedAt        time.Time       `db:"updated_at" json:"updated_at"`
 }
 
-// DeveloperAppStore defines the interface for developer app management.
-type DeveloperAppStore interface {
+// DeveloperAppRepository defines the interface for developer app management.
+type DeveloperAppRepository interface {
 	Create(ctx context.Context, app *DeveloperApp, clientSecret string) error
 	Get(ctx context.Context, tenantID, appID string) (*DeveloperApp, error)
 	GetByClientID(ctx context.Context, clientID string) (*DeveloperApp, error)
@@ -54,13 +54,13 @@ type DeveloperAppStore interface {
 	ListAssignedApps(ctx context.Context, tenantID, userID string) ([]DeveloperApp, error)
 }
 
-type developerAppRepo struct {
+type sqlDeveloperAppRepository struct {
 	db *sqlx.DB
 }
 
-// NewDeveloperAppStore creates a new developer app store.
-func NewDeveloperAppStore(db *sqlx.DB) DeveloperAppStore {
-	return &developerAppRepo{db: db}
+// NewDeveloperAppRepository creates a new developer app repository.
+func NewDeveloperAppRepository(db *sqlx.DB) DeveloperAppRepository {
+	return &sqlDeveloperAppRepository{db: db}
 }
 
 func generateClientID() string {
@@ -75,7 +75,7 @@ func generateClientSecret() string {
 	return "vvs_" + hex.EncodeToString(b)
 }
 
-func (r *developerAppRepo) Create(ctx context.Context, app *DeveloperApp, clientSecret string) error {
+func (r *sqlDeveloperAppRepository) Create(ctx context.Context, app *DeveloperApp, clientSecret string) error {
 	app.ClientID = generateClientID()
 	hash, err := bcrypt.GenerateFromPassword([]byte(clientSecret), bcrypt.DefaultCost)
 	if err != nil {
@@ -112,7 +112,7 @@ func (r *developerAppRepo) Create(ctx context.Context, app *DeveloperApp, client
 	).Scan(&app.ID, &app.CreatedAt, &app.UpdatedAt)
 }
 
-func (r *developerAppRepo) Get(ctx context.Context, tenantID, appID string) (*DeveloperApp, error) {
+func (r *sqlDeveloperAppRepository) Get(ctx context.Context, tenantID, appID string) (*DeveloperApp, error) {
 	var app DeveloperApp
 	query := `SELECT * FROM developer_apps WHERE tenant_id = $1 AND id = $2 AND status != 'deleted'`
 	err := r.db.GetContext(ctx, &app, query, tenantID, appID)
@@ -125,7 +125,7 @@ func (r *developerAppRepo) Get(ctx context.Context, tenantID, appID string) (*De
 	return &app, nil
 }
 
-func (r *developerAppRepo) GetByClientID(ctx context.Context, clientID string) (*DeveloperApp, error) {
+func (r *sqlDeveloperAppRepository) GetByClientID(ctx context.Context, clientID string) (*DeveloperApp, error) {
 	var app DeveloperApp
 	query := `SELECT * FROM developer_apps WHERE client_id = $1 AND status = 'active'`
 	err := r.db.GetContext(ctx, &app, query, clientID)
@@ -138,14 +138,14 @@ func (r *developerAppRepo) GetByClientID(ctx context.Context, clientID string) (
 	return &app, nil
 }
 
-func (r *developerAppRepo) ListByOwner(ctx context.Context, tenantID, ownerID string) ([]DeveloperApp, error) {
+func (r *sqlDeveloperAppRepository) ListByOwner(ctx context.Context, tenantID, ownerID string) ([]DeveloperApp, error) {
 	var apps []DeveloperApp
 	query := `SELECT * FROM developer_apps WHERE tenant_id = $1 AND owner_id = $2 AND status != 'deleted' ORDER BY created_at DESC`
 	err := r.db.SelectContext(ctx, &apps, query, tenantID, ownerID)
 	return apps, err
 }
 
-func (r *developerAppRepo) Update(ctx context.Context, app *DeveloperApp) error {
+func (r *sqlDeveloperAppRepository) Update(ctx context.Context, app *DeveloperApp) error {
 	query := `
 		UPDATE developer_apps 
 		SET name = $1, description = $2, redirect_uris = $3, logo_url = $4, 
@@ -159,13 +159,13 @@ func (r *developerAppRepo) Update(ctx context.Context, app *DeveloperApp) error 
 	return err
 }
 
-func (r *developerAppRepo) Delete(ctx context.Context, tenantID, appID string) error {
+func (r *sqlDeveloperAppRepository) Delete(ctx context.Context, tenantID, appID string) error {
 	query := `UPDATE developer_apps SET status = 'deleted', updated_at = NOW() WHERE tenant_id = $1 AND id = $2`
 	_, err := r.db.ExecContext(ctx, query, tenantID, appID)
 	return err
 }
 
-func (r *developerAppRepo) RotateSecret(ctx context.Context, tenantID, appID string) (string, error) {
+func (r *sqlDeveloperAppRepository) RotateSecret(ctx context.Context, tenantID, appID string) (string, error) {
 	newSecret := generateClientSecret()
 	hash, err := bcrypt.GenerateFromPassword([]byte(newSecret), bcrypt.DefaultCost)
 	if err != nil {
@@ -179,7 +179,7 @@ func (r *developerAppRepo) RotateSecret(ctx context.Context, tenantID, appID str
 	return newSecret, nil
 }
 
-func (r *developerAppRepo) ValidateCredentials(ctx context.Context, clientID, clientSecret string) (*DeveloperApp, error) {
+func (r *sqlDeveloperAppRepository) ValidateCredentials(ctx context.Context, clientID, clientSecret string) (*DeveloperApp, error) {
 	app, err := r.GetByClientID(ctx, clientID)
 	if err != nil {
 		return nil, err
@@ -193,7 +193,7 @@ func (r *developerAppRepo) ValidateCredentials(ctx context.Context, clientID, cl
 	return app, nil
 }
 
-func (r *developerAppRepo) AssignUserToApp(ctx context.Context, tenantID, appID, userID string) error {
+func (r *sqlDeveloperAppRepository) AssignUserToApp(ctx context.Context, tenantID, appID, userID string) error {
 	query := `
 		INSERT INTO developer_app_assignments (tenant_id, app_id, user_id)
 		VALUES ($1, $2, $3)
@@ -203,7 +203,7 @@ func (r *developerAppRepo) AssignUserToApp(ctx context.Context, tenantID, appID,
 	return err
 }
 
-func (r *developerAppRepo) CheckAssignment(ctx context.Context, tenantID, appID, userID string) (bool, error) {
+func (r *sqlDeveloperAppRepository) CheckAssignment(ctx context.Context, tenantID, appID, userID string) (bool, error) {
 	query := `
 		SELECT EXISTS(
 			SELECT 1 FROM developer_app_assignments
@@ -218,7 +218,7 @@ func (r *developerAppRepo) CheckAssignment(ctx context.Context, tenantID, appID,
 	return exists, nil
 }
 
-func (r *developerAppRepo) UnassignUserFromApp(ctx context.Context, tenantID, appID, userID string) error {
+func (r *sqlDeveloperAppRepository) UnassignUserFromApp(ctx context.Context, tenantID, appID, userID string) error {
 	query := `
 		DELETE FROM developer_app_assignments
 		WHERE tenant_id = $1 AND app_id = $2 AND user_id = $3
@@ -227,7 +227,7 @@ func (r *developerAppRepo) UnassignUserFromApp(ctx context.Context, tenantID, ap
 	return err
 }
 
-func (r *developerAppRepo) ListAssignedUsers(ctx context.Context, tenantID, appID string) ([]string, error) {
+func (r *sqlDeveloperAppRepository) ListAssignedUsers(ctx context.Context, tenantID, appID string) ([]string, error) {
 	query := `
 		SELECT user_id FROM developer_app_assignments
 		WHERE tenant_id = $1 AND app_id = $2
@@ -237,7 +237,7 @@ func (r *developerAppRepo) ListAssignedUsers(ctx context.Context, tenantID, appI
 	return users, err
 }
 
-func (r *developerAppRepo) ListAssignedApps(ctx context.Context, tenantID, userID string) ([]DeveloperApp, error) {
+func (r *sqlDeveloperAppRepository) ListAssignedApps(ctx context.Context, tenantID, userID string) ([]DeveloperApp, error) {
 	query := `
 		SELECT a.* FROM developer_apps a
 		JOIN developer_app_assignments aa ON a.id = aa.app_id

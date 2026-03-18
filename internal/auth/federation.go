@@ -21,22 +21,24 @@ type FederatedIdentity struct {
 	UpdatedAt   time.Time `db:"updated_at"`
 }
 
-type FederationStore interface {
+// FederationRepository defines storage for federated identities.
+type FederationRepository interface {
 	Get(ctx context.Context, tenantID, provider, externalID string) (*FederatedIdentity, error)
 	Create(ctx context.Context, identity FederatedIdentity) error
 	List(ctx context.Context, identityID string) ([]FederatedIdentity, error)
 	Delete(ctx context.Context, id string) error
 }
 
-type sqlFederationStore struct {
+type sqlFederationRepository struct {
 	db *sqlx.DB
 }
 
-func NewFederationStore(db *sqlx.DB) FederationStore {
-	return &sqlFederationStore{db: db}
+// NewFederationRepository creates a new FederationRepository.
+func NewFederationRepository(db *sqlx.DB) FederationRepository {
+	return &sqlFederationRepository{db: db}
 }
 
-func (s *sqlFederationStore) Get(ctx context.Context, tenantID, provider, externalID string) (*FederatedIdentity, error) {
+func (s *sqlFederationRepository) Get(ctx context.Context, tenantID, provider, externalID string) (*FederatedIdentity, error) {
 	var f FederatedIdentity
 	err := s.db.GetContext(ctx, &f, `
 		SELECT * FROM federated_identities 
@@ -51,7 +53,7 @@ func (s *sqlFederationStore) Get(ctx context.Context, tenantID, provider, extern
 	return &f, nil
 }
 
-func (s *sqlFederationStore) Create(ctx context.Context, identity FederatedIdentity) error {
+func (s *sqlFederationRepository) Create(ctx context.Context, identity FederatedIdentity) error {
 	query := `
 		INSERT INTO federated_identities (tenant_id, identity_id, provider, external_id, profile_data, created_at, updated_at)
 		VALUES (:tenant_id, :identity_id, :provider, :external_id, :profile_data, NOW(), NOW())
@@ -68,13 +70,13 @@ func (s *sqlFederationStore) Create(ctx context.Context, identity FederatedIdent
 	return nil
 }
 
-func (s *sqlFederationStore) List(ctx context.Context, identityID string) ([]FederatedIdentity, error) {
+func (s *sqlFederationRepository) List(ctx context.Context, identityID string) ([]FederatedIdentity, error) {
 	var identities []FederatedIdentity
 	err := s.db.SelectContext(ctx, &identities, `SELECT * FROM federated_identities WHERE identity_id = $1`, identityID)
 	return identities, err
 }
 
-func (s *sqlFederationStore) Delete(ctx context.Context, id string) error {
+func (s *sqlFederationRepository) Delete(ctx context.Context, id string) error {
 	_, err := s.db.ExecContext(ctx, `DELETE FROM federated_identities WHERE id = $1`, id)
 	return err
 }

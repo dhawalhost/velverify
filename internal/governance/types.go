@@ -75,3 +75,22 @@ type AccessRequestList struct {
 type ApprovalDecision struct {
 	Comment string `json:"comment"`
 }
+
+// IP Access Policy types
+
+type IPPolicy struct {
+	ID          string `json:"id"`
+	TenantID    string `json:"tenant_id"`
+	Type        string `json:"type"` // ALLOW, BLOCK
+	CIDR        string `json:"cidr,omitempty"`
+	CountryCode string `json:"country_code,omitempty"`
+	Reason      string `json:"reason,omitempty"`
+	CreatedAt   string `json:"created_at"`
+}
+
+type CreateIPPolicyRequest struct {
+	Type        string `json:"type" binding:"required,oneof=ALLOW BLOCK"`
+	CIDR        string `json:"cidr"`
+	CountryCode string `json:"country_code"`
+	Reason      string `json:"reason"`
+}

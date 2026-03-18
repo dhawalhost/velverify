@@ -46,6 +46,13 @@ func (h *HTTPHandler) RegisterRoutes(router *gin.Engine) {
 		requests.POST("/:accessRequestID/approve", h.approveAccessRequest)
 		requests.POST("/:accessRequestID/reject", h.rejectAccessRequest)
 	}
+
+	ipPolicies := tenantGroup.Group("/governance/ip-policies")
+	{
+		ipPolicies.GET("", h.listIPPolicies)
+		ipPolicies.POST("", h.createIPPolicy)
+		ipPolicies.DELETE("/:ipPolicyID", h.deleteIPPolicy)
+	}
 }
 
 func (h *HTTPHandler) healthCheck(c *gin.Context) {
@@ -218,6 +225,51 @@ func (h *HTTPHandler) rejectAccessRequest(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"status": "rejected"})
+}
+
+func (h *HTTPHandler) listIPPolicies(c *gin.Context) {
+	tenantID, ok := h.tenantID(c)
+	if !ok {
+		return
+	}
+	policies, err := h.svc.ListIPPolicies(c.Request.Context(), tenantID)
+	if err != nil {
+		h.handleServiceError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"policies": policies})
+}
+
+func (h *HTTPHandler) createIPPolicy(c *gin.Context) {
+	tenantID, ok := h.tenantID(c)
+	if !ok {
+		return
+	}
+	var req CreateIPPolicyRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		h.logger.Error("Failed to bind create ip policy request", zap.Error(err))
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	policy, err := h.svc.CreateIPPolicy(c.Request.Context(), tenantID, req)
+	if err != nil {
+		h.handleServiceError(c, err)
+		return
+	}
+	c.JSON(http.StatusCreated, policy)
+}
+
+func (h *HTTPHandler) deleteIPPolicy(c *gin.Context) {
+	tenantID, ok := h.tenantID(c)
+	if !ok {
+		return
+	}
+	id := c.Param("ipPolicyID")
+	if err := h.svc.DeleteIPPolicy(c.Request.Context(), tenantID, id); err != nil {
+		h.handleServiceError(c, err)
+		return
+	}
+	c.Status(http.StatusNoContent)
 }
 
 func (h *HTTPHandler) tenantID(c *gin.Context) (string, bool) {

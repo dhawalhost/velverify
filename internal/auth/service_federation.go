@@ -177,7 +177,7 @@ func (s *authService) SocialLogin(ctx context.Context, req SocialLoginRequest) (
 	scope := "openid profile email"
 	tokenClientID := socialTokenClientID(req.Provider, clientID)
 
-	return s.issueTokensWithoutRefresh(tenantID, tokenClientID, scope, userID, "")
+	return s.issueTokensWithoutRefresh(ctx, tenantID, tokenClientID, scope, userID, "")
 }
 
 func socialTokenClientID(provider, oidcClientID string) string {

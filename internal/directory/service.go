@@ -2,7 +2,6 @@ package directory
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"strings"
 
@@ -50,7 +49,7 @@ type Service interface {
 }
 
 type directoryService struct {
-	db *sqlx.DB // Use sqlx.DB
+	repo Repository
 }
 
 var ErrInvalidCredentials = errors.New("invalid credentials")
@@ -58,13 +57,12 @@ var ErrAlreadyExists = errors.New("already exists")
 var ErrEmailAlreadyExistsGlobally = errors.New("email already in use globally")
 
 // NewService creates a new directory service.
-func NewService(db *sqlx.DB) Service { // Use sqlx.DB
-	return &directoryService{db: db}
+func NewService(repo Repository) Service {
+	return &directoryService{repo: repo}
 }
 
 func (s *directoryService) HealthCheck(ctx context.Context) (bool, error) {
-	err := s.db.PingContext(ctx)
-	if err != nil {
+	if err := s.repo.HealthCheck(ctx); err != nil {
 		return false, err
 	}
 	return true, nil
@@ -76,257 +74,132 @@ func (s *directoryService) CreateUser(ctx context.Context, tenantID string, user
 		return "", err
 	}
 
-	tx, err := s.db.BeginTxx(ctx, nil) // Use BeginTxx for sqlx
-	if err != nil {
-		return "", err
-	}
-	defer func() { _ = tx.Rollback() }()
-
 	var userID string
-	err = tx.QueryRowxContext(ctx, // Use QueryRowxContext for sqlx
-		`INSERT INTO identities (tenant_id, status) VALUES ($1, $2) RETURNING id`,
-		tenantID, "active").Scan(&userID)
-	if err != nil {
-		return "", err
-	}
-
-	_, err = tx.ExecContext(ctx,
-		`INSERT INTO accounts (identity_id, tenant_id, login, password_hash) VALUES ($1, $2, $3, $4)`,
-		userID, tenantID, user.Email, string(hashedPassword))
-	if err != nil {
-		if strings.Contains(err.Error(), "unique constraint") && strings.Contains(err.Error(), "accounts_login_key") {
-			return "", ErrEmailAlreadyExistsGlobally
+	err = s.repo.WithTransaction(ctx, func(tx *sqlx.Tx) error {
+		var err error
+		userID, err = s.repo.CreateIdentity(ctx, tx, tenantID)
+		if err != nil {
+			return err
 		}
-		return "", err
-	}
 
-	return userID, tx.Commit()
+		err = s.repo.CreateAccount(ctx, tx, userID, tenantID, user.Email, string(hashedPassword))
+		if err != nil {
+			if strings.Contains(err.Error(), "unique constraint") && strings.Contains(err.Error(), "accounts_login_key") {
+				return ErrEmailAlreadyExistsGlobally
+			}
+			return err
+		}
+		return nil
+	})
+
+	return userID, err
 }
 
 func (s *directoryService) GetUserByID(ctx context.Context, tenantID, id string) (User, error) {
-	var user User
-	err := s.db.GetContext(ctx, &user, `SELECT i.id, i.tenant_id, a.login AS email, i.status, i.created_at, i.updated_at
-		 FROM identities i JOIN accounts a ON i.id = a.identity_id WHERE i.id = $1 AND i.tenant_id = $2`,
-		id, tenantID)
-	return user, err
+	return s.repo.GetUserByID(ctx, tenantID, id)
 }
 
 func (s *directoryService) GetUserByEmail(ctx context.Context, tenantID, email string) (User, error) {
-	var user User
-	err := s.db.GetContext(ctx, &user, `SELECT i.id, i.tenant_id, a.login AS email, i.status, i.created_at, i.updated_at
-		 FROM identities i JOIN accounts a ON i.id = a.identity_id WHERE a.login = $1 AND a.tenant_id = $2 AND i.tenant_id = $2`,
-		email, tenantID)
-	return user, err
+	return s.repo.GetUserByEmail(ctx, tenantID, email)
 }
 
 func (s *directoryService) ListUsers(ctx context.Context, tenantID string, limit, offset int) ([]User, int, error) {
-	// Get total count
-	var total int
-	err := s.db.GetContext(ctx, &total, `SELECT COUNT(*) FROM identities WHERE tenant_id = $1`, tenantID)
-	if err != nil {
-		return nil, 0, err
-	}
-
-	// Get paginated users
-	var users []User
-	err = s.db.SelectContext(ctx, &users, `SELECT i.id, i.tenant_id, a.login AS email, i.status, i.created_at, i.updated_at
-		FROM identities i JOIN accounts a ON i.id = a.identity_id 
-		WHERE i.tenant_id = $1 
-		ORDER BY i.created_at DESC 
-		LIMIT $2 OFFSET $3`,
-		tenantID, limit, offset)
-	if err != nil {
-		return nil, 0, err
-	}
-	return users, total, nil
+	return s.repo.ListUsers(ctx, tenantID, limit, offset)
 }
 
 func (s *directoryService) UpdateUser(ctx context.Context, tenantID, id string, user User) error {
-	tx, err := s.db.BeginTxx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = tx.Rollback() }()
+	return s.repo.WithTransaction(ctx, func(tx *sqlx.Tx) error {
+		var passwordHash string
+		if user.Password != "" {
+			hp, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
+			if err != nil {
+				return err
+			}
+			passwordHash = string(hp)
+		}
 
-	if user.Email != "" {
-		_, err := tx.ExecContext(ctx, `UPDATE accounts SET login = $1 WHERE identity_id = $2 AND tenant_id = $3`, user.Email, id, tenantID)
-		if err != nil {
+		if err := s.repo.UpdateIdentity(ctx, tx, tenantID, id, user.Status); err != nil {
 			return err
 		}
-	}
 
-	if user.Password != "" {
-		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
-		if err != nil {
-			return err
-		}
-		_, err = tx.ExecContext(ctx, `UPDATE accounts SET password_hash = $1 WHERE identity_id = $2 AND tenant_id = $3`, string(hashedPassword), id, tenantID)
-		if err != nil {
-			return err
-		}
-	}
-
-	if user.Status != "" {
-		_, err := tx.ExecContext(ctx, `UPDATE identities SET status = $1 WHERE id = $2 AND tenant_id = $3`, user.Status, id, tenantID)
-		if err != nil {
-			return err
-		}
-	}
-
-	_, err = tx.ExecContext(ctx, `UPDATE identities SET updated_at = NOW() WHERE id = $1 AND tenant_id = $2`, id, tenantID)
-	if err != nil {
-		return err
-	}
-
-	return tx.Commit()
+		return s.repo.UpdateAccount(ctx, tx, tenantID, id, user.Email, passwordHash)
+	})
 }
 
 func (s *directoryService) DeleteUser(ctx context.Context, tenantID, id string) error {
-	_, err := s.db.ExecContext(ctx, `DELETE FROM identities WHERE id = $1 AND tenant_id = $2`, id, tenantID)
-	return err
+	return s.repo.DeleteIdentity(ctx, tenantID, id)
 }
 
 func (s *directoryService) CreateGroup(ctx context.Context, tenantID string, group Group) (string, error) {
-	var groupID string
-	err := s.db.QueryRowxContext(ctx,
-		`INSERT INTO groups (tenant_id, name) VALUES ($1, $2) RETURNING id`,
-		tenantID, group.Name).Scan(&groupID)
-	return groupID, err
+	return s.repo.CreateGroup(ctx, tenantID, group.Name)
 }
 
 func (s *directoryService) GetGroupByID(ctx context.Context, tenantID, id string) (Group, error) {
-	var group Group
-	err := s.db.GetContext(ctx, &group, `SELECT id, tenant_id, name, created_at, updated_at FROM groups WHERE id = $1 AND tenant_id = $2`,
-		id, tenantID)
-	return group, err
+	return s.repo.GetGroupByID(ctx, tenantID, id)
 }
 
 func (s *directoryService) ListGroups(ctx context.Context, tenantID string, limit, offset int) ([]Group, int, error) {
-	var total int
-	err := s.db.GetContext(ctx, &total, `SELECT COUNT(*) FROM groups WHERE tenant_id = $1`, tenantID)
-	if err != nil {
-		return nil, 0, err
-	}
-
-	var groups []Group
-	err = s.db.SelectContext(ctx, &groups, `SELECT id, tenant_id, name, created_at, updated_at 
-		FROM groups WHERE tenant_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3`,
-		tenantID, limit, offset)
-	if err != nil {
-		return nil, 0, err
-	}
-	return groups, total, nil
+	return s.repo.ListGroups(ctx, tenantID, limit, offset)
 }
 
 func (s *directoryService) UpdateGroup(ctx context.Context, tenantID, id string, group Group) error {
-	_, err := s.db.ExecContext(ctx, `UPDATE groups SET name = $1, updated_at = NOW() WHERE id = $2 AND tenant_id = $3`, group.Name, id, tenantID)
-	return err
+	return s.repo.UpdateGroup(ctx, tenantID, id, group.Name)
 }
 
 func (s *directoryService) DeleteGroup(ctx context.Context, tenantID, id string) error {
-	_, err := s.db.ExecContext(ctx, `DELETE FROM groups WHERE id = $1 AND tenant_id = $2`, id, tenantID)
-	return err
+	return s.repo.DeleteGroup(ctx, tenantID, id)
 }
 
 func (s *directoryService) AddUserToGroup(ctx context.Context, tenantID, userID, groupID string) error {
-	_, err := s.db.ExecContext(ctx, `INSERT INTO identity_groups (identity_id, group_id, tenant_id)
-	SELECT $1, $2, $3
-	WHERE EXISTS (SELECT 1 FROM identities WHERE id = $1 AND tenant_id = $3)
-	AND EXISTS (SELECT 1 FROM groups WHERE id = $2 AND tenant_id = $3)`, userID, groupID, tenantID)
-	return err
+	return s.repo.AddUserToGroup(ctx, tenantID, userID, groupID)
 }
 
 func (s *directoryService) RemoveUserFromGroup(ctx context.Context, tenantID, userID, groupID string) error {
-	_, err := s.db.ExecContext(ctx, `DELETE FROM identity_groups
-	WHERE identity_id = $1 AND group_id = $2 AND tenant_id = $3`, userID, groupID, tenantID)
-	return err
+	return s.repo.RemoveUserFromGroup(ctx, tenantID, userID, groupID)
 }
 
 func (s *directoryService) VerifyCredentials(ctx context.Context, tenantID, email, password string) (User, error) {
-	var record struct {
-		User
-		PasswordHash string `db:"password_hash"`
-	}
-
-	err := s.db.GetContext(ctx, &record, `SELECT i.id, i.tenant_id, a.login AS email, i.status, i.created_at, i.updated_at, a.password_hash
-		FROM identities i JOIN accounts a ON i.id = a.identity_id
-		WHERE a.login = $1 AND a.tenant_id = $2 AND i.tenant_id = $2`, email, tenantID)
+	user, hash, err := s.repo.GetPasswordHash(ctx, tenantID, email)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return User{}, ErrInvalidCredentials
-		}
-		return User{}, err
-	}
-
-	if err := bcrypt.CompareHashAndPassword([]byte(record.PasswordHash), []byte(password)); err != nil {
 		return User{}, ErrInvalidCredentials
 	}
 
-	return record.User, nil
+	if err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)); err != nil {
+		return User{}, ErrInvalidCredentials
+	}
+
+	return user, nil
 }
 
 func (s *directoryService) GetTenantByEmail(ctx context.Context, email string) (string, error) {
-	var tenantID string
-	// We just need the tenant_id from accounts table
-	err := s.db.GetContext(ctx, &tenantID, `SELECT tenant_id FROM accounts WHERE login = $1 LIMIT 1`, email)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return "", nil // Not found
-		}
-		return "", err
-	}
-	return tenantID, nil
+	return s.repo.GetTenantIDByEmail(ctx, email)
 }
 
 func (s *directoryService) CreateTenant(ctx context.Context, id, name, slug, plan string) error {
-	_, err := s.db.ExecContext(ctx,
-		`INSERT INTO tenants (id, name, slug, plan, created_at, updated_at) VALUES ($1, $2, $3, $4, NOW(), NOW())`,
-		id, name, slug, plan)
+	err := s.repo.CreateTenant(ctx, id, name, slug, plan)
 	if err != nil {
-		// PostgreSql error code 23505 is unique_violation
-		// This is a bit brittle, but works for our Postgres setup.
 		if strings.Contains(err.Error(), "duplicate key value violates unique constraint") {
 			return ErrAlreadyExists
 		}
-		return err
 	}
-	return nil
+	return err
 }
 
 func (s *directoryService) GetTenantIDBySlug(ctx context.Context, slug string) (string, error) {
-	var id string
-	err := s.db.GetContext(ctx, &id, `SELECT id FROM tenants WHERE slug = $1`, slug)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return "", nil // Not found, could be a UUID already
-		}
-		return "", err
-	}
-	return id, nil
+	return s.repo.GetTenantIDBySlug(ctx, slug)
 }
 
 func (s *directoryService) AddUserToOrganization(ctx context.Context, tenantID, userID, orgID, role string) error {
 	if role == "" {
 		role = "member"
 	}
-	_, err := s.db.ExecContext(ctx,
-		`INSERT INTO user_organizations (tenant_id, user_id, org_id, role) VALUES ($1, $2, $3, $4)
-		 ON CONFLICT (tenant_id, user_id, org_id) DO UPDATE SET role = EXCLUDED.role, updated_at = NOW()`,
-		tenantID, userID, orgID, role)
-	return err
+	return s.repo.AddUserToOrganization(ctx, tenantID, userID, orgID, role)
 }
 
 func (s *directoryService) RemoveUserFromOrganization(ctx context.Context, tenantID, userID, orgID string) error {
-	_, err := s.db.ExecContext(ctx,
-		`DELETE FROM user_organizations WHERE tenant_id = $1 AND user_id = $2 AND org_id = $3`,
-		tenantID, userID, orgID)
-	return err
+	return s.repo.RemoveUserFromOrganization(ctx, tenantID, userID, orgID)
 }
 
 func (s *directoryService) ListUserOrganizations(ctx context.Context, tenantID, userID string) ([]string, error) {
-	var orgIDs []string
-	err := s.db.SelectContext(ctx, &orgIDs,
-		`SELECT org_id FROM user_organizations WHERE tenant_id = $1 AND user_id = $2`,
-		tenantID, userID)
-	return orgIDs, err
+	return s.repo.ListUserOrganizations(ctx, tenantID, userID)
 }
