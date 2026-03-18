@@ -224,7 +224,6 @@ services:
         VITE_ENVIRONMENT: local
         VITE_SITE_BASE_URL: http://wardseal.local
         VITE_CONSOLE_BASE_URL: http://manage.wardseal.local
-        VITE_CONSOLE_BASE_URL: http://manage.wardseal.local
         VITE_SUPPORT_EMAIL: support@wardseal.com
     labels:
       - traefik.enable=true

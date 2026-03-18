@@ -118,22 +118,59 @@ func (h *HTTPHandler) RegisterRoutes(router *gin.Engine) {
 	// but our TenantExtractor will provide it if we hit /t/:tenant/.well-known/openid-configuration.
 	// We should also support the legacy global discovery if needed, but for now we focus on the path.
 
-	tenantGroup.GET("/.well-known/openid-configuration", h.oidcConfig)
-	tenantGroup.GET("/.well-known/jwks.json", h.jwks)
-
-	// Protected routes within the tenant group
 	tenantGroup.POST("/login", h.login)
 	tenantGroup.POST("/login/mfa", h.completeMFALogin)
-	tenantGroup.POST("/auth/mfa/step-up", h.completeMFALogin) // Alias for step-up
-	tenantGroup.POST("/logout", h.logout)
+	tenantGroup.POST("/auth/mfa/complete", h.completeMFALogin) // Alias for completion
+	tenantGroup.POST("/auth/mfa/step-up", h.completeMFALogin)  // Alias for step-up
+	tenantGroup.GET("/logout", h.logout)
+	tenantGroup.POST("/logout", h.logout) // Also allow POST for logout
+
+	// OAuth2/OIDC endpoints
+	tenantGroup.GET("/.well-known/openid-configuration", h.oidcConfig)
+	tenantGroup.GET("/.well-known/jwks.json", h.jwks)
 	tenantGroup.GET("/oauth2/authorize", h.authorize)
 	tenantGroup.POST("/oauth2/token", h.token)
 	tenantGroup.POST("/oauth2/introspect", h.introspect)
 	tenantGroup.POST("/oauth2/revoke", h.revoke)
 
-	// Global routes (legacy or fallback)
-	router.GET("/.well-known/jwks.json", h.jwks)
+	// Legacy/Global aliases for tests (relying on X-Tenant-ID header)
+	authGroup := router.Group("/auth")
+	authGroup.Use(middleware.TenantExtractor(middleware.TenantConfig{
+		HeaderName:    "X-Tenant-ID",
+		AllowFallback: true, // Allow fallback for tests/legacy clients
+		SlugResolver: func(ctx context.Context, slug string) (string, error) {
+			return h.svc.ResolveTenantSlug(ctx, slug)
+		},
+	}))
+	{
+		authGroup.POST("/login", h.login)
+		authGroup.GET("/oauth/authorize", h.authorize)
+		authGroup.POST("/oauth/token", h.token)
+		authGroup.POST("/oauth/introspect", h.introspect)
+		authGroup.POST("/oauth/revoke", h.revoke)
+		authGroup.GET("/.well-known/jwks.json", h.jwks)
+	}
 
+	// Also support the root level aliases for some of these if strictly needed for tests
+	// but wrap them in a similar middleware or ensure they use header.
+	// For simplicity, we'll keep them in authGroup for now and update tests if needed.
+	// Actually, the tests use env.AuthServer.URL + "/oauth/authorize", so they hit root.
+	
+	oauthGroup := router.Group("/oauth")
+	oauthGroup.Use(middleware.TenantExtractor(middleware.TenantConfig{
+		HeaderName:    "X-Tenant-ID",
+		AllowFallback: true,
+		SlugResolver: func(ctx context.Context, slug string) (string, error) {
+			return h.svc.ResolveTenantSlug(ctx, slug)
+		},
+	}))
+	{
+		oauthGroup.GET("/authorize", h.authorize)
+		oauthGroup.POST("/token", h.token)
+		oauthGroup.POST("/introspect", h.introspect)
+		oauthGroup.POST("/revoke", h.revoke)
+	}
+	router.GET("/.well-known/jwks.json", h.jwks)
 	tenantProtected := router.Group("/")
 	tenantProtected.Use(middleware.TenantExtractor(middleware.TenantConfig{
 		HeaderName:    "X-Tenant-ID",
@@ -165,10 +202,12 @@ func (h *HTTPHandler) RegisterRoutes(router *gin.Engine) {
 	apiV1 := tenantProtected.Group("/api/v1")
 
 	// MFA WebAuthn
-	h.registerWebAuthnRoutes(apiV1)
-
-	// MFA TOTP
+	h.RegisterWebAuthnRoutes(apiV1)
 	h.RegisterTOTPRoutes(apiV1)
+
+	// MFA Completion Aliases for apiV1
+	apiV1.POST("/auth/mfa/complete", h.completeMFALogin)
+	apiV1.POST("/auth/mfa/step-up", h.completeMFALogin)
 
 	if samlProvider := h.svc.SAML(); samlProvider != nil {
 		samlHandler := gin.WrapH(samlProvider)

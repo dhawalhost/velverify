@@ -24,8 +24,31 @@ func (h *WebhookHTTPHandler) RegisterRoutes(rg *gin.RouterGroup) {
 	{
 		hooks.POST("", h.createWebhook)
 		hooks.GET("", h.listWebhooks)
+		hooks.GET("/:id", h.getWebhook)
 		hooks.DELETE("/:id", h.deleteWebhook)
 	}
+}
+
+func (h *WebhookHTTPHandler) getWebhook(c *gin.Context) {
+	tenantID, ok := h.tenantID(c)
+	if !ok {
+		return
+	}
+
+	id := c.Param("id")
+	hook, err := h.svc.GetWebhook(c.Request.Context(), tenantID, id)
+	if err != nil {
+		h.logger.Error("Failed to get webhook", zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get webhook"})
+		return
+	}
+
+	if hook == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "webhook not found"})
+		return
+	}
+
+	c.JSON(http.StatusOK, hook)
 }
 
 func (h *WebhookHTTPHandler) tenantID(c *gin.Context) (string, bool) {

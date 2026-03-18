@@ -31,16 +31,16 @@ func (s *service) CreateWebhook(ctx context.Context, tenantID, url, secret strin
 	return id, nil
 }
 
-func (s *service) GetWebhook(ctx context.Context, tenantID, id string) (Webhook, error) {
+func (s *service) GetWebhook(ctx context.Context, tenantID, id string) (*Webhook, error) {
 	var w Webhook
 	err := s.db.GetContext(ctx, &w, `SELECT * FROM webhooks WHERE id = $1 AND tenant_id = $2`, id, tenantID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return Webhook{}, fmt.Errorf("webhook not found")
+			return nil, nil
 		}
-		return Webhook{}, fmt.Errorf("get webhook: %w", err)
+		return nil, fmt.Errorf("get webhook: %w", err)
 	}
-	return w, nil
+	return &w, nil
 }
 
 func (s *service) ListWebhooks(ctx context.Context, tenantID string) ([]Webhook, error) {

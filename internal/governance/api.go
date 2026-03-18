@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/dhawalhost/wardseal/internal/oauthclient"
+	"github.com/dhawalhost/wardseal/internal/webhook"
 	"github.com/dhawalhost/wardseal/pkg/middleware"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
@@ -13,13 +14,22 @@ import (
 
 // HTTPHandler represents the HTTP API handlers for the governance service.
 type HTTPHandler struct {
-	svc    Service
-	logger *zap.Logger
+	svc             Service
+	campaignHandler *CampaignHTTPHandler
+	webhookHandler  *WebhookHTTPHandler
+	orgHandler      *OrganizationHandler
+	logger          *zap.Logger
 }
 
 // NewHTTPHandler creates a new HTTPHandler.
-func NewHTTPHandler(svc Service, logger *zap.Logger) *HTTPHandler {
-	return &HTTPHandler{svc: svc, logger: logger}
+func NewHTTPHandler(svc Service, campaignSvc CampaignService, webhookSvc webhook.Service, logger *zap.Logger) *HTTPHandler {
+	return &HTTPHandler{
+		svc:             svc,
+		campaignHandler: NewCampaignHTTPHandler(campaignSvc, logger),
+		webhookHandler:  NewWebhookHTTPHandler(webhookSvc, logger),
+		orgHandler:      NewOrganizationHandler(svc, logger),
+		logger:          logger,
+	}
 }
 
 // RegisterRoutes registers the governance routes.
@@ -53,6 +63,11 @@ func (h *HTTPHandler) RegisterRoutes(router *gin.Engine) {
 		ipPolicies.POST("", h.createIPPolicy)
 		ipPolicies.DELETE("/:ipPolicyID", h.deleteIPPolicy)
 	}
+
+	// Registered combined routes
+	h.orgHandler.RegisterRoutes(tenantGroup)
+	h.campaignHandler.RegisterRoutes(tenantGroup)
+	h.webhookHandler.RegisterRoutes(tenantGroup)
 }
 
 func (h *HTTPHandler) healthCheck(c *gin.Context) {

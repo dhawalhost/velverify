@@ -250,6 +250,8 @@ if [[ ! -d "../wardseal-docs" ]]; then
   warn "wardseal-docs directory not found at ../wardseal-docs — skipping"
 fi
 
+fi # end --skip-build
+
 # If using native containerd (not cri-dockerd), import images into k8s.io namespace
 if [[ "$SKIP_BUILD" == "true" ]]; then
   pass "--skip-build: skipping containerd import"

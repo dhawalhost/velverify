@@ -52,6 +52,12 @@ func (s *service) CreateProvider(ctx context.Context, tenantID string, p Provide
 
 	p.TenantID = tenantID
 	p.Enabled = true
+
+	// Default attribute_mappings to empty JSON if nil
+	if p.AttributeMappings == nil {
+		p.AttributeMappings = []byte("{}")
+	}
+
 	return s.store.Create(ctx, p)
 }
 
@@ -72,6 +78,11 @@ func (s *service) UpdateProvider(ctx context.Context, tenantID string, p Provide
 	// Can't change type
 	if p.Type != existing.Type {
 		return fmt.Errorf("cannot change provider type")
+	}
+
+	// Default attribute_mappings to empty JSON if nil
+	if p.AttributeMappings == nil {
+		p.AttributeMappings = []byte("{}")
 	}
 
 	p.TenantID = tenantID

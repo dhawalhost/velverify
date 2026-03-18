@@ -182,8 +182,8 @@ func TestLoginEndpoint(t *testing.T) {
 	// Test login with valid credentials
 	t.Run("ValidCredentials", func(t *testing.T) {
 		loginReq := map[string]interface{}{
-			"email":    env.TestUserEmail,
-			"password": "password", // bcrypt hash in setupTestData
+			"username": env.TestUserEmail,
+			"password": "password1234", // bcrypt hash in setupTestData (min 8 chars)
 		}
 		resp := client.Post(t, "/auth/login", loginReq)
 		// Note: This might fail if directory service is not properly connected
@@ -196,8 +196,8 @@ func TestLoginEndpoint(t *testing.T) {
 	// Test login with invalid credentials
 	t.Run("InvalidCredentials", func(t *testing.T) {
 		loginReq := map[string]interface{}{
-			"email":    "nonexistent@wardseal.com",
-			"password": "wrongpassword",
+			"username": "nonexistent@wardseal.com",
+			"password": "wrongpassword1",
 		}
 		resp := client.Post(t, "/auth/login", loginReq)
 		AssertStatus(t, resp, http.StatusUnauthorized)

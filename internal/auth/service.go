@@ -264,6 +264,8 @@ func NewService(cfg Config) (Service, error) {
 	if cfg.RevocationStore != nil {
 		revocationStore = cfg.RevocationStore
 	}
+	webAuthnStore := cfg.WebAuthnStore
+	totpStore := cfg.TOTPStore
 
 	// Initialize KMS Signer - use provided signer or create ephemeral local signer
 	signer := cfg.Signer
@@ -296,7 +298,8 @@ func NewService(cfg Config) (Service, error) {
 		signalStore:         cfg.SignalStore,
 		riskEngine:          NewRiskEngine(cfg.DeviceStore, cfg.SignalStore, zap.L()).WithIPPolicy(cfg.IPPolicyStore, nil),
 		webAuthn:            w,
-		webAuthnStore:       cfg.WebAuthnStore,
+		webAuthnStore:       webAuthnStore,
+		totpStore:           totpStore,
 		federationStore:     cfg.FederationStore,
 		brandingStore:       cfg.BrandingStore,
 		ssoProviderStore:    cfg.SSOProviderStore,
@@ -1382,11 +1385,13 @@ func verifyClientSecret(secret string, hash []byte) error {
 }
 
 func (s *authService) BeginWebAuthnRegistration(ctx context.Context, userID string) (*protocol.CredentialCreation, *webauthn.SessionData, error) {
-	// 1. Fetch user (or create dummy adapter)
-	// We need Name and DisplayName. For MVP, reusing ID as name or fetching from DirSvc is hard without token.
-	// But usually registration happens when user is already logged in? Yes.
-	// We can fetch from DirSvc? Or just use what we have.
-	// Let's assume we fetch basic info or use placeholder if allow.
+	if s.webAuthnStore == nil {
+		return nil, nil, errors.New("webauthn store not configured")
+	}
+	if s.webAuthn == nil {
+		return nil, nil, errors.New("webauthn provider not initialized")
+	}
+
 	user := &WebAuthnUser{
 		ID:          userID,
 		Name:        userID, // ideally email
@@ -1403,6 +1408,13 @@ func (s *authService) BeginWebAuthnRegistration(ctx context.Context, userID stri
 }
 
 func (s *authService) FinishWebAuthnRegistration(ctx context.Context, userID string, session webauthn.SessionData, req *http.Request) error {
+	if s.webAuthn == nil {
+		return errors.New("webauthn provider not initialized")
+	}
+	if s.webAuthnStore == nil {
+		return errors.New("webauthn store not configured")
+	}
+
 	user := &WebAuthnUser{
 		ID: userID,
 	}
@@ -1421,6 +1433,13 @@ func (s *authService) FinishWebAuthnRegistration(ctx context.Context, userID str
 }
 
 func (s *authService) BeginWebAuthnLogin(ctx context.Context, userID string) (*protocol.CredentialAssertion, *webauthn.SessionData, error) {
+	if s.webAuthnStore == nil {
+		return nil, nil, errors.New("webauthn store not configured")
+	}
+	if s.webAuthn == nil {
+		return nil, nil, errors.New("webauthn provider not initialized")
+	}
+
 	// 1. Fetch user and credentials
 	// Login might be "usernameless" (discoverable credentials) or username-first.
 	// We are doing username-first for now implies we know userID.

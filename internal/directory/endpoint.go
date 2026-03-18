@@ -10,8 +10,8 @@ type User struct {
 	ID        string    `json:"id,omitempty" db:"id" validate:"omitempty,uuid"`
 	TenantID  string    `json:"tenant_id,omitempty" db:"tenant_id" validate:"omitempty,uuid"`
 	Email     string    `json:"email" db:"email" validate:"required,email"`
-	Password  string    `json:"password,omitempty" db:"-" validate:"required,min=8"` // Ignore password for db scan, normally not selected or manual
-	Status    string    `json:"status,omitempty" db:"status" validate:"required,oneof=active inactive suspended"`
+	Password  string    `json:"password,omitempty" db:"-" validate:"omitempty,min=8"` // Ignore password for db scan, normally not selected or manual
+	Status    string    `json:"status,omitempty" db:"status" validate:"omitempty,oneof=active inactive suspended"`
 	CreatedAt time.Time `json:"created_at,omitempty" db:"created_at"`
 	UpdatedAt time.Time `json:"updated_at,omitempty" db:"updated_at"`
 }

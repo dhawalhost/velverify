@@ -3,6 +3,8 @@
 package integration
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"testing"
@@ -130,7 +132,7 @@ func TestAccessRequestWorkflow(t *testing.T) {
 		createReq := map[string]interface{}{
 			"requester_id":  env.TestUserID,
 			"resource_type": "application",
-			"resource_id":   "app-123",
+			"resource_id":   "00000000-0000-0000-0000-000000000777",
 			"justification": "Need access for testing",
 		}
 		resp := client.Post(t, "/api/v1/governance/requests", createReq)
@@ -143,10 +145,16 @@ func TestAccessRequestWorkflow(t *testing.T) {
 			t.Fatal("Expected request ID in response")
 		}
 
-		// Approve the request
-		approveResp := client.Post(t, fmt.Sprintf("/api/v1/governance/requests/%s/approve", requestID), map[string]interface{}{
-			"comment": "Approved for testing",
-		})
+		// Approve the request (needs X-User-ID header)
+		approveBody, _ := json.Marshal(map[string]interface{}{"comment": "Approved for testing"})
+		approveReq, _ := http.NewRequest(http.MethodPost, env.GovServer.URL+fmt.Sprintf("/api/v1/governance/requests/%s/approve", requestID), bytes.NewBuffer(approveBody))
+		approveReq.Header.Set("Content-Type", "application/json")
+		approveReq.Header.Set("X-Tenant-ID", env.TestTenantID)
+		approveReq.Header.Set("X-User-ID", "00000000-0000-0000-0000-000000000888") // Different from requester
+		approveResp, err := http.DefaultClient.Do(approveReq)
+		if err != nil {
+			t.Fatalf("Approve request failed: %v", err)
+		}
 		AssertStatus(t, approveResp, http.StatusOK)
 	})
 
@@ -156,7 +164,7 @@ func TestAccessRequestWorkflow(t *testing.T) {
 		createReq := map[string]interface{}{
 			"requester_id":  env.TestUserID,
 			"resource_type": "application",
-			"resource_id":   "app-456",
+			"resource_id":   "00000000-0000-0000-0000-000000000456",
 			"justification": "Need access for testing",
 		}
 		resp := client.Post(t, "/api/v1/governance/requests", createReq)
@@ -169,10 +177,16 @@ func TestAccessRequestWorkflow(t *testing.T) {
 			t.Fatal("Expected request ID in response")
 		}
 
-		// Reject the request
-		rejectResp := client.Post(t, fmt.Sprintf("/api/v1/governance/requests/%s/reject", requestID), map[string]interface{}{
-			"comment": "Rejected for testing",
-		})
+		// Reject the request (needs X-User-ID header)
+		rejectBody, _ := json.Marshal(map[string]interface{}{"comment": "Rejected for testing"})
+		rejectReq, _ := http.NewRequest(http.MethodPost, env.GovServer.URL+fmt.Sprintf("/api/v1/governance/requests/%s/reject", requestID), bytes.NewBuffer(rejectBody))
+		rejectReq.Header.Set("Content-Type", "application/json")
+		rejectReq.Header.Set("X-Tenant-ID", env.TestTenantID)
+		rejectReq.Header.Set("X-User-ID", env.TestUserID)
+		rejectResp, err := http.DefaultClient.Do(rejectReq)
+		if err != nil {
+			t.Fatalf("Reject request failed: %v", err)
+		}
 		AssertStatus(t, rejectResp, http.StatusOK)
 	})
 

@@ -1,6 +1,7 @@
 package directory
 
 import (
+	"database/sql"
 	"errors"
 	"net/http"
 
@@ -150,6 +151,10 @@ func (h *HTTPHandler) getUserByID(c *gin.Context) {
 
 	user, err := h.svc.GetUserByID(c.Request.Context(), tenantID, req.ID)
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
+			return
+		}
 		h.logger.Error("Get user by ID failed", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -175,6 +180,10 @@ func (h *HTTPHandler) listUsers(c *gin.Context) {
 
 		user, err := h.svc.GetUserByEmail(c.Request.Context(), tenantID, req.Email)
 		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				c.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
+				return
+			}
 			h.logger.Error("Get user by email failed", zap.Error(err))
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
@@ -298,6 +307,10 @@ func (h *HTTPHandler) getGroupByID(c *gin.Context) {
 
 	group, err := h.svc.GetGroupByID(c.Request.Context(), tenantID, req.ID)
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "group not found"})
+			return
+		}
 		h.logger.Error("Get group by ID failed", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

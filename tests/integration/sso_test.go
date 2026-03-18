@@ -22,12 +22,12 @@ func TestSSOProviderCRUD(t *testing.T) {
 	// 1. Create SSO Provider
 	t.Run("Create", func(t *testing.T) {
 		createReq := map[string]interface{}{
-			"name":          "Test OIDC Provider",
-			"type":          "oidc",
-			"client_id":     "test-client-id",
-			"client_secret": "test-client-secret",
-			"issuer_url":    "https://accounts.google.com",
-			"enabled":       false,
+			"name":               "Test OIDC Provider",
+			"type":               "oidc",
+			"oidc_client_id":     "test-client-id",
+			"oidc_client_secret": "test-client-secret",
+			"oidc_issuer_url":    "https://accounts.google.com",
+			"enabled":            false,
 		}
 		resp := client.Post(t, "/api/v1/sso/providers", createReq)
 		AssertStatus(t, resp, http.StatusCreated)
@@ -72,10 +72,11 @@ func TestSSOProviderCRUD(t *testing.T) {
 			t.Skip("No provider ID from create step")
 		}
 		updateReq := map[string]interface{}{
-			"name":          "Updated OIDC Provider",
-			"client_id":     "updated-client-id",
-			"client_secret": "updated-secret",
-			"issuer_url":    "https://accounts.google.com",
+			"name":               "Updated OIDC Provider",
+			"type":               "oidc",
+			"oidc_client_id":     "updated-client-id",
+			"oidc_client_secret": "updated-secret",
+			"oidc_issuer_url":    "https://accounts.google.com/updated",
 		}
 		resp := client.Put(t, "/api/v1/sso/providers/"+createdProviderID, updateReq)
 		AssertStatus(t, resp, http.StatusOK)

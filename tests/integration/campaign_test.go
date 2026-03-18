@@ -24,7 +24,7 @@ func TestCampaignCRUD(t *testing.T) {
 		createReq := map[string]interface{}{
 			"name":        "Q1 Access Review",
 			"description": "Quarterly access certification",
-			"owner_id":    env.TestUserID,
+			"reviewer_id": env.TestUserID,
 			"type":        "user_access",
 		}
 		resp := client.Post(t, "/api/v1/campaigns", createReq)
@@ -88,7 +88,7 @@ func TestCampaignCRUD(t *testing.T) {
 		createReq := map[string]interface{}{
 			"name":        "Delete Test Campaign",
 			"description": "Campaign for deletion testing",
-			"owner_id":    env.TestUserID,
+			"reviewer_id": env.TestUserID,
 			"type":        "user_access",
 		}
 		createResp := client.Post(t, "/api/v1/campaigns", createReq)
@@ -118,7 +118,7 @@ func TestCampaignReviewItems(t *testing.T) {
 	createResp := client.Post(t, "/api/v1/campaigns", map[string]interface{}{
 		"name":        "Review Items Test Campaign",
 		"description": "Campaign for review item testing",
-		"owner_id":    env.TestUserID,
+		"reviewer_id": env.TestUserID,
 		"type":        "user_access",
 	})
 	AssertStatus(t, createResp, http.StatusCreated)
@@ -132,7 +132,7 @@ func TestCampaignReviewItems(t *testing.T) {
 		itemReq := map[string]interface{}{
 			"user_id":       env.TestUserID,
 			"resource_type": "application",
-			"resource_id":   "app-123",
+			"resource_id":   "00000000-0000-0000-0000-000000000777",
 			"resource_name": "Test Application",
 			"reviewer_id":   env.TestUserID,
 		}
@@ -183,7 +183,7 @@ func TestCampaignCancel(t *testing.T) {
 	createResp := client.Post(t, "/api/v1/campaigns", map[string]interface{}{
 		"name":        "Cancel Test Campaign",
 		"description": "Campaign for cancel testing",
-		"owner_id":    env.TestUserID,
+		"reviewer_id": env.TestUserID,
 		"type":        "user_access",
 	})
 	AssertStatus(t, createResp, http.StatusCreated)

@@ -229,10 +229,11 @@ func (r *sqlRepository) DeleteGroup(ctx context.Context, tenantID, id string) er
 }
 
 func (r *sqlRepository) AddUserToGroup(ctx context.Context, tenantID, userID, groupID string) error {
-	_, err := r.db.ExecContext(ctx, `INSERT INTO identity_groups (identity_id, group_id, tenant_id)
-	SELECT $1, $2, $3
-	WHERE EXISTS (SELECT 1 FROM identities WHERE id = $1 AND tenant_id = $3)
-	AND EXISTS (SELECT 1 FROM groups WHERE id = $2 AND tenant_id = $3)`, userID, groupID, tenantID)
+	query := `INSERT INTO identity_groups (identity_id, group_id, tenant_id)
+		SELECT $1::uuid, $2::uuid, $3::varchar
+		WHERE EXISTS (SELECT 1 FROM identities WHERE id = $1::uuid AND tenant_id = $3::varchar)
+		AND EXISTS (SELECT 1 FROM groups WHERE id = $2::uuid AND tenant_id = $3::varchar)`
+	_, err := r.db.ExecContext(ctx, query, userID, groupID, tenantID)
 	return err
 }
 

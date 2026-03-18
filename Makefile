@@ -104,7 +104,7 @@ test-coverage: ## Run tests with coverage report
 
 test-integration: ## Run integration tests (requires PostgreSQL)
 	@echo "Running integration tests..."
-	TEST_DB_HOST=localhost \
+	TEST_DB_HOST=127.0.0.1 \
 	TEST_DB_USER=user \
 	TEST_DB_PASSWORD=password \
 	TEST_DB_NAME=identity_platform_test \

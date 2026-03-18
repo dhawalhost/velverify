@@ -13,13 +13,19 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dhawalhost/wardseal/internal/audit"
 	"github.com/dhawalhost/wardseal/internal/auth"
+	"github.com/dhawalhost/wardseal/internal/connector"
 	"github.com/dhawalhost/wardseal/internal/directory"
 	"github.com/dhawalhost/wardseal/internal/governance"
 	"github.com/dhawalhost/wardseal/internal/oauthclient"
 	"github.com/dhawalhost/wardseal/internal/policy"
+	"github.com/dhawalhost/wardseal/internal/rbac"
+	"github.com/dhawalhost/wardseal/internal/sso"
+	"github.com/dhawalhost/wardseal/internal/webhook"
 	"github.com/dhawalhost/wardseal/internal/saml"
 	"github.com/dhawalhost/wardseal/pkg/database"
+	"github.com/dhawalhost/wardseal/pkg/middleware"
 	"github.com/gin-gonic/gin"
 	"github.com/jmoiron/sqlx"
 	"go.uber.org/zap"
@@ -47,7 +53,7 @@ func SetupTestEnv(t *testing.T) *TestEnv {
 	// Use environment variable for database connection or default to local
 	dbHost := os.Getenv("TEST_DB_HOST")
 	if dbHost == "" {
-		dbHost = "localhost"
+		dbHost = "127.0.0.1"
 	}
 
 	dbConfig := database.Config{
@@ -131,12 +137,22 @@ func (env *TestEnv) setupTestData(t *testing.T) {
 
 	// Create account for the user
 	_, err = env.DB.ExecContext(ctx, `
-		INSERT INTO accounts (identity_id, tenant_id, login, password_hash, created_at, updated_at)
-		VALUES ($1, $2, $3, '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', NOW(), NOW())
+		INSERT INTO accounts (identity_id, tenant_id, login, password_hash)
+		VALUES ($1, $2, $3, '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy')
 		ON CONFLICT (tenant_id, login) DO NOTHING
 	`, userID, env.TestTenantID, env.TestUserEmail)
 	if err != nil {
 		t.Logf("Note: account creation skipped (may already exist): %v", err)
+	}
+
+	// Create test OAuth client
+	_, err = env.DB.ExecContext(ctx, `
+		INSERT INTO oauth_clients (tenant_id, client_id, client_type, name, redirect_uris, allowed_scopes)
+		VALUES ($1, $2, $3, $4, $5, $6)
+		ON CONFLICT (tenant_id, client_id) DO NOTHING
+	`, env.TestTenantID, "test-client", "public", "Test Client", "{https://app.wardseal.com/callback}", "{openid,profile,email}")
+	if err != nil {
+		t.Fatalf("Failed to create test OAuth client: %v", err)
 	}
 }
 
@@ -145,6 +161,14 @@ func (env *TestEnv) cleanupTestData(t *testing.T) {
 	ctx := context.Background()
 
 	// Clean up in reverse order of dependencies
+	env.DB.ExecContext(ctx, `DELETE FROM certification_items WHERE tenant_id = $1`, env.TestTenantID)
+	env.DB.ExecContext(ctx, `DELETE FROM certification_campaigns WHERE tenant_id = $1`, env.TestTenantID)
+	env.DB.ExecContext(ctx, `DELETE FROM user_roles WHERE tenant_id = $1`, env.TestTenantID)
+	env.DB.ExecContext(ctx, `DELETE FROM permissions WHERE tenant_id = $1`, env.TestTenantID)
+	env.DB.ExecContext(ctx, `DELETE FROM roles WHERE tenant_id = $1`, env.TestTenantID)
+	env.DB.ExecContext(ctx, `DELETE FROM sso_providers WHERE tenant_id = $1`, env.TestTenantID)
+	env.DB.ExecContext(ctx, `DELETE FROM webhooks WHERE tenant_id = $1`, env.TestTenantID)
+	env.DB.ExecContext(ctx, `DELETE FROM connectors WHERE tenant_id = $1`, env.TestTenantID)
 	env.DB.ExecContext(ctx, `DELETE FROM accounts WHERE tenant_id = $1`, env.TestTenantID)
 	env.DB.ExecContext(ctx, `DELETE FROM identities WHERE tenant_id = $1`, env.TestTenantID)
 	env.DB.ExecContext(ctx, `DELETE FROM oauth_clients WHERE tenant_id = $1`, env.TestTenantID)
@@ -156,44 +180,84 @@ func (env *TestEnv) setupServers(t *testing.T) {
 	t.Helper()
 
 	// Setup Directory Service
-	dirSvc := directory.NewService(env.DB)
-	dirHandler := directory.NewHTTPHandler(dirSvc, env.Logger, directory.HTTPHandlerConfig{})
+	dirRepo := directory.NewRepository(env.DB)
+	dirSvc := directory.NewService(dirRepo)
+	dirHandler := directory.NewHTTPHandler(dirSvc, env.Logger, directory.HTTPHandlerConfig{
+		ServiceAuthHeader: "X-Internal-Service-Auth",
+		ServiceAuthToken:  "test-service-token",
+	})
 	dirRouter := gin.New()
 	dirHandler.RegisterRoutes(dirRouter)
 	env.DirServer = httptest.NewServer(dirRouter)
 
 	// Setup Governance Service
 	clientStore := oauthclient.NewRepository(env.DB)
-	reqStore := governance.NewStore(env.DB)
-	dirClient := governance.NewDirectoryClient(env.DirServer.URL)
+	reqStore := governance.NewRepository(env.DB)
+	orgRepo := governance.NewOrganizationRepository(env.DB)
+	dirClient := governance.NewDirectoryClient(env.DirServer.URL, "", "")
 	policyEngine := policy.NewSimpleEngine()
-	govSvc := governance.NewService(clientStore, reqStore, dirClient, policyEngine)
-	govHandler := governance.NewHTTPHandler(govSvc, env.Logger)
+
+	govSvc := governance.NewService(clientStore, reqStore, orgRepo, dirClient, policyEngine)
+	campaignSvc := governance.NewCampaignService(governance.NewCampaignRepository(env.DB), dirClient)
+	webhookSvc := webhook.NewService(env.DB)
+
+	govHandler := governance.NewHTTPHandler(govSvc, campaignSvc, webhookSvc, env.Logger)
 	govRouter := gin.New()
-	govHandler.RegisterRoutes(govRouter)
+	apiGroup := govRouter.Group("/api/v1")
+	apiGroup.Use(middleware.TenantExtractor(middleware.TenantConfig{
+		SlugResolver: govSvc.ResolveTenantSlug,
+	}))
+
+	govHandler.RegisterRoutes(govRouter) // Note: New Governance API handles sub-routes properly
+
+	// Register other handlers that share the same API group
+	rbacRepo := rbac.NewRepository(env.DB)
+	rbacSvc := rbac.NewService(rbacRepo)
+	rbacHandler := rbac.NewHTTPHandler(rbacSvc, env.Logger)
+	rbacHandler.RegisterRoutes(apiGroup)
+
+	ssoRepo := sso.NewRepository(env.DB)
+	ssoSvc := sso.NewService(ssoRepo)
+	ssoHandler := sso.NewHTTPHandler(ssoSvc, env.Logger)
+	ssoHandler.RegisterRoutes(apiGroup)
+
+	auditRepo := audit.NewRepository(env.DB)
+	auditSvc := audit.NewService(auditRepo)
+	auditHandler := audit.NewHTTPHandler(auditSvc, env.Logger)
+	auditHandler.RegisterRoutes(apiGroup)
+
+	connectorRepo := connector.NewRepository(env.DB)
+	connectorRegistry := connector.NewRegistry()
+	connectorSvc := connector.NewService(connectorRepo, connectorRegistry)
+	connectorHandler := connector.NewHTTPHandler(connectorSvc, env.Logger)
+	connectorHandler.RegisterRoutes(apiGroup)
+
 	env.GovServer = httptest.NewServer(govRouter)
 
 	// Setup Auth Service
 	samlStore := saml.NewStore(nil)
+	loginAttemptStore := auth.NewLoginAttemptRepository(env.DB)
+	appStore := auth.NewDeveloperAppRepository(env.DB)
+
 	authSvc, err := auth.NewService(auth.Config{
 		BaseURL:             "http://localhost:8080",
 		DirectoryServiceURL: env.DirServer.URL,
 		SAMLStore:           samlStore,
 		ClientStore:         clientStore,
-		Clients: []auth.ClientConfig{
-			{
-				ID:            "test-client",
-				TenantID:      env.TestTenantID,
-				Name:          "Test Client",
-				RedirectURIs:  []string{"https://app.wardseal.com/callback"},
-				AllowedScopes: []string{"openid", "profile", "email"},
-			},
-		},
+		WebAuthnStore:       auth.NewWebAuthnRepository(env.DB),
+		TOTPStore:           auth.NewTOTPRepository(env.DB),
+		SSOProviderStore:    auth.NewSSOProviderRepository(env.DB),
+		BrandingStore:       auth.NewBrandingRepository(env.DB),
+		FederationStore:     auth.NewFederationRepository(env.DB),
+		AppStore:            appStore,
+		RBACStore:           rbacRepo,
+		IPPolicyStore:       auth.NewIPPolicyRepository(env.DB),
+		TenantStore:         auth.NewTenantRepository(env.DB),
 	})
 	if err != nil {
 		t.Fatalf("Failed to create auth service: %v", err)
 	}
-	authHandler := auth.NewHTTPHandler(authSvc, env.Logger, nil)
+	authHandler := auth.NewHTTPHandler(authSvc, env.Logger, loginAttemptStore, appStore)
 	authRouter := gin.New()
 	authHandler.RegisterRoutes(authRouter)
 	env.AuthServer = httptest.NewServer(authRouter)
@@ -312,6 +376,14 @@ func envOr(key, fallback string) string {
 		return value
 	}
 	return fallback
+}
+
+func mustJSON(v interface{}) io.Reader {
+	b, err := json.Marshal(v)
+	if err != nil {
+		panic(err)
+	}
+	return bytes.NewBuffer(b)
 }
 
 // Placeholder test to verify compilation

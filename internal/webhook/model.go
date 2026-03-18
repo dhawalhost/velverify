@@ -22,7 +22,7 @@ type Webhook struct {
 // Service defines the interface for managing webhooks.
 type Service interface {
 	CreateWebhook(ctx context.Context, tenantID, url, secret string, events []string) (string, error)
-	GetWebhook(ctx context.Context, tenantID, id string) (Webhook, error)
+	GetWebhook(ctx context.Context, tenantID, id string) (*Webhook, error)
 	ListWebhooks(ctx context.Context, tenantID string) ([]Webhook, error)
 	DeleteWebhook(ctx context.Context, tenantID, id string) error
 	GetWebhooksForEvent(ctx context.Context, tenantID, event string) ([]Webhook, error)

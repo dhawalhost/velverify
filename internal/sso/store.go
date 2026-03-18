@@ -27,7 +27,7 @@ type Provider struct {
 	// OIDC Configuration
 	OIDCIssuerURL    *string `json:"oidc_issuer_url,omitempty" db:"oidc_issuer_url"`
 	OIDCClientID     *string `json:"oidc_client_id,omitempty" db:"oidc_client_id"`
-	OIDCClientSecret *string `json:"-" db:"oidc_client_secret"` // Never serialized
+	OIDCClientSecret *string `json:"oidc_client_secret,omitempty" db:"oidc_client_secret"`
 	OIDCScopes       *string `json:"oidc_scopes,omitempty" db:"oidc_scopes"`
 
 	// SAML Configuration

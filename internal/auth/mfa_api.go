@@ -7,7 +7,7 @@ import (
 	"go.uber.org/zap"
 )
 
-func (h *HTTPHandler) registerWebAuthnRoutes(rg *gin.RouterGroup) {
+func (h *HTTPHandler) RegisterWebAuthnRoutes(rg *gin.RouterGroup) {
 	rg.POST("/mfa/webauthn/register/begin", h.beginWebAuthnRegistration)
 	rg.POST("/mfa/webauthn/register/finish", h.finishWebAuthnRegistration)
 	rg.POST("/mfa/webauthn/login/begin", h.beginWebAuthnLogin)
@@ -87,6 +87,10 @@ func (h *HTTPHandler) beginWebAuthnLogin(c *gin.Context) {
 	var req BeginLoginRequest
 	if err := c.BindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
+		return
+	}
+	if req.UserID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "user_id required"})
 		return
 	}
 

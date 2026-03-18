@@ -41,6 +41,7 @@ func (h *OrganizationHandler) RegisterRoutes(rg *gin.RouterGroup) {
 type CreateOrganizationRequest struct {
 	Name        string          `json:"name" binding:"required"`
 	DisplayName *string         `json:"display_name"`
+	Description *string         `json:"description"` // For compatibility with tests
 	Domain      *string         `json:"domain"`
 	Metadata    json.RawMessage `json:"metadata"`
 	Settings    json.RawMessage `json:"settings"`
@@ -98,10 +99,15 @@ func (h *OrganizationHandler) createOrganization(c *gin.Context) {
 		return
 	}
 
+	displayName := req.DisplayName
+	if displayName == nil {
+		displayName = req.Description
+	}
+
 	org := &Organization{
 		TenantID:    tenantID,
 		Name:        req.Name,
-		DisplayName: req.DisplayName,
+		DisplayName: displayName,
 		Domain:      req.Domain,
 		Metadata:    req.Metadata,
 		Settings:    req.Settings,
@@ -206,7 +212,7 @@ func (h *OrganizationHandler) deleteOrganization(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "organization deleted"})
+	c.Status(http.StatusNoContent)
 }
 func (h *OrganizationHandler) addUserToOrganization(c *gin.Context) {
 	tenantID := c.GetHeader("X-Tenant-ID")

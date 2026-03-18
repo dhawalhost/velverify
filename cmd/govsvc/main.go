@@ -157,19 +157,17 @@ func main() {
 	// Add metrics endpoint
 	router.GET("/metrics", gin.WrapH(observability.PrometheusHandler()))
 
-	govHandlers := governance.NewHTTPHandler(svc, log)
-	govHandlers.RegisterRoutes(router)
-
-	// Campaign handlers
 	campaignRepo := governance.NewCampaignRepository(db)
 	campaignSvc := governance.NewCampaignService(campaignRepo, dirClient)
-	campaignHandlers := governance.NewCampaignHTTPHandler(campaignSvc, log)
+	webhookSvc := webhook.NewService(db)
+
+	govHandlers := governance.NewHTTPHandler(svc, campaignSvc, webhookSvc, log)
+	govHandlers.RegisterRoutes(router)
 
 	apiGroup := router.Group("/api/v1")
 	apiGroup.Use(middleware.TenantExtractor(middleware.TenantConfig{
 		SlugResolver: dirClient.ResolveTenantSlug,
 	}))
-	campaignHandlers.RegisterRoutes(apiGroup)
 
 	// RBAC handlers
 	rbacRepo := rbac.NewRepository(db)
@@ -182,10 +180,6 @@ func main() {
 	auditSvc := audit.NewService(auditRepo)
 	auditHandlers := audit.NewHTTPHandler(auditSvc, log)
 	auditHandlers.RegisterRoutes(apiGroup)
-
-	// Organization handlers
-	orgHandlers := governance.NewOrganizationHandler(svc, log)
-	orgHandlers.RegisterRoutes(apiGroup)
 
 	// Domain verification handlers
 	domainVerifyHandler := governance.NewDomainVerificationHandler(db, orgRepo, log)
@@ -208,11 +202,6 @@ func main() {
 	connSvc := connector.NewService(connRepo, connRegistry)
 	connHandlers := connector.NewHTTPHandler(connSvc, log)
 	connHandlers.RegisterRoutes(apiGroup)
-
-	// Webhooks
-	webhookSvc := webhook.NewService(db)
-	webhookHandlers := governance.NewWebhookHTTPHandler(webhookSvc, log)
-	webhookHandlers.RegisterRoutes(apiGroup)
 
 	// Initialize active connectors from DB
 	// In a real app, this should be done more robustly
