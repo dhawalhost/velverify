@@ -144,7 +144,7 @@ func (c *directoryHTTPClient) AddUserToOrganization(ctx context.Context, tenantI
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode >= 300 {
 		return fmt.Errorf("dirsvc returned status %d", resp.StatusCode)
 	}
@@ -165,7 +165,7 @@ func (c *directoryHTTPClient) RemoveUserFromOrganization(ctx context.Context, te
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode >= 300 {
 		return fmt.Errorf("dirsvc returned status %d", resp.StatusCode)
 	}
@@ -186,7 +186,7 @@ func (c *directoryHTTPClient) ListUserOrganizations(ctx context.Context, tenantI
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("dirsvc returned status %d", resp.StatusCode)
 	}

@@ -163,7 +163,7 @@ func (f *fakeOrgStore) GetByName(ctx context.Context, tenantID, name string) (*O
 func (f *fakeOrgStore) List(ctx context.Context, tenantID string, limit, offset int) ([]Organization, error) {
 	return nil, nil
 }
-func (f *fakeOrgStore) Update(ctx context.Context, org *Organization) error { return nil }
+func (f *fakeOrgStore) Update(ctx context.Context, org *Organization) error      { return nil }
 func (f *fakeOrgStore) Delete(ctx context.Context, tenantID, orgID string) error { return nil }
 
 type fakePolicyEngine struct{}

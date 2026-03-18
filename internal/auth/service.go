@@ -1483,7 +1483,7 @@ func (s *authService) SignUp(ctx context.Context, email, password, companyName, 
 	// 0.1 Check if email already exists globally
 	respDisc, err := s.httpClient.Get(fmt.Sprintf("%s/internal/discover?email=%s", s.directoryServiceURL, url.QueryEscape(email)))
 	if err == nil {
-		defer respDisc.Body.Close()
+		defer func() { _ = respDisc.Body.Close() }()
 		if respDisc.StatusCode == http.StatusOK {
 			return "", "", "", errors.New("an account with this email already exists; please log in to your existing organization")
 		}
@@ -1530,7 +1530,7 @@ func (s *authService) SignUp(ctx context.Context, email, password, companyName, 
 		if err != nil {
 			return "", "", "", fmt.Errorf("failed to create tenant: %w", err)
 		}
-		defer respTenant.Body.Close()
+		defer func() { _ = respTenant.Body.Close() }()
 
 		if respTenant.StatusCode == http.StatusCreated {
 			goto TenantCreated

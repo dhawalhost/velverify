@@ -11,7 +11,7 @@ import (
 func TestRiskEngine_IPPolicy(t *testing.T) {
 	ctx := context.Background()
 	tenantID := uuid.New().String()
-	
+
 	// Mock IP Policy Store
 	repo := &mockIPPolicyRepo{
 		policies: []IPPolicy{
@@ -60,5 +60,3 @@ func TestRiskEngine_IPPolicy(t *testing.T) {
 		t.Errorf("expected score < 100 for allowed IP, got %d", res.Score)
 	}
 }
-
-

@@ -164,4 +164,3 @@ func tenantIDFromCtx(ctx context.Context) string {
 	id, _ := middleware.TenantIDFromContext(ctx)
 	return id
 }
-

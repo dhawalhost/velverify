@@ -159,7 +159,9 @@ func runGet(args []string) error {
 		return err
 	}
 	var client oauthClient
-	json.Unmarshal(body, &client)
+	if err := json.Unmarshal(body, &client); err != nil {
+		return fmt.Errorf("failed to parse response: %w", err)
+	}
 	prettyPrint(client)
 	return nil
 }
@@ -195,7 +197,9 @@ func runCreate(args []string) error {
 		return err
 	}
 	var client oauthClient
-	json.Unmarshal(body, &client)
+	if err := json.Unmarshal(body, &client); err != nil {
+		return fmt.Errorf("failed to parse response: %w", err)
+	}
 	fmt.Println("Client created:")
 	prettyPrint(client)
 	return nil
@@ -244,7 +248,9 @@ func runUpdate(args []string) error {
 		return err
 	}
 	var client oauthClient
-	json.Unmarshal(body, &client)
+	if err := json.Unmarshal(body, &client); err != nil {
+		return fmt.Errorf("failed to parse response: %w", err)
+	}
 	fmt.Println("Client updated:")
 	prettyPrint(client)
 	return nil
@@ -302,7 +308,7 @@ func runUserList(args []string) error {
 		return err
 	}
 
-	path := "/users"
+	var path string
 	if *email != "" {
 		path = fmt.Sprintf("/users?email=%s", *email)
 	} else {
@@ -317,14 +323,18 @@ func runUserList(args []string) error {
 		var resp struct {
 			User User `json:"user"`
 		}
-		json.Unmarshal(body, &resp)
+		if err := json.Unmarshal(body, &resp); err != nil {
+			return fmt.Errorf("failed to parse response: %w", err)
+		}
 		prettyPrint(resp.User)
 	} else {
 		var resp struct {
 			Users []User `json:"users"`
 			Total int    `json:"total"`
 		}
-		json.Unmarshal(body, &resp)
+		if err := json.Unmarshal(body, &resp); err != nil {
+			return fmt.Errorf("failed to parse response: %w", err)
+		}
 		fmt.Printf("Total: %d\n", resp.Total)
 		for _, u := range resp.Users {
 			fmt.Printf("- %s (%s)\n", u.ID, u.Email)
@@ -352,7 +362,9 @@ func runUserGet(args []string) error {
 	var resp struct {
 		User User `json:"user"`
 	}
-	json.Unmarshal(body, &resp)
+	if err := json.Unmarshal(body, &resp); err != nil {
+		return fmt.Errorf("failed to parse response: %w", err)
+	}
 	prettyPrint(resp.User)
 	return nil
 }
@@ -375,7 +387,9 @@ func runUserCreate(args []string) error {
 		return err
 	}
 	var resp CreateUserResponse
-	json.Unmarshal(body, &resp)
+	if err := json.Unmarshal(body, &resp); err != nil {
+		return fmt.Errorf("failed to parse response: %w", err)
+	}
 	fmt.Printf("User created: %s\n", resp.UserID)
 	return nil
 }
@@ -463,7 +477,9 @@ func runGroupCreate(args []string) error {
 	var resp struct {
 		GroupID string `json:"group_id"`
 	}
-	json.Unmarshal(body, &resp)
+	if err := json.Unmarshal(body, &resp); err != nil {
+		return fmt.Errorf("failed to parse response: %w", err)
+	}
 	fmt.Printf("Group created: %s\n", resp.GroupID)
 	return nil
 }
@@ -487,7 +503,9 @@ func runGroupGet(args []string) error {
 	var resp struct {
 		Group Group `json:"group"`
 	}
-	json.Unmarshal(body, &resp)
+	if err := json.Unmarshal(body, &resp); err != nil {
+		return fmt.Errorf("failed to parse response: %w", err)
+	}
 	prettyPrint(resp.Group)
 	return nil
 }
@@ -607,7 +625,9 @@ func runRequestList(args []string) error {
 	var resp struct {
 		Requests []AccessRequest `json:"requests"`
 	}
-	json.Unmarshal(body, &resp)
+	if err := json.Unmarshal(body, &resp); err != nil {
+		return fmt.Errorf("failed to parse response: %w", err)
+	}
 	if len(resp.Requests) == 0 {
 		fmt.Println("No requests found")
 		return nil
@@ -741,7 +761,7 @@ func doRequest(method, baseURL, path, tenantID, userID string, payload interface
 	if err != nil {
 		return nil, 0, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	respBody, _ := io.ReadAll(resp.Body)
 	if resp.StatusCode >= 400 {

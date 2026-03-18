@@ -382,10 +382,10 @@ func (h *HTTPHandler) login(c *gin.Context) {
 			h.respondOAuthError(c, ErrInvalidCredentials)
 		} else if errors.Is(err, ErrMFARequired) {
 			c.JSON(http.StatusAccepted, gin.H{
-				"mfa_required":   true,
-				"step_up_token":  token,
-				"error":          "mfa_required",
-				"message":        "Additional authentication required due to risk assessment",
+				"mfa_required":  true,
+				"step_up_token": token,
+				"error":         "mfa_required",
+				"message":       "Additional authentication required due to risk assessment",
 			})
 		} else {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})

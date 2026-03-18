@@ -53,8 +53,8 @@ func (m *MockService) Introspect(ctx context.Context, req auth.IntrospectRequest
 func (m *MockService) Revoke(ctx context.Context, req auth.RevokeRequest) error { return nil }
 func (m *MockService) SAML() *saml.Provider                                     { return nil }
 func (m *MockService) JWKS() jose.JSONWebKeySet                                 { return jose.JSONWebKeySet{} }
-func (m *MockService) Device() auth.DeviceRepository                                 { return nil }
-func (m *MockService) Signal() auth.SignalRepository                                 { return nil }
+func (m *MockService) Device() auth.DeviceRepository                            { return nil }
+func (m *MockService) Signal() auth.SignalRepository                            { return nil }
 func (m *MockService) WebAuthn() *webauthn.WebAuthn                             { return nil }
 func (m *MockService) BeginWebAuthnRegistration(ctx context.Context, userID string) (*protocol.CredentialCreation, *webauthn.SessionData, error) {
 	return nil, nil, nil

@@ -176,29 +176,29 @@ func decodeJSON(t *testing.T, data []byte, out interface{}) {
 }
 
 type stubService struct {
-	healthCheckFn          func(ctx context.Context) (bool, error)
-	listOAuthClientsFn     func(ctx context.Context, tenantID string) ([]oauthclient.Client, error)
-	getOAuthClientFn       func(ctx context.Context, tenantID, clientID string) (oauthclient.Client, error)
-	createOAuthClientFn    func(ctx context.Context, tenantID string, input CreateOAuthClientInput) (oauthclient.Client, error)
-	updateOAuthClientFn    func(ctx context.Context, tenantID, clientID string, input UpdateOAuthClientInput) (oauthclient.Client, error)
-	deleteOAuthClientFn    func(ctx context.Context, tenantID, clientID string) error
-	createAccessRequestFn  func(ctx context.Context, tenantID string, input CreateAccessRequest) (AccessRequest, error)
-	listAccessRequestsFn   func(ctx context.Context, tenantID, status string) ([]AccessRequest, error)
-	approveAccessRequestFn func(ctx context.Context, tenantID, requestID, approverID, comment string) error
-	rejectAccessRequestFn  func(ctx context.Context, tenantID, requestID, approverID, comment string) error
-	resolveTenantSlugFn    func(ctx context.Context, slug string) (string, error)
-	listOrganizationsFn    func(ctx context.Context, tenantID string, limit, offset int) ([]Organization, error)
-	createOrganizationFn   func(ctx context.Context, org *Organization) error
-	getOrganizationFn      func(ctx context.Context, tenantID, orgID string) (*Organization, error)
+	healthCheckFn           func(ctx context.Context) (bool, error)
+	listOAuthClientsFn      func(ctx context.Context, tenantID string) ([]oauthclient.Client, error)
+	getOAuthClientFn        func(ctx context.Context, tenantID, clientID string) (oauthclient.Client, error)
+	createOAuthClientFn     func(ctx context.Context, tenantID string, input CreateOAuthClientInput) (oauthclient.Client, error)
+	updateOAuthClientFn     func(ctx context.Context, tenantID, clientID string, input UpdateOAuthClientInput) (oauthclient.Client, error)
+	deleteOAuthClientFn     func(ctx context.Context, tenantID, clientID string) error
+	createAccessRequestFn   func(ctx context.Context, tenantID string, input CreateAccessRequest) (AccessRequest, error)
+	listAccessRequestsFn    func(ctx context.Context, tenantID, status string) ([]AccessRequest, error)
+	approveAccessRequestFn  func(ctx context.Context, tenantID, requestID, approverID, comment string) error
+	rejectAccessRequestFn   func(ctx context.Context, tenantID, requestID, approverID, comment string) error
+	resolveTenantSlugFn     func(ctx context.Context, slug string) (string, error)
+	listOrganizationsFn     func(ctx context.Context, tenantID string, limit, offset int) ([]Organization, error)
+	createOrganizationFn    func(ctx context.Context, org *Organization) error
+	getOrganizationFn       func(ctx context.Context, tenantID, orgID string) (*Organization, error)
 	getOrganizationByNameFn func(ctx context.Context, tenantID, name string) (*Organization, error)
-	updateOrganizationFn   func(ctx context.Context, org *Organization) error
-	deleteOrganizationFn   func(ctx context.Context, tenantID, orgID string) error
-	addUserToOrgFn         func(ctx context.Context, tenantID, userID, orgID, role string) error
-	removeUserFromOrgFn    func(ctx context.Context, tenantID, userID, orgID string) error
-	listUserOrgsFn         func(ctx context.Context, tenantID, userID string) ([]string, error)
-	createIPPolicyFn       func(ctx context.Context, tenantID string, req CreateIPPolicyRequest) (IPPolicy, error)
-	listIPPoliciesFn       func(ctx context.Context, tenantID string) ([]IPPolicy, error)
-	deleteIPPolicyFn       func(ctx context.Context, tenantID, ipPolicyID string) error
+	updateOrganizationFn    func(ctx context.Context, org *Organization) error
+	deleteOrganizationFn    func(ctx context.Context, tenantID, orgID string) error
+	addUserToOrgFn          func(ctx context.Context, tenantID, userID, orgID, role string) error
+	removeUserFromOrgFn     func(ctx context.Context, tenantID, userID, orgID string) error
+	listUserOrgsFn          func(ctx context.Context, tenantID, userID string) ([]string, error)
+	createIPPolicyFn        func(ctx context.Context, tenantID string, req CreateIPPolicyRequest) (IPPolicy, error)
+	listIPPoliciesFn        func(ctx context.Context, tenantID string) ([]IPPolicy, error)
+	deleteIPPolicyFn        func(ctx context.Context, tenantID, ipPolicyID string) error
 }
 
 func (s *stubService) HealthCheck(ctx context.Context) (bool, error) {

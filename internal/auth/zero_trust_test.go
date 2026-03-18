@@ -7,8 +7,8 @@ import (
 
 	"github.com/dhawalhost/wardseal/internal/rbac"
 	"github.com/dhawalhost/wardseal/pkg/middleware"
-	"github.com/google/uuid"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 )
 
 // Mock RBAC Store
@@ -33,15 +33,21 @@ func (m *mockRBACRepo) GetUserPermissions(ctx context.Context, tenantID, userID 
 }
 
 // Satisfy rbac.Repository interface
-func (m *mockRBACRepo) CreateRole(ctx context.Context, r rbac.Role) (string, error)             { return "", nil }
-func (m *mockRBACRepo) GetRole(ctx context.Context, tenantID, id string) (rbac.Role, error)    { return rbac.Role{}, nil }
+func (m *mockRBACRepo) CreateRole(ctx context.Context, r rbac.Role) (string, error) { return "", nil }
+func (m *mockRBACRepo) GetRole(ctx context.Context, tenantID, id string) (rbac.Role, error) {
+	return rbac.Role{}, nil
+}
 func (m *mockRBACRepo) GetRoleByName(ctx context.Context, tenantID, name string) (rbac.Role, error) {
 	return rbac.Role{}, nil
 }
-func (m *mockRBACRepo) ListRoles(ctx context.Context, tenantID string) ([]rbac.Role, error)      { return nil, nil }
-func (m *mockRBACRepo) UpdateRole(ctx context.Context, id string, r rbac.Role) error           { return nil }
-func (m *mockRBACRepo) DeleteRole(ctx context.Context, tenantID, id string) error             { return nil }
-func (m *mockRBACRepo) CreatePermission(ctx context.Context, p rbac.Permission) (string, error) { return "", nil }
+func (m *mockRBACRepo) ListRoles(ctx context.Context, tenantID string) ([]rbac.Role, error) {
+	return nil, nil
+}
+func (m *mockRBACRepo) UpdateRole(ctx context.Context, id string, r rbac.Role) error { return nil }
+func (m *mockRBACRepo) DeleteRole(ctx context.Context, tenantID, id string) error    { return nil }
+func (m *mockRBACRepo) CreatePermission(ctx context.Context, p rbac.Permission) (string, error) {
+	return "", nil
+}
 func (m *mockRBACRepo) ListPermissions(ctx context.Context, tenantID string) ([]rbac.Permission, error) {
 	return nil, nil
 }
@@ -57,14 +63,16 @@ func (m *mockRBACRepo) RemovePermissionFromRole(ctx context.Context, roleID, per
 func (m *mockRBACRepo) AssignRoleToUser(ctx context.Context, tenantID, userID, roleID string, assignedBy *string) error {
 	return nil
 }
-func (m *mockRBACRepo) RemoveRoleFromUser(ctx context.Context, userID, roleID string) error { return nil }
+func (m *mockRBACRepo) RemoveRoleFromUser(ctx context.Context, userID, roleID string) error {
+	return nil
+}
 
 func TestZeroTrust_RBACClaimsInJWT(t *testing.T) {
 	rbacStore := &mockRBACRepo{
 		roles:       []string{"admin", "editor"},
 		permissions: []string{"read:all", "write:all"},
 	}
-	
+
 	svc := &authService{
 		rbacStore: rbacStore,
 		signer:    &mockSigner{},
@@ -110,7 +118,7 @@ func TestZeroTrust_RBACClaimsInJWT(t *testing.T) {
 func TestZeroTrust_AdaptiveMFATrigger(t *testing.T) {
 	tenantID := uuid.New().String()
 	blockedIP := "10.0.0.1"
-	
+
 	repo := &mockIPPolicyRepo{
 		policies: []IPPolicy{
 			{
@@ -122,7 +130,7 @@ func TestZeroTrust_AdaptiveMFATrigger(t *testing.T) {
 	}
 
 	engine := NewRiskEngine(nil, nil, nil).WithIPPolicy(repo, nil)
-	
+
 	ctx := middleware.InjectTenantID(context.Background(), tenantID)
 
 	res, err := engine.Evaluate(ctx, uuid.New().String(), "", blockedIP)
@@ -141,11 +149,11 @@ func (s *mockSigner) Sign(claims jwt.Claims) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return token.SignedString([]byte("test-secret"))
 }
-func (s *mockSigner) KeyID() string { return "test-key" }
+func (s *mockSigner) KeyID() string                   { return "test-key" }
 func (s *mockSigner) PublicJWK() (interface{}, error) { return nil, nil }
-func (s *mockSigner) PublicKey() *rsa.PublicKey { return nil }
-func (s *mockSigner) Algorithm() string { return "HS256" }
-func (s *mockSigner) Close() error { return nil }
+func (s *mockSigner) PublicKey() *rsa.PublicKey       { return nil }
+func (s *mockSigner) Algorithm() string               { return "HS256" }
+func (s *mockSigner) Close() error                    { return nil }
 
 func strPtr(s string) *string { return &s }
 
@@ -154,7 +162,9 @@ type mockIPPolicyRepo struct {
 }
 
 func (m *mockIPPolicyRepo) Create(ctx context.Context, p IPPolicy) (string, error) { return "", nil }
-func (m *mockIPPolicyRepo) List(ctx context.Context, tenantID string) ([]IPPolicy, error) { return nil, nil }
+func (m *mockIPPolicyRepo) List(ctx context.Context, tenantID string) ([]IPPolicy, error) {
+	return nil, nil
+}
 func (m *mockIPPolicyRepo) Delete(ctx context.Context, tenantID, id string) error { return nil }
 func (m *mockIPPolicyRepo) ListBlocked(ctx context.Context, tenantID string) ([]IPPolicy, error) {
 	return m.policies, nil

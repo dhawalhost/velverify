@@ -11,7 +11,7 @@ import (
 // Repository defines the interface for database operations.
 type Repository interface {
 	HealthCheck(ctx context.Context) error
-	
+
 	// Transaction support
 	WithTransaction(ctx context.Context, fn func(tx *sqlx.Tx) error) error
 
