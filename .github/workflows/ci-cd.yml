@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
   packages: write
 
 jobs:
@@ -97,6 +97,7 @@ jobs:
   build-push:
     needs: [config-lint, config-policy, lint, test, integration-test]
     runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
     strategy:
       fail-fast: false
       matrix:
@@ -144,10 +145,8 @@ jobs:
         with:
           images: ghcr.io/${{ github.repository_owner }}/wardseal-${{ matrix.component }}
           tags: |
-            type=sha,format=long
-            type=ref,event=branch
-            type=semver,pattern={{version}}
-            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+            type=semver,pattern={{raw}}
+            type=raw,value=latest
 
       - name: Build and push
         uses: docker/build-push-action@v5
@@ -165,57 +164,3 @@ jobs:
             ${{ matrix.component == 'landingui' && 'VITE_SITE_BASE_URL=https://staging.wardseal.com' || '' }}
             ${{ matrix.component == 'landingui' && 'VITE_CONSOLE_BASE_URL=https://manage-staging.wardseal.com' || '' }}
             ${{ matrix.component == 'landingui' && 'VITE_ENVIRONMENT=staging' || '' }}
-
-  update-staging-manifests:
-    needs: build-push
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Update staging tags
-        run: |
-          set -e
-          SHA=${{ github.sha }}
-          # Use yq to update tags in values-staging.yaml
-          yq -i ".authsvc.image.tag = \"$SHA\"" deploy/charts/wardseal/values-staging.yaml
-          yq -i ".dirsvc.image.tag = \"$SHA\"" deploy/charts/wardseal/values-staging.yaml
-          yq -i ".govsvc.image.tag = \"$SHA\"" deploy/charts/wardseal/values-staging.yaml
-          yq -i ".policysvc.image.tag = \"$SHA\"" deploy/charts/wardseal/values-staging.yaml
-          yq -i ".provsvc.image.tag = \"$SHA\"" deploy/charts/wardseal/values-staging.yaml
-          yq -i ".adminui.image.tag = \"$SHA\"" deploy/charts/wardseal/values-staging.yaml
-          yq -i ".landingui.image.tag = \"$SHA\"" deploy/charts/wardseal/values-staging.yaml
-
-      - name: Commit and push
-        uses: stefanzweifel/git-auto-commit-action@v5
-        with:
-          commit_message: "chore(staging): update image tags to ${{ github.sha }} [skip ci]"
-          file_pattern: "deploy/charts/wardseal/values-staging.yaml"
-
-  update-production-manifests:
-    needs: build-push
-    runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Update production tags
-        run: |
-          set -e
-          TAG=${GITHUB_REF#refs/tags/}
-          # Use yq to update tags in values-production.yaml
-          yq -i ".authsvc.image.tag = \"$TAG\"" deploy/charts/wardseal/values-production.yaml
-          yq -i ".dirsvc.image.tag = \"$TAG\"" deploy/charts/wardseal/values-production.yaml
-          yq -i ".govsvc.image.tag = \"$TAG\"" deploy/charts/wardseal/values-production.yaml
-          yq -i ".policysvc.image.tag = \"$TAG\"" deploy/charts/wardseal/values-production.yaml
-          yq -i ".provsvc.image.tag = \"$TAG\"" deploy/charts/wardseal/values-production.yaml
-          yq -i ".adminui.image.tag = \"$TAG\"" deploy/charts/wardseal/values-production.yaml
-          yq -i ".landingui.image.tag = \"$TAG\"" deploy/charts/wardseal/values-production.yaml
-
-      - name: Commit and push
-        uses: stefanzweifel/git-auto-commit-action@v5
-        with:
-          commit_message: "chore(production): release ${{ github.ref_name }} [skip ci]"
-          file_pattern: "deploy/charts/wardseal/values-production.yaml"
