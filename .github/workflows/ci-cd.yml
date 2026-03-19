@@ -19,7 +19,7 @@ jobs:
       - name: Install Helm
         uses: azure/setup-helm@v4
       - name: Run environment config validation
-        run: bash scripts/validate_env_config.sh
+        run: make config-lint
 
   config-policy:
     runs-on: ubuntu-latest

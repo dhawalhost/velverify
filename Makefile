@@ -223,6 +223,8 @@ frontend-lint: ## Lint frontend code
 validate-env-config: ## Validate local/staging/production Helm config consistency
 	./scripts/validate_env_config.sh
 
+config-lint: validate-env-config ## Alias for CI config lint checks
+
 # ==================
 # Local k8s (Rancher Desktop)
 # ==================

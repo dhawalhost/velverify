@@ -37,6 +37,9 @@ check_not_contains() {
 }
 
 echo "Rendering environment manifests..."
+echo "Ensuring chart dependencies are present..."
+helm dependency build "$CHART_DIR" >/dev/null
+
 render local -f "$CHART_DIR/values.yaml" -f "$CHART_DIR/values-local.yaml"
 render staging -f "$CHART_DIR/values.yaml" -f "$CHART_DIR/values-staging.yaml"
 render staging-cm -f "$CHART_DIR/values.yaml" -f "$CHART_DIR/values-staging.yaml" -f "$CHART_DIR/values-staging-certmanager.yaml"
