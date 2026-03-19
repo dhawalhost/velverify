@@ -133,12 +133,21 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Validate semantic version
+      - name: Validate and normalize semantic version
+        id: semver
         run: |
-          if ! [[ "${{ inputs.version }}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
-            echo "Invalid version '${{ inputs.version }}'. Expected semver like v1.2.3"
+          RAW_VERSION="${{ inputs.version }}"
+          if ! [[ "${RAW_VERSION}" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
+            echo "Invalid version '${RAW_VERSION}'. Expected semver like v1.2.3 or 1.2.3"
             exit 1
           fi
+
+          NORMALIZED_VERSION="${RAW_VERSION}"
+          if [[ "${NORMALIZED_VERSION}" != v* ]]; then
+            NORMALIZED_VERSION="v${NORMALIZED_VERSION}"
+          fi
+          echo "normalized_version=${NORMALIZED_VERSION}" >> "$GITHUB_OUTPUT"
+
           if [[ -n "${{ inputs.tag_suffix }}" ]] && ! [[ "${{ inputs.tag_suffix }}" =~ ^[0-9A-Za-z._-]+$ ]]; then
             echo "Invalid tag_suffix '${{ inputs.tag_suffix }}'. Allowed characters: letters, numbers, dot, underscore, hyphen"
             exit 1
@@ -196,7 +205,7 @@ jobs:
         id: release
         run: |
           IMAGE="ghcr.io/${{ github.repository_owner }}/wardseal-${{ inputs.service }}"
-          TAG="${{ inputs.version }}-${{ inputs.service }}"
+          TAG="${{ steps.semver.outputs.normalized_version }}-${{ inputs.service }}"
           if [[ -n "${{ inputs.tag_suffix }}" ]]; then
             TAG="${TAG}-${{ inputs.tag_suffix }}"
           fi
@@ -251,6 +260,7 @@ jobs:
       - name: Release summary
         run: |
           echo "Service: ${{ inputs.service }}"
+          echo "Normalized version: ${{ steps.semver.outputs.normalized_version }}"
           echo "Image: ${{ steps.release.outputs.image }}"
           echo "Release tag: ${{ steps.release.outputs.release_tag }}"
           echo "Tag existed: ${{ steps.exists.outputs.exists }}"

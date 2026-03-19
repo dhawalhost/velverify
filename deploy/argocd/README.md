@@ -39,7 +39,7 @@ Update only the service you want to promote; leave others unchanged.
 Use the `CI/CD` workflow in GitHub Actions with **Run workflow** and provide:
 
 - `service`: service to build (`authsvc`, `dirsvc`, `govsvc`, `policysvc`, `provsvc`, `adminui`, `landingui`)
-- `version`: base semantic version (example: `v1.2.3`)
+- `version`: base semantic version (example: `v1.2.3` or `1.2.3`; workflow normalizes to `v*`)
 - `tag_suffix`: optional extra suffix (example: `rc1`)
 - `push_latest`: whether to also push `latest`
 - `skip_if_exists`: skip build if the computed tag already exists in GHCR
