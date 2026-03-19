@@ -111,10 +111,7 @@ spec:
                   name: {{ .Values.vaultAppRole.existingSecret }}
                   key: VAULT_KEY_NAME
             - name: VAULT_KEY_PATH
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.vaultAppRole.existingSecret }}
-                  key: VAULT_KEY_PATH
+              value: {{ .Values.vaultAppRole.keyPath | default "transit" | quote }}
             {{- end }}
           {{- if .Values.livenessProbe }}
           livenessProbe:

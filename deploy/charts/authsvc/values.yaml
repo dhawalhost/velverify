@@ -72,7 +72,8 @@ database:
 # ====================
 vaultAppRole:
   existingSecret: vault-approle  # Optional, for Vault integration
-  # Secret should contain: role-id, secret-id
+  keyPath: transit  # VAULT_KEY_PATH — Transit mount path, rarely changes
+  # Secret should contain: VAULT_ADDR, VAULT_ROLE_ID, VAULT_SECRET_ID, VAULT_KEY_NAME
 
 # ====================
 # Security Contexts
