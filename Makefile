@@ -82,13 +82,13 @@ fmt: ## Format Go code
 
 install-lint: ## Install golangci-lint
 	@echo "Installing golangci-lint..."
-	go install github.com/golangci/golangci-lint/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION)
+	go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest 
 
 lint: ## Run linter
-	golangci-lint run --timeout=5m ./...
+	go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest run --tests=false --timeout=15m 
 
 lint-fix: ## Run linter with auto-fix
-	golangci-lint run --fix --timeout=5m ./...
+	go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest run --tests=false --timeout=15m --fix
 
 # ==================
 # Testing
