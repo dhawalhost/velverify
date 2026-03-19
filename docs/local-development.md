@@ -38,6 +38,9 @@ Then access:
 * Landing Site: <http://wardseal.local>
 * Help Portal: <http://help.wardseal.local>
 
+> [!IMPORTANT]
+> `UI_URL` must point to the Admin Console origin (for example `http://manage.wardseal.local`), not the auth API host. Auth flows use this value for redirects to `/login` and password setup links.
+
 ### Stop
 
 ```bash

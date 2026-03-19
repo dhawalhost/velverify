@@ -15,6 +15,8 @@ VAULT_RELEASE="vault"
 VAULT_CHART_VERSION="0.28.1"
 VAULT_VALUES_FILE="${VAULT_VALUES_FILE:-$(dirname "$0")/../../argocd-infra/vault/charts/vault/vault-values-staging.yaml}"
 TLS_SECRET_NAME="vault-staging-tls"
+VAULT_TRANSIT_PATH="${VAULT_TRANSIT_PATH:-transit}"
+VAULT_SIGNING_KEY_NAME="${VAULT_SIGNING_KEY_NAME:-wardseal-signing-key-staging}"
 
 # Function to print colored output
 log_info() {
@@ -273,32 +275,32 @@ configure_vault() {
     kubectl exec -n "$NAMESPACE" vault-0 -- vault login "$VAULT_ROOT_TOKEN" > /dev/null
     kubectl exec -n "$NAMESPACE" vault-0 -- vault secrets enable transit 2>/dev/null || log_warn "Transit already enabled"
     
-    # Create JWT signing key (matching values-staging.yaml)
-    log_info "Creating JWT signing key: wardseal-signing-key-staging..."
-    kubectl exec -n "$NAMESPACE" vault-0 -- vault write -f transit/keys/wardseal-signing-key-staging \
-        type=ecdsa-p256 \
+    # Create JWT signing key (RS256 compatible)
+    log_info "Creating JWT signing key: $VAULT_SIGNING_KEY_NAME..."
+    kubectl exec -n "$NAMESPACE" vault-0 -- vault write -f "$VAULT_TRANSIT_PATH/keys/$VAULT_SIGNING_KEY_NAME" \
+        type=rsa-2048 \
         exportable=false \
         allow_plaintext_backup=false 2>/dev/null || log_warn "Key already exists"
     
     # Configure key rotation (90 days for staging)
-    kubectl exec -n "$NAMESPACE" vault-0 -- vault write transit/keys/wardseal-signing-key-staging/config \
+    kubectl exec -n "$NAMESPACE" vault-0 -- vault write "$VAULT_TRANSIT_PATH/keys/$VAULT_SIGNING_KEY_NAME/config" \
         auto_rotate_period=2160h
     
     # Create policy for wardseal
     log_info "Creating Vault policy for Wardseal staging..."
     kubectl exec -n "$NAMESPACE" vault-0 -- vault policy write wardseal-auth-staging - <<EOF
 # Allow signing with the JWT key
-path "transit/sign/wardseal-signing-key-staging" {
+path "$VAULT_TRANSIT_PATH/sign/$VAULT_SIGNING_KEY_NAME" {
   capabilities = ["create", "update"]
 }
 
 # Allow verifying signatures
-path "transit/verify/wardseal-signing-key-staging" {
+path "$VAULT_TRANSIT_PATH/verify/$VAULT_SIGNING_KEY_NAME" {
   capabilities = ["create", "update"]
 }
 
 # Allow reading key metadata
-path "transit/keys/wardseal-signing-key-staging" {
+path "$VAULT_TRANSIT_PATH/keys/$VAULT_SIGNING_KEY_NAME" {
   capabilities = ["read"]
 }
 EOF

@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { ModeToggle } from "@/components/mode-toggle";
@@ -10,35 +11,85 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { getUserRoles } from '../api';
 import { useAuth } from '../hooks/useAuth';
+
+const ADMIN_ROLE = 'admin';
+
+type TokenPayload = {
+    sub?: string;
+    user_id?: string;
+    roles?: string[];
+    role?: string;
+};
+
+type RBACRole = {
+    id?: string;
+    name?: string;
+};
+
+const decodeTokenPayload = (token: string | null): TokenPayload | null => {
+    if (!token) return null;
+    try {
+        const [, payload] = token.split('.');
+        if (!payload) return null;
+
+        const normalized = payload.replace(/-/g, '+').replace(/_/g, '/');
+        const padded = normalized + '='.repeat((4 - (normalized.length % 4)) % 4);
+        return JSON.parse(atob(padded));
+    } catch {
+        return null;
+    }
+};
+
+const getTokenUserID = (token: string | null): string => {
+    const payload = decodeTokenPayload(token);
+    if (!payload) return '';
+    return payload.sub || payload.user_id || '';
+};
 
 const PortalLayout = () => {
     const location = useLocation();
     const navigate = useNavigate();
     const { logout } = useAuth();
+    const [canAccessAdmin, setCanAccessAdmin] = useState(false);
     const policyBaseUrl = window.location.hostname.endsWith('.local')
         ? 'http://wardseal.local'
         : 'https://wardseal.com';
 
-    const getTokenRoles = () => {
-        const token = localStorage.getItem('token');
-        if (!token) return [] as string[];
+    useEffect(() => {
+        let mounted = true;
 
-        try {
-            const [, payload] = token.split('.');
-            if (!payload) return [] as string[];
+        const loadAdminAccess = async () => {
+            const token = localStorage.getItem('token');
+            const userID = getTokenUserID(token);
+            if (!userID) {
+                if (mounted) setCanAccessAdmin(false);
+                return;
+            }
 
-            const normalized = payload.replace(/-/g, '+').replace(/_/g, '/');
-            const padded = normalized + '='.repeat((4 - (normalized.length % 4)) % 4);
-            const parsed = JSON.parse(atob(padded));
+            try {
+                const response = await getUserRoles(userID);
+                const roles = Array.isArray(response?.roles) ? response.roles : [];
+                const roleNames = roles
+                    .map((role: RBACRole | string) => (typeof role === 'string' ? role : role?.name))
+                    .filter((name): name is string => typeof name === 'string');
 
-            return Array.isArray(parsed?.roles) ? parsed.roles : [];
-        } catch {
-            return [] as string[];
-        }
-    };
+                if (mounted) {
+                    setCanAccessAdmin(roleNames.some((role) => role.toLowerCase() === ADMIN_ROLE));
+                }
+            } catch {
+                if (mounted) {
+                    setCanAccessAdmin(false);
+                }
+            }
+        };
 
-    const canAccessAdmin = getTokenRoles().includes('admin');
+        loadAdminAccess();
+        return () => {
+            mounted = false;
+        };
+    }, [location.pathname]);
 
     const handleSignOut = () => {
         logout();

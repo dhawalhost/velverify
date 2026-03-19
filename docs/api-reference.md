@@ -58,6 +58,46 @@ POST /logout
 | `/oauth2/introspect` | POST | Validate token |
 | `/oauth2/revoke` | POST | Revoke token |
 | `/.well-known/jwks.json` | GET | Public keys |
+| `/api/v1/oidc/resolve` | GET | Resolve tenant-specific issuer/discovery/JWKS by email |
+| `/.well-known/webfinger` | GET | Return tenant issuer for `acct:user@domain` |
+
+### OIDC Tenant Auto-Discovery
+
+#### Resolve by email
+
+```bash
+curl "http://localhost:8080/api/v1/oidc/resolve?email=admin@wardseal.com"
+```
+
+```json
+{
+  "tenant_id": "admin-system",
+  "tenant_slug": "admin",
+  "issuer": "http://localhost:8080/t/admin",
+  "discovery_url": "http://localhost:8080/t/admin/.well-known/openid-configuration",
+  "jwks_uri": "http://localhost:8080/t/admin/.well-known/jwks.json",
+  "authorization": "http://localhost:8080/t/admin/oauth2/authorize",
+  "token_endpoint": "http://localhost:8080/t/admin/oauth2/token"
+}
+```
+
+#### WebFinger
+
+```bash
+curl "http://localhost:8080/.well-known/webfinger?resource=acct:admin@wardseal.com"
+```
+
+```json
+{
+  "subject": "acct:admin@wardseal.com",
+  "links": [
+    {
+      "rel": "http://openid.net/specs/connect/1.0/issuer",
+      "href": "http://localhost:8080/t/admin"
+    }
+  ]
+}
+```
 
 ### MFA - TOTP
 

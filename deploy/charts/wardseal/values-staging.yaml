@@ -43,6 +43,9 @@ authsvc:
     - secretRef:
         name: wardseal-vault-kms-staging
 
+  vaultAppRole:
+    existingSecret: wardseal-vault-kms-staging
+
   resources:
     limits:
       cpu: 200m

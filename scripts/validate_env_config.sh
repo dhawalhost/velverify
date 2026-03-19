@@ -70,8 +70,17 @@ check_contains "$TMP_DIR/prod.yaml" 'host: "wardseal.com"' "production landing h
 
 echo "Checking critical URL/env configuration..."
 check_contains "$TMP_DIR/local.yaml" 'value: "http://auth.wardseal.local"' "local AUTH_SERVICE_URL"
+check_contains "$TMP_DIR/local.yaml" 'value: "http://manage.wardseal.local"' "local UI_URL"
 check_contains "$TMP_DIR/staging.yaml" 'value: "https://auth-staging.wardseal.com"' "staging AUTH_SERVICE_URL"
+check_contains "$TMP_DIR/staging.yaml" 'value: "https://manage-staging.wardseal.com"' "staging UI_URL"
+check_contains "$TMP_DIR/staging.yaml" 'name: "KMS_PROVIDER"' "staging KMS_PROVIDER present"
+check_contains "$TMP_DIR/staging.yaml" 'value: "vault"' "staging KMS provider is vault"
+check_contains "$TMP_DIR/staging.yaml" 'name: wardseal-vault-kms-staging' "staging Vault AppRole secret wiring"
 check_contains "$TMP_DIR/prod.yaml" 'value: "https://auth.wardseal.com"' "production AUTH_SERVICE_URL"
+check_contains "$TMP_DIR/prod.yaml" 'value: "https://manage.wardseal.com"' "production UI_URL"
+check_contains "$TMP_DIR/prod.yaml" 'name: "KMS_PROVIDER"' "production KMS_PROVIDER present"
+check_contains "$TMP_DIR/prod.yaml" 'value: "vault"' "production KMS provider is vault"
+check_contains "$TMP_DIR/prod.yaml" 'name: wardseal-vault-kms-production' "production Vault AppRole secret wiring"
 check_not_contains "$TMP_DIR/prod.yaml" 'admin.wardseal.com' "production admin host removed"
 check_not_contains "$TMP_DIR/staging.yaml" 'admin-staging.wardseal.com' "staging admin host removed"
 

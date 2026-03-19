@@ -9,6 +9,7 @@ import (
 	"crypto/subtle"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"database/sql"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -1633,6 +1634,10 @@ TenantCreated:
 		return "", "", "", fmt.Errorf("failed to decode create user response: %w", err)
 	}
 
+	if err := s.ensureTenantAdminRoleAssignment(ctx, tenantID, createUserResp.UserID); err != nil {
+		return "", "", "", fmt.Errorf("failed to assign admin role: %w", err)
+	}
+
 	claims := jwt.MapClaims{
 		"sub":    createUserResp.UserID,
 		"iss":    "identity-platform",
@@ -1641,6 +1646,7 @@ TenantCreated:
 		"iat":    time.Now().Unix(),
 		"scope":  "openid profile email",
 		"tenant": tenantID,
+		"roles":  []string{"admin"},
 	}
 
 	signedToken, err := s.signer.Sign(claims)
@@ -1769,6 +1775,10 @@ func (s *authService) PerformSystemSetup(ctx context.Context, email, password st
 		return "", err
 	}
 
+	if err := s.ensureTenantAdminRoleAssignment(ctx, systemTenantID, createResp.UserID); err != nil {
+		return "", fmt.Errorf("failed to assign system admin role: %w", err)
+	}
+
 	// Sign a token for the new user
 	claims := jwt.MapClaims{
 		"sub":    createResp.UserID,
@@ -1778,10 +1788,35 @@ func (s *authService) PerformSystemSetup(ctx context.Context, email, password st
 		"iat":    time.Now().Unix(),
 		"scope":  "openid profile email",
 		"tenant": systemTenantID,
-		"role":   "owner",
+		"roles":  []string{"admin"},
 	}
 
 	return s.signer.Sign(claims)
+}
+
+func (s *authService) ensureTenantAdminRoleAssignment(ctx context.Context, tenantID, userID string) error {
+	if s.rbacStore == nil || tenantID == "" || userID == "" {
+		return nil
+	}
+
+	role, err := s.rbacStore.GetRoleByName(ctx, tenantID, "admin")
+	if err != nil {
+		if !errors.Is(err, sql.ErrNoRows) {
+			return err
+		}
+
+		roleID, createErr := s.rbacStore.CreateRole(ctx, rbac.Role{
+			TenantID:    tenantID,
+			Name:        "admin",
+			Description: "Default tenant administrator role",
+		})
+		if createErr != nil {
+			return createErr
+		}
+		role.ID = roleID
+	}
+
+	return s.rbacStore.AssignRoleToUser(ctx, tenantID, userID, role.ID, nil)
 }
 
 func (s *authService) ListClients(ctx context.Context, tenantID string) ([]oauthclient.Client, error) {

@@ -9,7 +9,9 @@ package config
 
 import (
 	"fmt"
+	"net/url"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -221,7 +223,16 @@ func (l *Loader) Load() (*Config, error) {
 	l.loadOSEnv()
 
 	// Build config struct
-	return l.buildConfig()
+	cfg, err := l.buildConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	if err := cfg.Validate(); err != nil {
+		return nil, err
+	}
+
+	return cfg, nil
 }
 
 // loadDefaults sets built-in default values.
@@ -241,7 +252,7 @@ func (l *Loader) loadDefaults() {
 		"KMS_PROVIDER":                       "local",
 		"VAULT_KEY_NAME":                     "wardseal-signing-key",
 		"VAULT_KEY_PATH":                     "transit",
-		"UI_URL":                             "http://localhost:5173",
+		"UI_URL":                             "http://manage.wardseal.local",
 		"RATE_LIMIT_USE_TENANT":              "true",
 		"RATE_LIMIT_KEY_PREFIX":              "authsvc:ratelimit",
 		"RATE_LIMIT_DEFAULT_REQUESTS":        "1200",
@@ -396,7 +407,7 @@ func (l *Loader) buildConfig() (*Config, error) {
 			JWTPrivateKeyPath:   l.get("JWT_PRIVATE_KEY_PATH", ""),
 			JWTPublicKeyPath:    l.get("JWT_PUBLIC_KEY_PATH", ""),
 			DeploymentMode:      l.get("DEPLOYMENT_MODE", "selfhost"),
-			UIURL:               l.get("UI_URL", "http://localhost:5173"),
+			UIURL:               l.get("UI_URL", "http://manage.wardseal.local"),
 			RedisAddr:           l.get("REDIS_ADDR", ""),
 			RedisPassword:       l.get("REDIS_PASSWORD", ""),
 			RedisDB:             redisDB,
@@ -519,6 +530,118 @@ func MustLoad(opts ...LoaderOption) *Config {
 		panic(fmt.Sprintf("failed to load config: %v", err))
 	}
 	return cfg
+}
+
+func (c *Config) Validate() error {
+	var problems []string
+	envName := strings.ToLower(strings.TrimSpace(string(c.Environment)))
+
+	if err := validateAbsoluteURL(c.Auth.BaseURL, false); err != nil {
+		problems = append(problems, fmt.Sprintf("AUTH_SERVICE_URL invalid: %v", err))
+	}
+
+	if err := validateAbsoluteURL(c.Auth.UIURL, false); err != nil {
+		problems = append(problems, fmt.Sprintf("UI_URL invalid: %v", err))
+	}
+
+	if c.Environment == Staging || c.Environment == Production {
+		if err := validateAbsoluteURL(c.Auth.BaseURL, true); err != nil {
+			problems = append(problems, fmt.Sprintf("AUTH_SERVICE_URL must be https in %s: %v", c.Environment, err))
+		}
+		if err := validateAbsoluteURL(c.Auth.UIURL, true); err != nil {
+			problems = append(problems, fmt.Sprintf("UI_URL must be https in %s: %v", c.Environment, err))
+		}
+		if !strings.EqualFold(strings.TrimSpace(c.KMS.Provider), "vault") {
+			problems = append(problems, fmt.Sprintf("KMS_PROVIDER must be vault in %s", c.Environment))
+		}
+	}
+
+	if envName == "local" {
+		if !strings.EqualFold(strings.TrimSpace(c.KMS.Provider), "local") {
+			problems = append(problems, "KMS_PROVIDER must be local in local environment")
+		}
+
+		privateKeyPath := strings.TrimSpace(c.Auth.JWTPrivateKeyPath)
+		publicKeyPath := strings.TrimSpace(c.Auth.JWTPublicKeyPath)
+		if privateKeyPath == "" {
+			problems = append(problems, "JWT_PRIVATE_KEY_PATH is required in local environment")
+		} else if !filepath.IsAbs(privateKeyPath) {
+			problems = append(problems, "JWT_PRIVATE_KEY_PATH must be an absolute path in local environment")
+		}
+		if publicKeyPath == "" {
+			problems = append(problems, "JWT_PUBLIC_KEY_PATH is required in local environment")
+		} else if !filepath.IsAbs(publicKeyPath) {
+			problems = append(problems, "JWT_PUBLIC_KEY_PATH must be an absolute path in local environment")
+		}
+	}
+
+	for _, origin := range c.Governance.CORSAllowedOrigins {
+		if err := validateCORSOrigin(origin); err != nil {
+			problems = append(problems, fmt.Sprintf("CORS_ALLOWED_ORIGINS contains invalid origin %q: %v", origin, err))
+		}
+	}
+
+	if len(problems) > 0 {
+		return fmt.Errorf("configuration validation failed: %s", strings.Join(problems, "; "))
+	}
+
+	return nil
+}
+
+func validateAbsoluteURL(raw string, requireHTTPS bool) error {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return fmt.Errorf("value is empty")
+	}
+
+	u, err := url.Parse(raw)
+	if err != nil {
+		return err
+	}
+	if !u.IsAbs() || u.Host == "" {
+		return fmt.Errorf("must be an absolute URL with host")
+	}
+
+	scheme := strings.ToLower(u.Scheme)
+	if scheme != "http" && scheme != "https" {
+		return fmt.Errorf("unsupported scheme %q", u.Scheme)
+	}
+	if requireHTTPS && scheme != "https" {
+		return fmt.Errorf("scheme must be https")
+	}
+
+	if u.Path != "" && u.Path != "/" {
+		return fmt.Errorf("must not include a path")
+	}
+	if u.RawQuery != "" || u.Fragment != "" {
+		return fmt.Errorf("must not include query or fragment")
+	}
+
+	return nil
+}
+
+func validateCORSOrigin(raw string) error {
+	u, err := url.Parse(strings.TrimSpace(raw))
+	if err != nil {
+		return err
+	}
+	if !u.IsAbs() || u.Host == "" {
+		return fmt.Errorf("must be an absolute URL origin")
+	}
+	scheme := strings.ToLower(u.Scheme)
+	if scheme != "http" && scheme != "https" {
+		return fmt.Errorf("unsupported scheme %q", u.Scheme)
+	}
+	if u.Path != "" && u.Path != "/" {
+		return fmt.Errorf("origin must not include a path")
+	}
+	if u.RawQuery != "" || u.Fragment != "" {
+		return fmt.Errorf("origin must not include query or fragment")
+	}
+	if u.User != nil {
+		return fmt.Errorf("origin must not include user info")
+	}
+	return nil
 }
 
 // Refresh reloads configuration (useful for secret rotation).

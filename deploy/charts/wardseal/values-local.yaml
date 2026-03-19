@@ -50,7 +50,7 @@ authsvc:
     JWT_PRIVATE_KEY_PATH: /etc/wardseal/keys/private_key.pem
     JWT_PUBLIC_KEY_PATH: /etc/wardseal/keys/public_key.pem
     DEPLOYMENT_MODE: saas
-    UI_URL: http://auth.wardseal.local
+    UI_URL: http://manage.wardseal.local
     REDIS_ADDR: redis.wardseal-local.svc.cluster.local:6379
     REDIS_DB: "0"
     REDIS_ENABLED: "true"

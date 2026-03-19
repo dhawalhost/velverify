@@ -18,6 +18,8 @@ POSTGRES_RELEASE="postgres"
 WARDSEAL_RELEASE="wardseal"
 VAULT_NAMESPACE="vault-staging"
 VAULT_ADDR="${VAULT_ADDR:-http://vault.vault-staging.svc.cluster.local:8200}"
+VAULT_KEY_PATH="${VAULT_KEY_PATH:-transit}"
+VAULT_KEY_NAME="${VAULT_KEY_NAME:-wardseal-signing-key-staging}"
 DEPLOY_POSTGRES="${DEPLOY_POSTGRES:-yes}"  # Set to 'no' to skip PostgreSQL deployment
 EXTERNAL_DB_HOST="${EXTERNAL_DB_HOST:-}"    # Set if using external PostgreSQL
 
@@ -321,7 +323,8 @@ create_secrets() {
             --from-literal=VAULT_ADDR="$VAULT_ADDR" \
             --from-literal=VAULT_ROLE_ID="$ROLE_ID" \
             --from-literal=VAULT_SECRET_ID="$SECRET_ID" \
-            --from-literal=VAULT_KEY_NAME="wardseal-signing-key-staging" \
+            --from-literal=VAULT_KEY_NAME="$VAULT_KEY_NAME" \
+            --from-literal=VAULT_KEY_PATH="$VAULT_KEY_PATH" \
             --dry-run=client -o yaml | kubectl apply -f -
         
         log_info "Vault KMS secret created ✓"

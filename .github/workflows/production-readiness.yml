@@ -1,0 +1,308 @@
+name: Production Readiness Checks
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'deploy/charts/**'
+      - 'scripts/validate_env_config.sh'
+      - 'scripts/preflight_production.sh'
+      - '.github/workflows/production-readiness.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'deploy/charts/**'
+      - 'scripts/validate_env_config.sh'
+      - 'scripts/preflight_production.sh'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  production-manifest-validation:
+    runs-on: ubuntu-latest
+    name: Production Manifest Validation
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+
+      - name: Validate Helm chart structure
+        run: helm lint deploy/charts/wardseal/
+        continue-on-error: false
+
+      - name: Test Helm template rendering (Production)
+        id: helm-render-prod
+        run: |
+          helm template wardseal deploy/charts/wardseal \
+            -f deploy/charts/wardseal/values-production.yaml \
+            --namespace wardseal \
+            -o /tmp/wardseal-prod-manifests.yaml
+          echo "✓ Production manifests rendered successfully"
+
+      - name: Validate production manifest structure
+        run: |
+          echo "Checking rendered manifests for required configurations..."
+          
+          # Check KMS_PROVIDER is set to vault
+          if grep -q "KMS_PROVIDER.*vault" /tmp/wardseal-prod-manifests.yaml; then
+            echo "✓ KMS_PROVIDER correctly set to vault"
+          else
+            echo "✗ KMS_PROVIDER not set to vault in production manifests"
+            exit 1
+          fi
+          
+          # Check Vault AppRole secret reference
+          if grep -q "wardseal-vault-kms-production" /tmp/wardseal-prod-manifests.yaml; then
+            echo "✓ Vault AppRole secret correctly referenced: wardseal-vault-kms-production"
+          else
+            echo "✗ Vault AppRole secret not correctly set"
+            exit 1
+          fi
+          
+          # Check Auth Service URL is set
+          if grep -q "AUTH_SERVICE_URL.*auth.wardseal.com" /tmp/wardseal-prod-manifests.yaml; then
+            echo "✓ AUTH_SERVICE_URL correctly configured"
+          else
+            echo "✗ AUTH_SERVICE_URL not correctly configured for production"
+            exit 1
+          fi
+          
+          # Check UI URL is set
+          if grep -q "UI_URL.*manage.wardseal.com" /tmp/wardseal-prod-manifests.yaml; then
+            echo "✓ UI_URL correctly configured"
+          else
+            echo "✗ UI_URL not correctly configured for production"
+            exit 1
+          fi
+          
+          # Check for ingress with TLS
+          if grep -q "kind: Ingress" /tmp/wardseal-prod-manifests.yaml; then
+            echo "✓ Ingress resource found"
+            if grep -q "tls:" /tmp/wardseal-prod-manifests.yaml; then
+              echo "✓ Ingress has TLS configured"
+            else
+              echo "⚠ Warning: Ingress does not have TLS configured"
+            fi
+          else
+            echo "✗ Ingress resource not found"
+            exit 1
+          fi
+          
+          # Check for replica count (HA setup)
+          if grep -q "replicas:" /tmp/wardseal-prod-manifests.yaml; then
+            echo "✓ Replica count configured"
+          else
+            echo "✗ Replica count not configured"
+            exit 1
+          fi
+
+  production-values-validation:
+    runs-on: ubuntu-latest
+    name: Production Values Validation
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate production values file exists
+        run: |
+          if [ ! -f deploy/charts/wardseal/values-production.yaml ]; then
+            echo "✗ values-production.yaml not found"
+            exit 1
+          fi
+          echo "✓ values-production.yaml exists"
+
+      - name: Check required configuration keys
+        run: |
+          VALUES_FILE="deploy/charts/wardseal/values-production.yaml"
+          
+          echo "Validating required production configuration..."
+          
+          # Check for KMS section
+          if grep -q "^kms:" "$VALUES_FILE" && grep -q "provider: vault" "$VALUES_FILE"; then
+            echo "✓ KMS section configured with vault provider"
+          else
+            echo "✗ KMS section not properly configured"
+            exit 1
+          fi
+          
+          # Check for vault AppRole secret
+          if grep -q "vaultAppRole:" "$VALUES_FILE" && grep -q "existingSecret: wardseal-vault-kms-production" "$VALUES_FILE"; then
+            echo "✓ Vault AppRole secret properly referenced"
+          else
+            echo "✗ Vault AppRole secret not properly referenced"
+            exit 1
+          fi
+          
+          # Check KMS_PROVIDER environment variable
+          if grep -q "KMS_PROVIDER:" "$VALUES_FILE" && grep -q "vault" "$VALUES_FILE"; then
+            echo "✓ KMS_PROVIDER environment variable set"
+          else
+            echo "✗ KMS_PROVIDER not set correctly"
+            exit 1
+          fi
+          
+          # Check AUTH_SERVICE_URL
+          if grep -q "AUTH_SERVICE_URL:" "$VALUES_FILE" && grep -q "auth.wardseal.com" "$VALUES_FILE"; then
+            echo "✓ AUTH_SERVICE_URL set correctly for production"
+          else
+            echo "✗ AUTH_SERVICE_URL not set correctly for production"
+            exit 1
+          fi
+          
+          # Check UI_URL
+          if grep -q "UI_URL:" "$VALUES_FILE" && grep -q "manage.wardseal.com" "$VALUES_FILE"; then
+            echo "✓ UI_URL set correctly for production"
+          else
+            echo "✗ UI_URL not set correctly for production"
+            exit 1
+          fi
+          
+          # Check for replica count (HA)
+          if grep -q "replicaCount:" "$VALUES_FILE"; then
+            REPLICAS=$(grep "replicaCount:" "$VALUES_FILE" | head -1 | awk '{print $2}')
+            if [ "$REPLICAS" -ge 2 ]; then
+              echo "✓ HA setup configured (replicas: $REPLICAS)"
+            else
+              echo "⚠ Warning: Low replica count ($REPLICAS) - consider at least 2 for HA"
+            fi
+          else
+            echo "✗ replicaCount not configured"
+            exit 1
+          fi
+
+  production-script-validation:
+    runs-on: ubuntu-latest
+    name: Production Script Validation
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate preflight script syntax
+        run: |
+          echo "Checking preflight production script syntax..."
+          bash -n scripts/preflight_production.sh
+          echo "✓ preflight_production.sh syntax valid"
+
+      - name: Validate environment config script syntax
+        run: |
+          echo "Checking environment config validation script syntax..."
+          bash -n scripts/validate_env_config.sh
+          echo "✓ validate_env_config.sh syntax valid"
+
+      - name: Verify preflight script is executable
+        run: |
+          if [ -x scripts/preflight_production.sh ]; then
+            echo "✓ preflight_production.sh is executable"
+          else
+            echo "⚠ Warning: preflight_production.sh is not marked executable"
+            chmod +x scripts/preflight_production.sh
+          fi
+
+  production-deployment-documentation:
+    runs-on: ubuntu-latest
+    name: Deployment Documentation Check
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify production deployment documentation exists
+        run: |
+          if [ ! -f deploy/k8s-production/README.md ]; then
+            echo "✗ Production deployment guide not found at deploy/k8s-production/README.md"
+            exit 1
+          fi
+          echo "✓ Production deployment guide exists"
+
+      - name: Check critical documentation sections
+        run: |
+          DOC_FILE="deploy/k8s-production/README.md"
+          
+          echo "Validating critical documentation sections..."
+          
+          REQUIRED_SECTIONS=(
+            "Prerequisites"
+            "Helm Configuration Contract"
+            "Vault Setup"
+            "Kubernetes Secrets"
+            "Helm Deploy"
+            "Verification"
+            "Rotation"
+          )
+          
+          for section in "${REQUIRED_SECTIONS[@]}"; do
+            if grep -q "## $section" "$DOC_FILE"; then
+              echo "✓ Section found: $section"
+            else
+              echo "✗ Critical section missing: $section"
+              exit 1
+            fi
+          done
+
+      - name: Verify deployment guide links
+        run: |
+          if grep -q "Production Preflight Checks" docs/DEPLOYMENT_GUIDE.md; then
+            echo "✓ Production Preflight Checks section found in main guide"
+          else
+            echo "✗ Production Preflight Checks section not linked in main guide"
+            exit 1
+          fi
+          
+          if grep -q "scripts/preflight_production.sh" docs/DEPLOYMENT_GUIDE.md; then
+            echo "✓ Preflight script referenced in documentation"
+          else
+            echo "✗ Preflight script not referenced in documentation"
+            exit 1
+          fi
+
+  summary:
+    runs-on: ubuntu-latest
+    name: Production Readiness Summary
+    needs: [production-manifest-validation, production-values-validation, production-script-validation, production-deployment-documentation]
+    if: always()
+    steps:
+      - name: Check all validation results
+        run: |
+          echo "================================"
+          echo "Production Readiness Report"
+          echo "================================"
+          
+          if [ "${{ needs.production-manifest-validation.result }}" = "success" ]; then
+            echo "✓ Production manifest validation: PASSED"
+          else
+            echo "✗ Production manifest validation: FAILED"
+          fi
+          
+          if [ "${{ needs.production-values-validation.result }}" = "success" ]; then
+            echo "✓ Production values validation: PASSED"
+          else
+            echo "✗ Production values validation: FAILED"
+          fi
+          
+          if [ "${{ needs.production-script-validation.result }}" = "success" ]; then
+            echo "✓ Production script validation: PASSED"
+          else
+            echo "✗ Production script validation: FAILED"
+          fi
+          
+          if [ "${{ needs.production-deployment-documentation.result }}" = "success" ]; then
+            echo "✓ Deployment documentation: PASSED"
+          else
+            echo "✗ Deployment documentation: FAILED"
+          fi
+          
+          echo "================================"
+          
+          if [ "${{ needs.production-manifest-validation.result }}" = "success" ] && \
+             [ "${{ needs.production-values-validation.result }}" = "success" ] && \
+             [ "${{ needs.production-script-validation.result }}" = "success" ] && \
+             [ "${{ needs.production-deployment-documentation.result }}" = "success" ]; then
+            echo "✓ Code is PRODUCTION READY"
+            exit 0
+          else
+            echo "✗ Code is NOT production ready - fix failures above"
+            exit 1
+          fi

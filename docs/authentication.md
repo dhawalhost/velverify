@@ -181,6 +181,56 @@ curl -X POST http://localhost:8080/api/v1/saml/providers \
 
 WardSeal is a fully compliant OAuth 2.0 and OpenID Connect provider.
 
+### Tenant Auto-Discovery (Recommended)
+
+For multi-tenant setups, clients can resolve the correct tenant issuer automatically from user email.
+
+#### 1) Resolve issuer/discovery/JWKS by email
+
+**Endpoint:** `GET /api/v1/oidc/resolve?email=user@company.com`
+
+```bash
+curl "http://localhost:8080/api/v1/oidc/resolve?email=admin@wardseal.com"
+```
+
+**Response:**
+```json
+{
+  "tenant_id": "admin-system",
+  "tenant_slug": "admin",
+  "issuer": "http://localhost:8080/t/admin",
+  "discovery_url": "http://localhost:8080/t/admin/.well-known/openid-configuration",
+  "jwks_uri": "http://localhost:8080/t/admin/.well-known/jwks.json",
+  "authorization": "http://localhost:8080/t/admin/oauth2/authorize",
+  "token_endpoint": "http://localhost:8080/t/admin/oauth2/token"
+}
+```
+
+Use the returned `issuer` (or `discovery_url`) in your OIDC client config.
+
+#### 2) WebFinger issuer discovery (OIDC clients)
+
+**Endpoint:** `GET /.well-known/webfinger?resource=acct:user@company.com`
+
+```bash
+curl "http://localhost:8080/.well-known/webfinger?resource=acct:admin@wardseal.com"
+```
+
+**Response:**
+```json
+{
+  "subject": "acct:admin@wardseal.com",
+  "links": [
+    {
+      "rel": "http://openid.net/specs/connect/1.0/issuer",
+      "href": "http://localhost:8080/t/admin"
+    }
+  ]
+}
+```
+
+Many OIDC RPs can use this to auto-locate the tenant issuer.
+
 ### Endpoints
 
 | Endpoint | URL |

@@ -12,7 +12,9 @@ Complete step-by-step guide for deploying WardSeal Identity Platform.
 4. [Kubernetes Deployment](#kubernetes-deployment)
 5. [ArgoCD GitOps Deployment](#argocd-gitops-deployment)
 6. [Production Checklist](#production-checklist)
-7. [Troubleshooting](#troubleshooting)
+7. [Production Vault Runbook](#production-vault-runbook)
+8. [Production Preflight Checks](#production-preflight-checks)
+9. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -453,6 +455,39 @@ ingress:
 ```
 
 ---
+
+## Production Vault Runbook
+
+For the complete production setup (Vault Transit key creation, AppRole, required Kubernetes secrets, Helm deploy, verification, and rotation):
+
+- [deploy/k8s-production/README.md](../deploy/k8s-production/README.md)
+
+## Production Preflight Checks
+
+Before deploying to production, run the preflight checklist script to validate:
+
+- Kubernetes cluster connectivity and namespace setup
+- Required secrets (database, service auth, Vault KMS, license)
+- DNS resolution for AUTH_SERVICE_URL and UI_URL
+- TLS certificates and cert-manager setup
+- Ingress configuration
+- Vault Transit key and AppRole configuration
+- Helm chart template rendering with production values
+- PostgreSQL database connectivity
+
+**Usage:**
+```bash
+bash scripts/preflight_production.sh
+```
+
+This script validates ~40 configuration checks and will block deployment if any critical check fails. Review all YELLOW warnings before proceeding.
+
+**Script Features:**
+- Color-coded output (✓ = pass, ✗ = fail, ⚠ = warning)
+- Detailed section breakdown for easy troubleshooting
+- Helm template validation to catch manifest issues early
+- Database connectivity testing
+- TLS certificate verification
 
 ## Troubleshooting
 

@@ -1,12 +1,64 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { login, getBranding, completeMfaLogin, lookupUser, beginLogin, finishLogin, getSetupStatus } from '../api';
+import { login, getBranding, completeMfaLogin, lookupUser, beginLogin, finishLogin, getSetupStatus, getUserRoles } from '../api';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ShieldCheck, Fingerprint, ArrowRight, User as UserIcon, Lock } from 'lucide-react';
 import { startAuthentication } from '@simplewebauthn/browser';
+import { v4 as uuidv4 } from 'uuid';
+
+const ADMIN_ROLE = 'admin';
+
+type TokenPayload = {
+    sub?: string;
+    user_id?: string;
+    roles?: string[];
+    role?: string;
+};
+
+type RBACRole = {
+    id?: string;
+    name?: string;
+};
+
+const decodeTokenPayload = (token: string | null): TokenPayload | null => {
+    if (!token) return null;
+
+    try {
+        const [, payload] = token.split('.');
+        if (!payload) return null;
+
+        const normalized = payload.replace(/-/g, '+').replace(/_/g, '/');
+        const padded = normalized + '='.repeat((4 - (normalized.length % 4)) % 4);
+        return JSON.parse(atob(padded));
+    } catch {
+        return null;
+    }
+};
+
+const getTokenUserID = (token: string | null): string => {
+    const payload = decodeTokenPayload(token);
+    if (!payload) return '';
+    return payload.sub || payload.user_id || '';
+};
+
+const hasAdminAccess = (roles: string[]): boolean => {
+    return roles.some((role) => role.toLowerCase() === ADMIN_ROLE);
+};
+
+const fetchBackendRoleNames = async (token: string | null): Promise<string[]> => {
+    const userID = getTokenUserID(token);
+    if (!userID) return [];
+
+    const response = await getUserRoles(userID);
+    const roles = Array.isArray(response?.roles) ? response.roles : [];
+
+    return roles
+        .map((role: RBACRole | string) => (typeof role === 'string' ? role : role?.name))
+        .filter((name): name is string => typeof name === 'string');
+};
 
 const Login: React.FC = () => {
     const policyBaseUrl = window.location.hostname.endsWith('.local')
@@ -16,7 +68,7 @@ const Login: React.FC = () => {
     const getDeviceID = () => {
         let deviceID = localStorage.getItem('deviceID');
         if (!deviceID) {
-            deviceID = crypto.randomUUID();
+            deviceID = uuidv4();
             localStorage.setItem('deviceID', deviceID);
         }
         return deviceID;
@@ -92,9 +144,9 @@ const Login: React.FC = () => {
     }, [tenantID]);
 
 
-    const performRedirection = (data: any) => {
+    const performRedirection = async () => {
         const redirectUri = searchParams.get('redirect_uri');
-        console.log('Performing redirection. redirectUri:', redirectUri, 'data:', data);
+        console.log('Performing redirection. redirectUri:', redirectUri);
 
         if (redirectUri) {
             // Explicitly handle relative paths by using window.location for full page transition
@@ -106,9 +158,16 @@ const Login: React.FC = () => {
             return;
         }
 
-        // Role-based redirection fallback
-        const roles = data.roles || [];
-        if (roles.includes('admin')) {
+        // Role-based redirection using backend RBAC source of truth only
+        const token = localStorage.getItem('token');
+        let roles: string[] = [];
+        try {
+            roles = await fetchBackendRoleNames(token);
+        } catch {
+            roles = [];
+        }
+
+        if (hasAdminAccess(roles)) {
             navigate('/dashboard');
         } else {
             navigate('/portal');
@@ -120,7 +179,7 @@ const Login: React.FC = () => {
         setError('');
         setLoading(true);
 
-        // Tenant ID is optional now (backend discovery)
+        // Tenant ID is optional now (resolved by backend)
         // If provided, we save it. If not, backend returns it.
         if (tenantID) {
             localStorage.setItem('tenantID', tenantID);
@@ -195,7 +254,8 @@ const Login: React.FC = () => {
             }
 
             localStorage.setItem('token', data.token);
-            localStorage.setItem('userId', email);
+            const tokenUserID = getTokenUserID(data.token) || email;
+            localStorage.setItem('userId', tokenUserID);
             if (data.tenant_id) {
                 localStorage.setItem('tenantID', data.tenant_id);
             }
@@ -203,7 +263,7 @@ const Login: React.FC = () => {
                 localStorage.setItem('tenantSlug', data.tenant_slug);
             }
 
-            performRedirection(data);
+            await performRedirection();
         } catch (err: any) {
             console.error(err);
             // Ensure tenantID is still set if login fails (it should be from step 1)
@@ -227,7 +287,8 @@ const Login: React.FC = () => {
             const data = await finishLogin(userID, creds);
 
             localStorage.setItem('token', data.token);
-            localStorage.setItem('userId', email);
+            const tokenUserID = getTokenUserID(data.token) || email;
+            localStorage.setItem('userId', tokenUserID);
             if (data.tenant_id) {
                 localStorage.setItem('tenantID', data.tenant_id);
             }
@@ -235,7 +296,7 @@ const Login: React.FC = () => {
                 localStorage.setItem('tenantSlug', data.tenant_slug);
             }
 
-            performRedirection(data);
+            await performRedirection();
         } catch (err: any) {
             console.error(err);
             setError('Passkey authentication failed');
@@ -250,7 +311,8 @@ const Login: React.FC = () => {
         try {
             const data = await completeMfaLogin(pendingToken, totpCode, mfaUserId);
             localStorage.setItem('token', data.token);
-            localStorage.setItem('userId', email);
+            const tokenUserID = getTokenUserID(data.token) || email;
+            localStorage.setItem('userId', tokenUserID);
             if (data.tenant_id) {
                 localStorage.setItem('tenantID', data.tenant_id);
             }
@@ -258,7 +320,7 @@ const Login: React.FC = () => {
                 localStorage.setItem('tenantSlug', data.tenant_slug);
             }
 
-            performRedirection(data);
+            await performRedirection();
         } catch (err: any) {
             console.error(err);
             setError('Invalid TOTP code');
@@ -340,6 +402,7 @@ const Login: React.FC = () => {
                                     onChange={(e) => setEmail(e.target.value)}
                                     required
                                     autoFocus
+                                    autoComplete="username email"
                                 />
                             </div>
 
@@ -405,6 +468,7 @@ const Login: React.FC = () => {
                                         onChange={(e) => setPassword(e.target.value)}
                                         required
                                         autoFocus={!webAuthnEnabled}
+                                        autoComplete="current-password"
                                     />
                                 </div>
                                 {error && <div className="p-3 text-sm bg-destructive/10 text-destructive rounded-md flex items-center gap-2"><ShieldCheck className="w-4 h-4" /> {error}</div>}

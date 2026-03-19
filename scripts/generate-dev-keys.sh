@@ -15,7 +15,7 @@ if [ -f "$PRIVATE_KEY" ] && [ -f "$PUBLIC_KEY" ]; then
     exit 0
 fi
 
-echo "Generating new RSA keypair for local development (JWT Signing)..."
+echo "Generating new RSA keypair (JWT Signing)..."
 
 # Generate private key (2048-bit)
 openssl genpkey -algorithm RSA -out "$PRIVATE_KEY" -pkeyopt rsa_keygen_bits:2048

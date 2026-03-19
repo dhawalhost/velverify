@@ -37,7 +37,6 @@ interface APIKey {
 const DeveloperApps: React.FC = () => {
     const currentTenantID = localStorage.getItem('tenantID') || '';
     const currentIssuerBaseURL = currentTenantID ? `${window.location.origin}/t/${currentTenantID}` : window.location.origin;
-    const currentDiscoveryURL = `${currentIssuerBaseURL}/.well-known/openid-configuration`;
     const [apps, setApps] = useState<DeveloperApp[]>([]);
     const [apiKeys, setAPIKeys] = useState<APIKey[]>([]);
     const [loading, setLoading] = useState(true);
@@ -405,7 +404,6 @@ const DeveloperApps: React.FC = () => {
         const primaryRedirectURI = app.redirect_uris?.[0] || 'http://localhost:3000/callback';
         return [
             `ISSUER_BASE_URL=${currentIssuerBaseURL}`,
-            `DISCOVERY_URL=${currentDiscoveryURL}`,
             `CLIENT_ID=${app.client_id}`,
             `REDIRECT_URI=${primaryRedirectURI}`,
             `GRANT_TYPES=${(app.grant_types && app.grant_types.length > 0 ? app.grant_types : ['authorization_code', 'refresh_token']).join(' ')}`,
@@ -543,16 +541,7 @@ const DeveloperApps: React.FC = () => {
                                                     <RefreshCw className="h-4 w-4" />
                                                 </Button>
                                             </div>
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label>Discovery URL</Label>
-                                            <div className="flex gap-2">
-                                                <Input readOnly value={currentDiscoveryURL} className="bg-muted font-mono text-xs" />
-                                                <Button type="button" variant="outline" size="icon" onClick={() => handleCopyValue('Discovery URL', currentDiscoveryURL)}>
-                                                    <RefreshCw className="h-4 w-4" />
-                                                </Button>
-                                            </div>
-                                            <div className="text-xs text-muted-foreground">Use these values in the client app while configuring OIDC.</div>
+                                            <div className="text-xs text-muted-foreground">Use issuer URL, client ID, and client secret in your OIDC client configuration.</div>
                                         </div>
                                     </div>
                                     <div className="space-y-2">
@@ -638,15 +627,6 @@ const DeveloperApps: React.FC = () => {
                                             <div className="flex gap-2">
                                                 <Input readOnly value={currentIssuerBaseURL} className="bg-muted font-mono text-xs" />
                                                 <Button type="button" variant="outline" size="icon" onClick={() => handleCopyValue('Issuer URL', currentIssuerBaseURL)}>
-                                                    <RefreshCw className="h-4 w-4" />
-                                                </Button>
-                                            </div>
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label>Discovery URL</Label>
-                                            <div className="flex gap-2">
-                                                <Input readOnly value={currentDiscoveryURL} className="bg-muted font-mono text-xs" />
-                                                <Button type="button" variant="outline" size="icon" onClick={() => handleCopyValue('Discovery URL', currentDiscoveryURL)}>
                                                     <RefreshCw className="h-4 w-4" />
                                                 </Button>
                                             </div>
@@ -823,15 +803,6 @@ const DeveloperApps: React.FC = () => {
                                     </div>
                                 </div>
                                 <div className="space-y-2">
-                                    <Label>Discovery URL</Label>
-                                    <div className="flex gap-2">
-                                        <Input readOnly value={currentDiscoveryURL} className="bg-muted font-mono text-xs" />
-                                        <Button type="button" variant="outline" size="icon" onClick={() => handleCopyValue('Discovery URL', currentDiscoveryURL)}>
-                                            <RefreshCw className="h-4 w-4" />
-                                        </Button>
-                                    </div>
-                                </div>
-                                <div className="space-y-2">
                                     <Label>Client ID</Label>
                                     <div className="flex gap-2">
                                         <Input readOnly value={quickstartApp.client_id} className="bg-muted font-mono text-xs" />
@@ -953,48 +924,21 @@ const DeveloperApps: React.FC = () => {
                     <Card>
                         <CardHeader>
                             <CardTitle>Identity Provider Configuration</CardTitle>
-                            <CardDescription>Use these endpoints to configure Wardseal as an IdP in external applications (Okta, Azure AD, Auth0).</CardDescription>
+                            <CardDescription>Use this issuer with your client credentials to configure WardSeal as an IdP in external applications (Okta, Azure AD, Auth0).</CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-6">
                             <div className="space-y-4">
                                 <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">OpenID Connect (OIDC)</h3>
-                                <div className="grid gap-4 md:grid-cols-2">
+                                <div className="grid gap-4 md:grid-cols-1">
                                     <div className="space-y-2">
                                         <Label>Issuer URL</Label>
                                         <div className="flex gap-2">
-                                            <Input readOnly value={window.location.origin} className="bg-muted font-mono text-xs" />
-                                            <Button variant="outline" size="icon" onClick={() => navigator.clipboard.writeText(window.location.origin)}>
+                                            <Input readOnly value={currentIssuerBaseURL} className="bg-muted font-mono text-xs" />
+                                            <Button variant="outline" size="icon" onClick={() => navigator.clipboard.writeText(currentIssuerBaseURL)}>
                                                 <RefreshCw className="h-4 w-4" />
                                             </Button>
                                         </div>
-                                        <p className="text-xs text-muted-foreground">The root URL for OIDC discovery.</p>
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label>Authorization Endpoint</Label>
-                                        <div className="flex gap-2">
-                                            <Input readOnly value={`${window.location.origin}/oauth2/authorize`} className="bg-muted font-mono text-xs" />
-                                            <Button variant="outline" size="icon" onClick={() => navigator.clipboard.writeText(`${window.location.origin}/oauth2/authorize`)}>
-                                                <RefreshCw className="h-4 w-4" />
-                                            </Button>
-                                        </div>
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label>Token Endpoint</Label>
-                                        <div className="flex gap-2">
-                                            <Input readOnly value={`${window.location.origin}/oauth2/token`} className="bg-muted font-mono text-xs" />
-                                            <Button variant="outline" size="icon" onClick={() => navigator.clipboard.writeText(`${window.location.origin}/oauth2/token`)}>
-                                                <RefreshCw className="h-4 w-4" />
-                                            </Button>
-                                        </div>
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label>JWKS URI</Label>
-                                        <div className="flex gap-2">
-                                            <Input readOnly value={`${window.location.origin}/.well-known/jwks.json`} className="bg-muted font-mono text-xs" />
-                                            <Button variant="outline" size="icon" onClick={() => navigator.clipboard.writeText(`${window.location.origin}/.well-known/jwks.json`)}>
-                                                <RefreshCw className="h-4 w-4" />
-                                            </Button>
-                                        </div>
+                                        <p className="text-xs text-muted-foreground">Configure your client with issuer URL, client ID, and client secret. OIDC libraries auto-discover the rest.</p>
                                     </div>
                                 </div>
                             </div>

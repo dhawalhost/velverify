@@ -223,12 +223,13 @@ const Landing: React.FC = () => {
                             <p>{'  '}--set auth.domain=auth.example.com \</p>
                             <p>{'  '}--set global.mode=cloud</p>
                             <br />
-                            <p className="text-muted-foreground"># OIDC discovery</p>
-                            <p><span className="text-primary">curl</span> https://auth.example.com/t/acme/</p>
-                            <p>{'  '}.well-known/openid-configuration</p>
+                            <p className="text-muted-foreground"># OIDC app config</p>
+                            <p><span className="text-primary">export</span> ISSUER_URL=https://auth.example.com/t/acme</p>
+                            <p><span className="text-primary">export</span> CLIENT_ID=ws_xxx</p>
+                            <p><span className="text-primary">export</span> CLIENT_SECRET=ws_secret_xxx</p>
                             <br />
                             <p className="text-green-500">✓ Issuer: https://auth.example.com/t/acme</p>
-                            <p className="text-green-500">✓ JWKS, token, userinfo endpoints live</p>
+                            <p className="text-green-500">✓ Client credentials issued</p>
                             <p className="text-green-500">✓ MFA policies active</p>
                         </div>
                     </div>

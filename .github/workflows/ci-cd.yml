@@ -11,6 +11,28 @@ permissions:
   packages: write
 
 jobs:
+  config-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+      - name: Run environment config validation
+        run: bash scripts/validate_env_config.sh
+
+  config-policy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+      - name: Run config policy tests
+        run: go test -v ./pkg/config/...
+
   lint:
     runs-on: ubuntu-latest
     steps:
@@ -75,7 +97,7 @@ jobs:
         run: go test -v -tags=integration ./tests/integration/...
 
   build-push:
-    needs: [lint, test, integration-test]
+    needs: [config-lint, config-policy, lint, test, integration-test]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false

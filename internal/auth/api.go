@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/mail"
 	"net/url"
 	"os"
 	"strings"
@@ -100,6 +101,8 @@ func (h *HTTPHandler) RegisterRoutes(router *gin.Engine) {
 
 	// Public routes (but still tenant-aware if slug provided)
 	router.GET("/api/v1/setup/status", h.getSetupStatus)
+	router.GET("/api/v1/oidc/resolve", h.oidcResolve)
+	router.GET("/.well-known/webfinger", h.webfinger)
 	router.POST("/api/v1/signup", h.signup)
 	router.POST("/api/v1/setup", h.performSetup)
 	router.POST("/api/v1/setup/password", h.completePasswordSetup)
@@ -155,7 +158,7 @@ func (h *HTTPHandler) RegisterRoutes(router *gin.Engine) {
 	// but wrap them in a similar middleware or ensure they use header.
 	// For simplicity, we'll keep them in authGroup for now and update tests if needed.
 	// Actually, the tests use env.AuthServer.URL + "/oauth/authorize", so they hit root.
-	
+
 	oauthGroup := router.Group("/oauth")
 	oauthGroup.Use(middleware.TenantExtractor(middleware.TenantConfig{
 		HeaderName:    "X-Tenant-ID",
@@ -495,6 +498,96 @@ func (h *HTTPHandler) lookupUser(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, result)
+}
+
+func (h *HTTPHandler) oidcResolve(c *gin.Context) {
+	email := strings.TrimSpace(c.Query("email"))
+	if email == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "email query param is required"})
+		return
+	}
+
+	if _, err := mail.ParseAddress(email); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid email"})
+		return
+	}
+
+	result, err := h.svc.LookupUser(c.Request.Context(), "", email)
+	if err != nil {
+		h.logger.Warn("OIDC resolve failed", zap.String("email", email), zap.Error(err))
+		c.JSON(http.StatusNotFound, gin.H{"error": "tenant not found for user"})
+		return
+	}
+
+	tenantSlug := result.TenantSlug
+	if tenantSlug == "" {
+		tenantSlug = h.tenantSlugForID(c.Request.Context(), result.TenantID)
+	}
+	if tenantSlug == "" {
+		c.JSON(http.StatusNotFound, gin.H{"error": "tenant slug not found"})
+		return
+	}
+
+	baseIssuer := strings.TrimRight(h.svc.GetOIDCConfiguration().Issuer, "/")
+	issuer := fmt.Sprintf("%s/t/%s", baseIssuer, tenantSlug)
+
+	c.JSON(http.StatusOK, gin.H{
+		"tenant_id":      result.TenantID,
+		"tenant_slug":    tenantSlug,
+		"issuer":         issuer,
+		"discovery_url":  fmt.Sprintf("%s/.well-known/openid-configuration", issuer),
+		"jwks_uri":       fmt.Sprintf("%s/.well-known/jwks.json", issuer),
+		"authorization":  fmt.Sprintf("%s/oauth2/authorize", issuer),
+		"token_endpoint": fmt.Sprintf("%s/oauth2/token", issuer),
+	})
+}
+
+func (h *HTTPHandler) webfinger(c *gin.Context) {
+	resource := strings.TrimSpace(c.Query("resource"))
+	if resource == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "resource query param is required"})
+		return
+	}
+
+	const acctPrefix = "acct:"
+	if !strings.HasPrefix(strings.ToLower(resource), acctPrefix) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "resource must be in acct:user@example.com format"})
+		return
+	}
+
+	email := strings.TrimSpace(resource[len(acctPrefix):])
+	if _, err := mail.ParseAddress(email); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid acct resource email"})
+		return
+	}
+
+	result, err := h.svc.LookupUser(c.Request.Context(), "", email)
+	if err != nil {
+		h.logger.Warn("WebFinger resolve failed", zap.String("resource", resource), zap.Error(err))
+		c.JSON(http.StatusNotFound, gin.H{"error": "resource not found"})
+		return
+	}
+
+	tenantSlug := result.TenantSlug
+	if tenantSlug == "" {
+		tenantSlug = h.tenantSlugForID(c.Request.Context(), result.TenantID)
+	}
+	if tenantSlug == "" {
+		c.JSON(http.StatusNotFound, gin.H{"error": "tenant slug not found"})
+		return
+	}
+
+	issuer := fmt.Sprintf("%s/t/%s", strings.TrimRight(h.svc.GetOIDCConfiguration().Issuer, "/"), tenantSlug)
+
+	c.JSON(http.StatusOK, gin.H{
+		"subject": resource,
+		"links": []gin.H{
+			{
+				"rel":  "http://openid.net/specs/connect/1.0/issuer",
+				"href": issuer,
+			},
+		},
+	})
 }
 
 // MFALoginRequest is the request to complete MFA login.

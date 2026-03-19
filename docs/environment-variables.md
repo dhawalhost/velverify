@@ -68,12 +68,31 @@ go test -v -tags=integration ./tests/integration/...
 | Variable | Required | Default | Description |
 | :--- | :---: | :--- | :--- |
 | `AUTH_SERVICE_URL` | ❌ | `http://localhost:8080` | Base URL for auth service |
+| `UI_URL` | ❌ | `http://manage.wardseal.local` | Admin UI origin used for login/password redirects |
 | `DIRECTORY_SERVICE_URL` | ❌ | `http://dirsvc:8081` | URL of directory service |
-| `SERVICE_AUTH_TOKEN` | ⚠️ | `dev-internal-token` | Token for service-to-service auth |
-| `SERVICE_AUTH_HEADER` | ❌ | - | Custom header name for service auth |
-| `JWT_SIGNING_KEY` | ✅ | - | Private key for signing JWTs |
-| `JWT_PUBLIC_KEY` | ❌ | - | Public key for verifying JWTs |
+| `SERVICE_AUTH_TOKEN` | ⚠️ | - | Token for service-to-service auth |
+| `SERVICE_AUTH_HEADER` | ❌ | `X-Service-Auth` | Header name for service auth |
+| `KMS_PROVIDER` | ❌ | `local` | Key provider: `local` or `vault` |
+| `JWT_PRIVATE_KEY_PATH` | ⚠️ | - | Required in local mode; filesystem path to private key |
+| `JWT_PUBLIC_KEY_PATH` | ⚠️ | - | Required in local mode; filesystem path to public key |
+| `VAULT_ADDR` | ⚠️ | - | Required with `KMS_PROVIDER=vault` |
+| `VAULT_TOKEN` | ⚠️ | - | Vault auth token (optional if using AppRole) |
+| `VAULT_ROLE_ID` | ⚠️ | - | Vault AppRole role ID (optional if using token) |
+| `VAULT_SECRET_ID` | ⚠️ | - | Vault AppRole secret ID (optional if using token) |
+| `VAULT_KEY_NAME` | ❌ | `wardseal-signing-key` | Vault Transit key name used for JWT signing |
+| `VAULT_KEY_PATH` | ❌ | `transit` | Vault Transit mount path |
+| `VAULT_NAMESPACE` | ❌ | - | Vault Enterprise namespace (if used) |
 | `LOG_LEVEL` | ❌ | `info` | Logging level: `debug`, `info`, `warn`, `error` |
+
+#### Key Management Mode Matrix
+
+| Environment | KMS Mode | Required Key Vars |
+| :--- | :--- | :--- |
+| Local | `KMS_PROVIDER=local` | `JWT_PRIVATE_KEY_PATH`, `JWT_PUBLIC_KEY_PATH` |
+| Staging | `KMS_PROVIDER=vault` | `VAULT_ADDR` + (`VAULT_TOKEN` **or** `VAULT_ROLE_ID`+`VAULT_SECRET_ID`) + `VAULT_KEY_NAME` (+ optional `VAULT_KEY_PATH`) |
+| Production | `KMS_PROVIDER=vault` | Same as staging |
+
+> Runtime policy enforcement now validates this contract. Staging/production reject non-vault KMS; local rejects missing JWT key paths.
 
 #### Redis-backed session and distributed rate-limit settings
 
@@ -149,9 +168,13 @@ go test -v -tags=integration ./tests/integration/...
 > [!CAUTION]
 > Never use default values in production!
 
-1. **Generate strong secrets:**
+1. **Use environment-appropriate key management:**
+   - Local: file-based key paths via `JWT_PRIVATE_KEY_PATH` and `JWT_PUBLIC_KEY_PATH`
+   - Staging/Production: Vault Transit (`KMS_PROVIDER=vault`) with `VAULT_KEY_NAME` and AppRole/token auth
+
+2. **Generate strong secrets:**
    ```bash
-   # Generate JWT signing key
+   # Generate local JWT signing key pair (local mode only)
    openssl genpkey -algorithm RSA -out jwt_private.pem -pkeyopt rsa_keygen_bits:2048
    openssl rsa -pubout -in jwt_private.pem -out jwt_public.pem
    
@@ -159,10 +182,10 @@ go test -v -tags=integration ./tests/integration/...
    openssl rand -hex 32
    ```
 
-2. **Use secrets management:**
+3. **Use secrets management:**
    - Kubernetes: Use Secrets or external secrets operator
    - CircleCI: Use Contexts for sensitive values
    - Production: Consider HashiCorp Vault or AWS Secrets Manager
 
-3. **Enable SSL for database:**
+4. **Enable SSL for database:**
    - Set `DB_SSLMODE=verify-full` in production

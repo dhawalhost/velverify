@@ -121,7 +121,7 @@ The script performs the following:
 - Initializes Vault (3 key shares, threshold of 2)
 - Unseals Vault
 - Enables Transit secrets engine
-- Creates JWT signing key: `wardseal-signing-key-staging`
+- Creates JWT signing key: `wardseal-signing-key-staging` (RSA-2048 for RS256 JWTs)
 - Configures AppRole authentication
 - Saves credentials to `/tmp/vault-staging-keys.json` and `/tmp/vault-approle-staging.json`
 
@@ -166,6 +166,9 @@ DB_PASSWORD=secure-password ./scripts/deploy_wardseal_staging.sh
 
 # Custom Vault address (for external Vault)
 VAULT_ADDR=https://vault.example.com:8200 ./scripts/deploy_wardseal_staging.sh
+
+# Custom Vault Transit path / key name (must match Vault setup)
+VAULT_KEY_PATH=transit VAULT_KEY_NAME=wardseal-signing-key-staging ./scripts/deploy_wardseal_staging.sh
 ```
 
 ## Accessing Services
@@ -327,11 +330,24 @@ kubectl create secret generic wardseal-vault-kms-staging \
   --from-literal=VAULT_ADDR="http://vault.vault-staging.svc.cluster.local:8200" \
   --from-literal=VAULT_ROLE_ID="$ROLE_ID" \
   --from-literal=VAULT_SECRET_ID="$SECRET_ID" \
-  --from-literal=VAULT_KEY_NAME="wardseal-signing-key-staging"
+  --from-literal=VAULT_KEY_NAME="wardseal-signing-key-staging" \
+  --from-literal=VAULT_KEY_PATH="transit"
 
 # Restart auth service
 kubectl rollout restart deployment/wardseal-authsvc -n wardseal-staging
 ```
+
+### Required Vault + Key Configuration (Auth Service)
+
+For staging, `authsvc` uses Vault Transit signing (`KMS_PROVIDER=vault`) and must receive these values via `wardseal-vault-kms-staging`:
+
+- `VAULT_ADDR`
+- `VAULT_ROLE_ID`
+- `VAULT_SECRET_ID`
+- `VAULT_KEY_NAME` (example: `wardseal-signing-key-staging`)
+- `VAULT_KEY_PATH` (usually `transit`)
+
+The Helm values also map AppRole credentials from this exact secret via `authsvc.vaultAppRole.existingSecret: wardseal-vault-kms-staging`, so using a different secret name requires updating values as well.
 
 ## Cleanup
 

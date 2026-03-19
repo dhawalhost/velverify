@@ -1,6 +1,5 @@
 import React from 'react';
-import SwaggerUI from 'swagger-ui-react';
-import 'swagger-ui-react/swagger-ui.css';
+import { RedocStandalone } from 'redoc';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Terminal } from 'lucide-react';
@@ -28,15 +27,16 @@ const Developer: React.FC = () => {
                 </Card>
 
                 <Card className="overflow-hidden">
-                    <div className="swagger-wrapper bg-white">
-                        <SwaggerUI url="/openapi.yaml" />
+                    <div className="redoc-wrapper bg-white">
+                        <RedocStandalone specUrl="/openapi.yaml" />
                     </div>
                 </Card>
             </div>
 
             <style>{`
-                /* Simple override to make Swagger UI fit better in the card context if needed */
-                .swagger-ui .wrapper { padding: 0; }
+                /* ReDoc styling */
+                .redoc-wrapper { overflow: hidden; }
+                [role="main"] { padding: 0 !important; }
             `}</style>
         </div>
     );

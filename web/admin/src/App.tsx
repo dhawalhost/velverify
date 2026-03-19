@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider } from "@/components/theme-provider";
 import Layout from './components/Layout';
@@ -18,7 +18,6 @@ import Campaigns from './pages/Campaigns';
 
 import SSOConfig from './pages/SSOConfig';
 import Connectors from './pages/Connectors';
-import Developer from './pages/Developer';
 import Passkeys from './pages/Passkeys';
 import Branding from './pages/Branding';
 import Webhooks from './pages/Webhooks';
@@ -32,6 +31,9 @@ import PortalLayout from './layouts/PortalLayout';
 import PortalDashboard from './pages/PortalDashboard';
 import PortalProfile from './pages/PortalProfile';
 
+// Lazy load Developer page to reduce initial bundle size
+const Developer = React.lazy(() => import('./pages/Developer'));
+
 // Basic protected route
 const ProtectedRoute = ({ children }: { children: JSX.Element }) => {
   const token = localStorage.getItem('token');
@@ -40,6 +42,16 @@ const ProtectedRoute = ({ children }: { children: JSX.Element }) => {
   }
   return children;
 };
+
+// Loading fallback component
+const LoadingFallback = () => (
+  <div className="flex items-center justify-center min-h-screen">
+    <div className="text-center space-y-4">
+      <div className="w-12 h-12 border-4 border-primary/30 border-t-primary rounded-full animate-spin mx-auto"></div>
+      <p className="text-muted-foreground">Loading API documentation...</p>
+    </div>
+  </div>
+);
 
 const App: React.FC = () => {
   return (
@@ -73,7 +85,7 @@ const App: React.FC = () => {
             <Route path="/campaigns" element={<Campaigns />} />
             <Route path="/sso" element={<SSOConfig />} />
             <Route path="/connectors" element={<Connectors />} />
-            <Route path="/developer" element={<Developer />} />
+            <Route path="/developer" element={<Suspense fallback={<LoadingFallback />}><Developer /></Suspense>} />
             <Route path="/developer/analytics" element={<DeveloperAnalytics />} />
             <Route path="/passkeys" element={<Passkeys />} />
             <Route path="/branding" element={<Branding />} />
