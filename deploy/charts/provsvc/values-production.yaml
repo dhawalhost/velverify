@@ -1,0 +1,16 @@
+replicaCount: 3
+
+env:
+  ENVIRONMENT: production
+  LOG_LEVEL: warn
+  DIRECTORY_SERVICE_URL: http://wardseal-dirsvc:8081
+
+database:
+  existingSecret: wardseal-db-credentials-production
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 2
+
+networkPolicy:
+  enabled: true

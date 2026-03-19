@@ -1,0 +1,28 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: wardseal-production-adminui
+  namespace: argocd
+  labels:
+    environment: production
+    service: adminui
+spec:
+  project: production
+  source:
+    repoURL: https://github.com/dhawalhost/wardseal.git
+    targetRevision: main
+    path: deploy/charts/adminui
+    helm:
+      releaseName: wardseal
+      valueFiles:
+        - values.yaml
+        - values-production.yaml
+        - version-production.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: wardseal-production
+  syncPolicy:
+    syncOptions:
+      - CreateNamespace=true
+      - PruneLast=true
+      - ApplyOutOfSyncOnly=true

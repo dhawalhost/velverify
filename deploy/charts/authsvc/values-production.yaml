@@ -1,0 +1,28 @@
+replicaCount: 3
+
+env:
+  ENVIRONMENT: production
+  LOG_LEVEL: warn
+  DIRECTORY_SERVICE_URL: http://wardseal-dirsvc:8081
+  AUTH_SERVICE_URL: https://auth.wardseal.com
+  UI_URL: https://manage.wardseal.com
+  KMS_PROVIDER: vault
+  REDIS_ENABLED: "true"
+  REDIS_ADDR: redis-production.wardseal.svc.cluster.local:6379
+  WEBAUTHN_SESSION_TTL_SECONDS: "600"
+  RATE_LIMIT_USE_TENANT: "true"
+  RATE_LIMIT_KEY_PREFIX: wardseal:ratelimit
+  CORS_ALLOWED_ORIGINS: https://wardseal.com,https://manage.wardseal.com
+
+database:
+  existingSecret: wardseal-db-credentials-production
+
+vaultAppRole:
+  existingSecret: wardseal-vault-kms-production
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 2
+
+networkPolicy:
+  enabled: true

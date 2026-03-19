@@ -1,0 +1,31 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: wardseal-staging-provsvc
+  namespace: argocd
+  labels:
+    environment: staging
+    service: provsvc
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/dhawalhost/wardseal.git
+    targetRevision: main
+    path: deploy/charts/provsvc
+    helm:
+      releaseName: wardseal
+      valueFiles:
+        - values.yaml
+        - values-staging.yaml
+        - version-staging.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: wardseal-staging
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - PruneLast=true
+      - ApplyOutOfSyncOnly=true

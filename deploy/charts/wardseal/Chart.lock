@@ -1,0 +1,24 @@
+dependencies:
+- name: authsvc
+  repository: file://../authsvc
+  version: 0.1.0
+- name: dirsvc
+  repository: file://../dirsvc
+  version: 0.1.0
+- name: govsvc
+  repository: file://../govsvc
+  version: 0.1.0
+- name: policysvc
+  repository: file://../policysvc
+  version: 0.1.0
+- name: provsvc
+  repository: file://../provsvc
+  version: 0.1.0
+- name: adminui
+  repository: file://../adminui
+  version: 0.1.0
+- name: landingui
+  repository: file://../landingui
+  version: 0.1.0
+digest: sha256:f91b5a173043955ac9b70f9b803e9e126225d00b3eccf4ed1cf3877321eb5f75
+generated: "2026-03-19T20:37:07.678965+05:30"

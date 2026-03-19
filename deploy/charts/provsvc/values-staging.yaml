@@ -1,0 +1,9 @@
+replicaCount: 1
+
+env:
+  ENVIRONMENT: staging
+  LOG_LEVEL: debug
+  DIRECTORY_SERVICE_URL: http://wardseal-dirsvc:8081
+
+database:
+  existingSecret: wardseal-db-credentials-staging

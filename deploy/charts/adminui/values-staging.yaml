@@ -1,0 +1,7 @@
+replicaCount: 1
+
+env:
+  ENVIRONMENT: staging
+  NEXT_PUBLIC_API_URL: https://auth-staging.wardseal.com
+  NEXT_PUBLIC_DIR_URL: https://dir-staging.wardseal.com
+  LOG_LEVEL: debug

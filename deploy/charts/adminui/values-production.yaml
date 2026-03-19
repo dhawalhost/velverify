@@ -1,0 +1,14 @@
+replicaCount: 2
+
+env:
+  ENVIRONMENT: production
+  NEXT_PUBLIC_API_URL: https://auth.wardseal.com
+  NEXT_PUBLIC_DIR_URL: https://dir.wardseal.com
+  LOG_LEVEL: warn
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+networkPolicy:
+  enabled: true

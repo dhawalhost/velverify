@@ -199,6 +199,53 @@ Use this when you intentionally want every service updated.
 3. Commit and push one PR with all tag updates.
 4. Sync the target Argo CD app once.
 
+## Service-isolated Argo CD Applications
+
+To track and sync services independently, use the new manifests under:
+
+- `deploy/argocd/services/`
+
+### What is added
+
+For each environment, there are separate apps for:
+
+- `authsvc`, `dirsvc`, `govsvc`, `policysvc`, `provsvc`, `adminui`, `landingui`, `ingress`
+
+Each service app uses its own chart path (`deploy/charts/<service>`) and local values files:
+
+- `values-staging.yaml` or `values-production.yaml`
+- `version-staging.yaml` or `version-production.yaml`
+
+`ingress` remains a dedicated app on the umbrella chart and uses `services/ingress/selector.yaml`.
+
+### Apply service-isolated apps
+
+```bash
+# staging
+kubectl apply -n argocd -f deploy/argocd/services/staging-authsvc.yaml
+kubectl apply -n argocd -f deploy/argocd/services/staging-dirsvc.yaml
+kubectl apply -n argocd -f deploy/argocd/services/staging-govsvc.yaml
+kubectl apply -n argocd -f deploy/argocd/services/staging-policysvc.yaml
+kubectl apply -n argocd -f deploy/argocd/services/staging-provsvc.yaml
+kubectl apply -n argocd -f deploy/argocd/services/staging-adminui.yaml
+kubectl apply -n argocd -f deploy/argocd/services/staging-landingui.yaml
+kubectl apply -n argocd -f deploy/argocd/services/staging-ingress.yaml
+
+# production
+kubectl apply -n argocd -f deploy/argocd/services/production-authsvc.yaml
+kubectl apply -n argocd -f deploy/argocd/services/production-dirsvc.yaml
+kubectl apply -n argocd -f deploy/argocd/services/production-govsvc.yaml
+kubectl apply -n argocd -f deploy/argocd/services/production-policysvc.yaml
+kubectl apply -n argocd -f deploy/argocd/services/production-provsvc.yaml
+kubectl apply -n argocd -f deploy/argocd/services/production-adminui.yaml
+kubectl apply -n argocd -f deploy/argocd/services/production-landingui.yaml
+kubectl apply -n argocd -f deploy/argocd/services/production-ingress.yaml
+```
+
+### Important migration note
+
+Do not keep the old umbrella apps (`wardseal-staging` / `wardseal-production` or `application-staging` / `application-production`) active at the same time as service-isolated apps in the same namespace, or Argo CD resource ownership conflicts can occur.
+
 ### 4. Post-deploy verification checklist
 
 ```bash
