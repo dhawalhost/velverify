@@ -17,7 +17,7 @@ authsvc:
   replicaCount: 3
   
   image:
-    tag: ""  # Set by CI/CD pipeline
+    tag: ""  # Overridden by values-production-versions.yaml in Argo CD
     pullPolicy: IfNotPresent
   
   resources:
@@ -131,7 +131,7 @@ dirsvc:
   replicaCount: 3
   
   image:
-    tag: ""  # Set by CI/CD pipeline
+    tag: ""  # Overridden by values-production-versions.yaml in Argo CD
     pullPolicy: IfNotPresent
   
   resources:
@@ -226,7 +226,7 @@ govsvc:
   replicaCount: 3
   
   image:
-    tag: ""  # Set by CI/CD pipeline
+    tag: ""  # Overridden by values-production-versions.yaml in Argo CD
     pullPolicy: IfNotPresent
   
   resources:

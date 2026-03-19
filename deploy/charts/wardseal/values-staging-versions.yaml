@@ -6,28 +6,28 @@
 # The git commit is separately tagged as <version>-<service> (e.g. v1.2.3-authsvc).
 authsvc:
   image:
-    tag: "v0.1.0"
+    tag: "v0.1.1"
 
 dirsvc:
   image:
-    tag: "v0.1.0"
+    tag: "v0.1.1"
 
 govsvc:
   image:
-    tag: "v0.1.0"
+    tag: "v0.1.1"
 
 policysvc:
   image:
-    tag: "v0.1.0"
+    tag: "v0.1.1"
 
 provsvc:
   image:
-    tag: "v0.1.0"
+    tag: "v0.1.1"
 
 adminui:
   image:
-    tag: "v0.1.0"
+    tag: "v0.1.1"
 
 landingui:
   image:
-    tag: "v0.1.0"
+    tag: "v0.1.1"

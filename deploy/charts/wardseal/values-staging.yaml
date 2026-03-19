@@ -23,7 +23,7 @@ authsvc:
   replicaCount: 1
 
   image:
-    tag: "latest"  # Will be overridden by CI
+    tag: "latest"  # Base/default only; overridden by values-staging-versions.yaml in Argo CD
 
   env:
     ENVIRONMENT: staging
@@ -60,7 +60,7 @@ dirsvc:
   replicaCount: 1
 
   image:
-    tag: "latest"
+    tag: "latest"  # Base/default only; overridden by values-staging-versions.yaml in Argo CD
 
   env:
     LOG_LEVEL: debug
@@ -84,7 +84,7 @@ govsvc:
   replicaCount: 1
 
   image:
-    tag: "latest"
+    tag: "latest"  # Base/default only; overridden by values-staging-versions.yaml in Argo CD
 
   env:
     LOG_LEVEL: debug
@@ -106,12 +106,12 @@ govsvc:
 adminui:
   enabled: true
   image:
-    tag: "latest"
+    tag: "latest"  # Base/default only; overridden by values-staging-versions.yaml in Argo CD
 
 landingui:
   enabled: true
   image:
-    tag: "latest"
+    tag: "latest"  # Base/default only; overridden by values-staging-versions.yaml in Argo CD
 
 # Ingress - Staging
 ingress:

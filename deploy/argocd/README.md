@@ -70,6 +70,162 @@ The git tag is the skip-if-exists key — if `v1.2.3-authsvc` already exists in 
 
 `ApplyOutOfSyncOnly=true` is enabled in the Argo CD app manifests, so only out-of-sync resources are applied.
 
+## Deployment Runbook (Staging and Production)
+
+This runbook covers first-time bootstrap, ongoing releases, full-environment rollouts, and rollback for both environments.
+
+### 0. Preconditions
+
+- Kubernetes cluster and Argo CD are installed and healthy.
+- External Secrets Operator is installed.
+- Vault policies and AppRoles are created for staging and production.
+- GHCR push permissions are configured for GitHub Actions.
+
+Validate local repo config before any rollout:
+
+```bash
+make config-lint
+```
+
+### 1. One-time bootstrap per environment
+
+#### 1.1 Create namespaces
+
+```bash
+kubectl create namespace wardseal-staging --dry-run=client -o yaml | kubectl apply -f -
+kubectl create namespace wardseal-production --dry-run=client -o yaml | kubectl apply -f -
+```
+
+#### 1.2 Create Vault AppRole bootstrap secret in each namespace
+
+```bash
+# staging
+kubectl create secret generic wardseal-vault-approle \
+  --namespace wardseal-staging \
+  --from-literal=role_id="<STAGING_ROLE_ID>" \
+  --from-literal=secret_id="<STAGING_SECRET_ID>" \
+  --dry-run=client -o yaml | kubectl apply -f -
+
+# production
+kubectl create secret generic wardseal-vault-approle \
+  --namespace wardseal-production \
+  --from-literal=role_id="<PROD_ROLE_ID>" \
+  --from-literal=secret_id="<PROD_SECRET_ID>" \
+  --dry-run=client -o yaml | kubectl apply -f -
+```
+
+#### 1.3 Apply External Secrets manifests
+
+```bash
+kubectl apply -f deploy/argocd/external-secrets-staging.yaml
+kubectl apply -f deploy/argocd/external-secrets-production.yaml
+```
+
+#### 1.4 Verify synced Kubernetes secrets
+
+```bash
+kubectl get externalsecrets -n wardseal-staging
+kubectl get externalsecrets -n wardseal-production
+
+kubectl get secrets -n wardseal-staging | grep wardseal
+kubectl get secrets -n wardseal-production | grep wardseal
+```
+
+Expected key secrets:
+
+- Staging: `wardseal-db-credentials-staging`, `wardseal-service-auth-staging`, `wardseal-vault-kms-staging`
+- Production: `wardseal-db-credentials-production`, `wardseal-service-auth-production`, `wardseal-vault-kms-production`, `wardseal-license-production`
+
+#### 1.5 Register Argo CD applications
+
+Use either application manifest set:
+
+- General app manifests: `deploy/argocd/application-staging.yaml`, `deploy/argocd/application-production.yaml`
+- Alternative app manifests: `deploy/argocd/wardseal-staging.yaml`, `deploy/argocd/wardseal-production.yaml`
+
+```bash
+kubectl apply -n argocd -f deploy/argocd/application-staging.yaml
+kubectl apply -n argocd -f deploy/argocd/application-production.yaml
+```
+
+### 2. Regular release workflow (single service)
+
+#### 2.1 Build and push the selected service image
+
+In GitHub Actions, run `CI/CD` workflow manually with:
+
+- `service`: one of `authsvc`, `dirsvc`, `govsvc`, `policysvc`, `provsvc`, `adminui`, `landingui`
+- `version`: semver (for example `0.1.1` or `v0.1.1`)
+- `tag_suffix`: optional (for example `rc1`)
+- `push_latest`: optional latest image push
+- `skip_if_exists`: skip when git release tag already exists
+
+Output behavior:
+
+- Docker image tag pushed to GHCR: version only (for example `v0.1.1`)
+- Git release tag created: service-specific (for example `v0.1.1-authsvc`)
+
+#### 2.2 Promote to staging or production by updating only one service tag
+
+Update one service in:
+
+- Staging file: `deploy/charts/wardseal/values-staging-versions.yaml`
+- Production file: `deploy/charts/wardseal/values-production-versions.yaml`
+
+Example:
+
+```yaml
+authsvc:
+  image:
+    tag: "v0.1.1"
+```
+
+Commit and push.
+
+#### 2.3 Sync Argo CD
+
+- Staging app: sync `wardseal-staging`
+- Production app: sync `wardseal-production`
+
+Production should be manually approved/synced.
+
+### 3. Full environment rollout (all services)
+
+Use this when you intentionally want every service updated.
+
+1. Build/push each service with the target version via workflow runs.
+2. Update all service tags in the target environment versions file.
+3. Commit and push one PR with all tag updates.
+4. Sync the target Argo CD app once.
+
+### 4. Post-deploy verification checklist
+
+```bash
+kubectl get pods -n wardseal-staging
+kubectl get pods -n wardseal-production
+
+kubectl get ingress -n wardseal-staging
+kubectl get ingress -n wardseal-production
+
+kubectl get externalsecrets -n wardseal-staging
+kubectl get externalsecrets -n wardseal-production
+```
+
+Recommended smoke checks:
+
+- `https://auth-staging.wardseal.com/health/ready`
+- `https://api-staging.wardseal.com/health/ready`
+- `https://auth.wardseal.com/health/ready`
+- `https://api.wardseal.com/health/ready`
+
+### 5. Rollback procedure
+
+1. Edit environment versions file and revert only impacted services to prior known-good image tags.
+2. Commit and push rollback change.
+3. Sync corresponding Argo CD application.
+
+Fast rollback is version-file based; no image rebuild is required.
+
 ## Architecture
 
 ```
