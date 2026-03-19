@@ -158,6 +158,7 @@ In GitHub Actions, run `CI/CD` workflow manually with:
 - `version`: semver (for example `0.1.1` or `v0.1.1`)
 - `tag_suffix`: optional (for example `rc1`)
 - `push_latest`: optional latest image push
+- `platforms`: target architectures (default `linux/amd64,linux/arm64`)
 - `skip_if_exists`: skip when git release tag already exists
 
 Output behavior:
