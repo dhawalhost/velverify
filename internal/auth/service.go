@@ -319,10 +319,10 @@ func (s *authService) Login(ctx context.Context, username, password, deviceID, u
 	if err != nil {
 		return "", err
 	}
-	payload := struct {
-		Email    string `json:"email"`
-		Password string `json:"password"`
-	}{Email: username, Password: password}
+	payload := map[string]string{
+		"email":    username,
+		"password": password,
+	}
 	body, err := json.Marshal(payload)
 	if err != nil {
 		return "", err

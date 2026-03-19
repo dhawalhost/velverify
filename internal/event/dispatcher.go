@@ -43,7 +43,7 @@ func NewDispatcher(webhookSvc webhook.Service, logger *zap.Logger) *Dispatcher {
 func (d *Dispatcher) Publish(ctx context.Context, event Event) {
 	// In a real system, this would push to a queue (NATS/Kafka).
 	// For MVP, we launch a goroutine.
-	go d.processEvent(context.Background(), event) // detached context
+	go d.processEvent(context.WithoutCancel(ctx), event)
 }
 
 func (d *Dispatcher) processEvent(ctx context.Context, event Event) {

@@ -3,6 +3,7 @@ package audit
 import (
 	"context"
 	"encoding/json"
+	"strconv"
 	"time"
 
 	"github.com/jmoiron/sqlx"
@@ -162,5 +163,5 @@ func (s *sqlRepository) GetEvent(ctx context.Context, tenantID, id string) (Even
 }
 
 func itoa(i int) string {
-	return string(rune('0' + i))
+	return strconv.Itoa(i)
 }
