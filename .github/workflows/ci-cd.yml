@@ -3,8 +3,38 @@ name: CI/CD
 on:
   push:
     branches: [ main ]
-    tags: [ 'v*' ]
   workflow_dispatch:
+    inputs:
+      service:
+        description: "Service image to build and push"
+        required: true
+        type: choice
+        options:
+          - authsvc
+          - dirsvc
+          - govsvc
+          - policysvc
+          - provsvc
+          - adminui
+          - landingui
+      version:
+        description: "Semantic version tag (example: v1.2.3)"
+        required: true
+        type: string
+      tag_suffix:
+        description: "Optional extra suffix appended after service (example: rc1)"
+        required: false
+        type: string
+      push_latest:
+        description: "Also tag/push latest"
+        required: true
+        type: boolean
+        default: true
+      skip_if_exists:
+        description: "Skip build/push if the computed service tag already exists in GHCR"
+        required: true
+        type: boolean
+        default: true
 
 permissions:
   contents: read
@@ -29,7 +59,7 @@ jobs:
       - name: Install Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.24'
+          go-version: '1.25'
       - name: Run config policy tests
         run: go test -v ./pkg/config/...
 
@@ -53,7 +83,7 @@ jobs:
       - name: Install Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.24'
+          go-version: '1.25'
       - name: Run unit tests
         run: make test
 
@@ -79,7 +109,7 @@ jobs:
       - name: Install Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.24'
+          go-version: '1.25'
       - name: Install migrate tool
         run: |
           curl -L https://github.com/golang-migrate/migrate/releases/download/v4.15.2/migrate.linux-amd64.tar.gz | tar xvz
@@ -97,37 +127,60 @@ jobs:
   build-push:
     needs: [config-lint, config-policy, lint, test, integration-test]
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
-    strategy:
-      fail-fast: false
-      matrix:
-        component: [authsvc, dirsvc, govsvc, policysvc, provsvc, adminui, landingui]
-        include:
-          - component: authsvc
-            context: .
-            dockerfile: cmd/authsvc/Dockerfile
-          - component: dirsvc
-            context: .
-            dockerfile: cmd/dirsvc/Dockerfile
-          - component: govsvc
-            context: .
-            dockerfile: cmd/govsvc/Dockerfile
-          - component: policysvc
-            context: .
-            dockerfile: cmd/policysvc/Dockerfile
-          - component: provsvc
-            context: .
-            dockerfile: cmd/provsvc/Dockerfile
-          - component: adminui
-            context: web/admin
-            dockerfile: web/admin/Dockerfile
-          - component: landingui
-            context: web/landing
-            dockerfile: web/landing/Dockerfile
+    if: github.event_name == 'workflow_dispatch'
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Validate semantic version
+        run: |
+          if ! [[ "${{ inputs.version }}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
+            echo "Invalid version '${{ inputs.version }}'. Expected semver like v1.2.3"
+            exit 1
+          fi
+          if [[ -n "${{ inputs.tag_suffix }}" ]] && ! [[ "${{ inputs.tag_suffix }}" =~ ^[0-9A-Za-z._-]+$ ]]; then
+            echo "Invalid tag_suffix '${{ inputs.tag_suffix }}'. Allowed characters: letters, numbers, dot, underscore, hyphen"
+            exit 1
+          fi
+
+      - name: Resolve build target
+        id: target
+        run: |
+          case "${{ inputs.service }}" in
+            authsvc|dirsvc|govsvc|policysvc|provsvc)
+              echo "context=." >> "$GITHUB_OUTPUT"
+              echo "dockerfile=cmd/${{ inputs.service }}/Dockerfile" >> "$GITHUB_OUTPUT"
+              echo "build_args=" >> "$GITHUB_OUTPUT"
+              ;;
+            adminui)
+              echo "context=web/admin" >> "$GITHUB_OUTPUT"
+              echo "dockerfile=web/admin/Dockerfile" >> "$GITHUB_OUTPUT"
+              {
+                echo "build_args<<EOF"
+                echo "VITE_AUTHSVC_URL=https://auth-staging.wardseal.com"
+                echo "VITE_DIRSVC_URL=https://api-staging.wardseal.com"
+                echo "VITE_GOVSVC_URL=https://api-staging.wardseal.com"
+                echo "VITE_APP_MODE=saas"
+                echo "EOF"
+              } >> "$GITHUB_OUTPUT"
+              ;;
+            landingui)
+              echo "context=web/landing" >> "$GITHUB_OUTPUT"
+              echo "dockerfile=web/landing/Dockerfile" >> "$GITHUB_OUTPUT"
+              {
+                echo "build_args<<EOF"
+                echo "VITE_SITE_BASE_URL=https://staging.wardseal.com"
+                echo "VITE_CONSOLE_BASE_URL=https://manage-staging.wardseal.com"
+                echo "VITE_ENVIRONMENT=staging"
+                echo "EOF"
+              } >> "$GITHUB_OUTPUT"
+              ;;
+            *)
+              echo "Unsupported service '${{ inputs.service }}'"
+              exit 1
+              ;;
+          esac
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -139,28 +192,71 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Compute release tag
+        id: release
+        run: |
+          IMAGE="ghcr.io/${{ github.repository_owner }}/wardseal-${{ inputs.service }}"
+          TAG="${{ inputs.version }}-${{ inputs.service }}"
+          if [[ -n "${{ inputs.tag_suffix }}" ]]; then
+            TAG="${TAG}-${{ inputs.tag_suffix }}"
+          fi
+          echo "image=${IMAGE}" >> "$GITHUB_OUTPUT"
+          echo "release_tag=${TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Check if tag already exists
+        id: exists
+        run: |
+          IMAGE="${{ steps.release.outputs.image }}"
+          TAG="${{ steps.release.outputs.release_tag }}"
+          if docker buildx imagetools inspect "${IMAGE}:${TAG}" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "Tag already exists: ${IMAGE}:${TAG}"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "Tag does not exist yet: ${IMAGE}:${TAG}"
+          fi
+
+      - name: Decide build execution
+        id: decision
+        run: |
+          if [[ "${{ steps.exists.outputs.exists }}" == "true" && "${{ inputs.skip_if_exists }}" == "true" ]]; then
+            echo "should_build=false" >> "$GITHUB_OUTPUT"
+            echo "skip_reason=Tag already exists and skip_if_exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "should_build=true" >> "$GITHUB_OUTPUT"
+            echo "skip_reason=" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Extract metadata (tags, labels) for Docker
         id: meta
+        if: steps.decision.outputs.should_build == 'true'
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/${{ github.repository_owner }}/wardseal-${{ matrix.component }}
+          images: ${{ steps.release.outputs.image }}
           tags: |
-            type=semver,pattern={{raw}}
-            type=raw,value=latest
+            type=raw,value=${{ steps.release.outputs.release_tag }}
+            type=raw,value=latest,enable=${{ inputs.push_latest }}
 
       - name: Build and push
+        if: steps.decision.outputs.should_build == 'true'
         uses: docker/build-push-action@v5
         with:
-          context: ${{ matrix.context }}
-          file: ${{ matrix.dockerfile }}
+          context: ${{ steps.target.outputs.context }}
+          file: ${{ steps.target.outputs.dockerfile }}
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          build-args: |
-            ${{ matrix.component == 'adminui' && 'VITE_AUTHSVC_URL=https://auth-staging.wardseal.com' || '' }}
-            ${{ matrix.component == 'adminui' && 'VITE_DIRSVC_URL=https://api-staging.wardseal.com' || '' }}
-            ${{ matrix.component == 'adminui' && 'VITE_GOVSVC_URL=https://api-staging.wardseal.com' || '' }}
-            ${{ matrix.component == 'adminui' && 'VITE_APP_MODE=saas' || '' }}
-            ${{ matrix.component == 'landingui' && 'VITE_SITE_BASE_URL=https://staging.wardseal.com' || '' }}
-            ${{ matrix.component == 'landingui' && 'VITE_CONSOLE_BASE_URL=https://manage-staging.wardseal.com' || '' }}
-            ${{ matrix.component == 'landingui' && 'VITE_ENVIRONMENT=staging' || '' }}
+          build-args: ${{ steps.target.outputs.build_args }}
+
+      - name: Release summary
+        run: |
+          echo "Service: ${{ inputs.service }}"
+          echo "Image: ${{ steps.release.outputs.image }}"
+          echo "Release tag: ${{ steps.release.outputs.release_tag }}"
+          echo "Tag existed: ${{ steps.exists.outputs.exists }}"
+          echo "skip_if_exists: ${{ inputs.skip_if_exists }}"
+          if [[ "${{ steps.decision.outputs.should_build }}" == "true" ]]; then
+            echo "Result: build and push completed"
+          else
+            echo "Result: build skipped (${{ steps.decision.outputs.skip_reason }})"
+          fi

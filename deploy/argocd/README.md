@@ -13,6 +13,58 @@ Your Vault is deployed at:
 
 WardSeal uses **External Secrets Operator** to sync secrets from Vault to Kubernetes automatically.
 
+## Service-wise Versioning and Manual Promotion
+
+WardSeal now supports independent service image versioning by environment.
+
+### Version Files
+
+- Staging versions: `deploy/charts/wardseal/values-staging-versions.yaml`
+- Production versions: `deploy/charts/wardseal/values-production-versions.yaml`
+
+Each file contains independent image tags for:
+
+- `authsvc`
+- `dirsvc`
+- `govsvc`
+- `policysvc`
+- `provsvc`
+- `adminui`
+- `landingui`
+
+Update only the service you want to promote; leave others unchanged.
+
+### Build/Push Workflow (Single Service)
+
+Use the `CI/CD` workflow in GitHub Actions with **Run workflow** and provide:
+
+- `service`: service to build (`authsvc`, `dirsvc`, `govsvc`, `policysvc`, `provsvc`, `adminui`, `landingui`)
+- `version`: base semantic version (example: `v1.2.3`)
+- `tag_suffix`: optional extra suffix (example: `rc1`)
+- `push_latest`: whether to also push `latest`
+- `skip_if_exists`: skip build if the computed tag already exists in GHCR
+
+This builds and pushes only the selected service image to GHCR.
+
+### Tag Format
+
+The workflow computes service-specific tags:
+
+- Default: `<version>-<service>` (example: `v1.2.3-authsvc`)
+- With suffix: `<version>-<service>-<tag_suffix>` (example: `v1.2.3-authsvc-rc1`)
+
+This avoids collisions and keeps versions independently trackable per service.
+
+If `skip_if_exists=true` and the computed tag already exists, the build/push is skipped automatically.
+
+### Deployment via Argo CD UI
+
+1. Update the relevant environment version file for the target service tag.
+2. Commit and push the change.
+3. In Argo CD UI, sync the application for that environment.
+
+`ApplyOutOfSyncOnly=true` is enabled in the Argo CD app manifests, so only out-of-sync resources are applied.
+
 ## Architecture
 
 ```

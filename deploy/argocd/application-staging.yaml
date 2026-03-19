@@ -22,14 +22,7 @@ spec:
       valueFiles:
         - values.yaml
         - values-staging.yaml
-      # Override image tags from CI
-      parameters:
-        - name: authsvc.image.tag
-          value: $ARGOCD_APP_REVISION
-        - name: dirsvc.image.tag
-          value: $ARGOCD_APP_REVISION
-        - name: govsvc.image.tag
-          value: $ARGOCD_APP_REVISION
+        - values-staging-versions.yaml
 
   destination:
     server: https://kubernetes.default.svc

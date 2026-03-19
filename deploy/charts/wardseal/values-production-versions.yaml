@@ -1,0 +1,30 @@
+# Production service image versions (manually managed)
+# Update only the service you are promoting.
+
+authsvc:
+  image:
+    tag: "v0.1.0-authsvc"
+
+dirsvc:
+  image:
+    tag: "v0.1.0-dirsvc"
+
+govsvc:
+  image:
+    tag: "v0.1.0-govsvc"
+
+policysvc:
+  image:
+    tag: "v0.1.0-policysvc"
+
+provsvc:
+  image:
+    tag: "v0.1.0-provsvc"
+
+adminui:
+  image:
+    tag: "v0.1.0-adminui"
+
+landingui:
+  image:
+    tag: "v0.1.0-landingui"

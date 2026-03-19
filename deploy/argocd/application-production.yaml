@@ -23,14 +23,7 @@ spec:
       valueFiles:
         - values.yaml
         - values-production.yaml
-      # Image tags set via CI pipeline
-      parameters:
-        - name: authsvc.image.tag
-          value: ""  # Set by CI
-        - name: dirsvc.image.tag
-          value: ""
-        - name: govsvc.image.tag
-          value: ""
+        - values-production-versions.yaml
 
   destination:
     server: https://kubernetes.default.svc

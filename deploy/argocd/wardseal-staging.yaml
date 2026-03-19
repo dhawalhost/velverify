@@ -19,6 +19,7 @@ spec:
       valueFiles:
         - values.yaml
         - values-staging.yaml
+        - values-staging-versions.yaml
 
   destination:
     server: https://kubernetes.default.svc
@@ -31,3 +32,4 @@ spec:
     syncOptions:
       - CreateNamespace=true
       - PruneLast=true
+      - ApplyOutOfSyncOnly=true
