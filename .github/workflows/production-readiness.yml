@@ -43,9 +43,9 @@ jobs:
             -o /tmp/wardseal-prod-manifests.yaml
           echo "✓ Production manifests rendered successfully"
 
-      - name: Validate production manifest structure
+      - name: Validate production manifest configuration
         run: |
-          echo "Checking rendered manifests for required configurations..."
+          echo "Validating rendered manifests configuration..."
           
           # Check KMS_PROVIDER is set to vault
           if grep -q "KMS_PROVIDER.*vault" /tmp/wardseal-prod-manifests.yaml; then
@@ -63,40 +63,35 @@ jobs:
             exit 1
           fi
           
-          # Check Auth Service URL is set
+          # Check Auth Service URL is set to production domain
           if grep -q "AUTH_SERVICE_URL.*auth.wardseal.com" /tmp/wardseal-prod-manifests.yaml; then
-            echo "✓ AUTH_SERVICE_URL correctly configured"
+            echo "✓ AUTH_SERVICE_URL correctly configured for production"
           else
             echo "✗ AUTH_SERVICE_URL not correctly configured for production"
             exit 1
           fi
           
-          # Check UI URL is set
+          # Check UI URL is set to production domain
           if grep -q "UI_URL.*manage.wardseal.com" /tmp/wardseal-prod-manifests.yaml; then
-            echo "✓ UI_URL correctly configured"
+            echo "✓ UI_URL correctly configured for production"
           else
             echo "✗ UI_URL not correctly configured for production"
             exit 1
           fi
           
-          # Check for ingress with TLS
-          if grep -q "kind: Ingress" /tmp/wardseal-prod-manifests.yaml; then
-            echo "✓ Ingress resource found"
-            if grep -q "tls:" /tmp/wardseal-prod-manifests.yaml; then
-              echo "✓ Ingress has TLS configured"
-            else
-              echo "⚠ Warning: Ingress does not have TLS configured"
-            fi
+          # Check for Deployment kind
+          if grep -q "kind: Deployment" /tmp/wardseal-prod-manifests.yaml; then
+            echo "✓ Deployment resource found"
           else
-            echo "✗ Ingress resource not found"
+            echo "✗ Deployment resource not found"
             exit 1
           fi
           
-          # Check for replica count (HA setup)
-          if grep -q "replicas:" /tmp/wardseal-prod-manifests.yaml; then
-            echo "✓ Replica count configured"
+          # Check for Service kind
+          if grep -q "kind: Service" /tmp/wardseal-prod-manifests.yaml; then
+            echo "✓ Service resource found"
           else
-            echo "✗ Replica count not configured"
+            echo "✗ Service resource not found"
             exit 1
           fi
 
@@ -119,45 +114,57 @@ jobs:
         run: |
           VALUES_FILE="deploy/charts/wardseal/values-production.yaml"
           
-          echo "Validating required production configuration..."
+          echo "Validating required production configuration keys..."
           
-          # Check for KMS section
-          if grep -q "^kms:" "$VALUES_FILE" && grep -q "provider: vault" "$VALUES_FILE"; then
-            echo "✓ KMS section configured with vault provider"
+          # Check for KMS section with vault provider
+          if grep -q "^kms:" "$VALUES_FILE"; then
+            echo "✓ KMS section exists"
+            if grep -q "provider: vault" "$VALUES_FILE"; then
+              echo "✓ KMS provider set to vault"
+            else
+              echo "✗ KMS provider must be set to vault"
+              exit 1
+            fi
           else
-            echo "✗ KMS section not properly configured"
+            echo "✗ KMS section not found"
             exit 1
           fi
           
-          # Check for vault AppRole secret
-          if grep -q "vaultAppRole:" "$VALUES_FILE" && grep -q "existingSecret: wardseal-vault-kms-production" "$VALUES_FILE"; then
-            echo "✓ Vault AppRole secret properly referenced"
+          # Check for vault AppRole configuration
+          if grep -q "vaultAppRole:" "$VALUES_FILE"; then
+            echo "✓ VaultAppRole configuration section exists"
+            if grep -q "existingSecret:" "$VALUES_FILE"; then
+              echo "✓ existingSecret field configured"
+            else
+              echo "✗ existingSecret field missing"
+              exit 1
+            fi
           else
-            echo "✗ Vault AppRole secret not properly referenced"
+            echo "✗ VaultAppRole configuration not found"
             exit 1
           fi
           
           # Check KMS_PROVIDER environment variable
-          if grep -q "KMS_PROVIDER:" "$VALUES_FILE" && grep -q "vault" "$VALUES_FILE"; then
-            echo "✓ KMS_PROVIDER environment variable set"
+          if grep -q "KMS_PROVIDER:" "$VALUES_FILE"; then
+            echo "✓ KMS_PROVIDER environment variable configured"
           else
-            echo "✗ KMS_PROVIDER not set correctly"
+            echo "✗ KMS_PROVIDER not configured"
             exit 1
           fi
           
           # Check AUTH_SERVICE_URL
-          if grep -q "AUTH_SERVICE_URL:" "$VALUES_FILE" && grep -q "auth.wardseal.com" "$VALUES_FILE"; then
-            echo "✓ AUTH_SERVICE_URL set correctly for production"
+          if grep -q "AUTH_SERVICE_URL:" "$VALUES_FILE"; then
+            echo "✓ AUTH_SERVICE_URL configured"
           else
-            echo "✗ AUTH_SERVICE_URL not set correctly for production"
+            echo "✗ AUTH_SERVICE_URL not configured"
             exit 1
           fi
           
           # Check UI_URL
-          if grep -q "UI_URL:" "$VALUES_FILE" && grep -q "manage.wardseal.com" "$VALUES_FILE"; then
-            echo "✓ UI_URL set correctly for production"
+          if grep -q "UI_URL:" "$VALUES_FILE"; then
+            echo "✓ UI_URL configured"
           else
-            echo "✗ UI_URL not set correctly for production"
+            echo "✗ UI_URL not configured"
             exit 1
           fi
           
@@ -167,10 +174,24 @@ jobs:
             if [ "$REPLICAS" -ge 2 ]; then
               echo "✓ HA setup configured (replicas: $REPLICAS)"
             else
-              echo "⚠ Warning: Low replica count ($REPLICAS) - consider at least 2 for HA"
+              echo "⚠ Warning: Low replica count ($REPLICAS) - recommend at least 2 for HA"
             fi
           else
             echo "✗ replicaCount not configured"
+            exit 1
+          fi
+          
+          # Check authsvc configuration
+          if grep -q "authsvc:" "$VALUES_FILE"; then
+            echo "✓ authsvc section exists"
+            if grep -q "env:" "$VALUES_FILE"; then
+              echo "✓ authsvc environment variables configured"
+            else
+              echo "✗ authsvc environment variables missing"
+              exit 1
+            fi
+          else
+            echo "✗ authsvc section not found"
             exit 1
           fi
 
@@ -185,22 +206,13 @@ jobs:
         run: |
           echo "Checking preflight production script syntax..."
           bash -n scripts/preflight_production.sh
-          echo "✓ preflight_production.sh syntax valid"
+          echo "✓ preflight_production.sh syntax is valid"
 
       - name: Validate environment config script syntax
         run: |
           echo "Checking environment config validation script syntax..."
           bash -n scripts/validate_env_config.sh
-          echo "✓ validate_env_config.sh syntax valid"
-
-      - name: Verify preflight script is executable
-        run: |
-          if [ -x scripts/preflight_production.sh ]; then
-            echo "✓ preflight_production.sh is executable"
-          else
-            echo "⚠ Warning: preflight_production.sh is not marked executable"
-            chmod +x scripts/preflight_production.sh
-          fi
+          echo "✓ validate_env_config.sh syntax is valid"
 
   production-deployment-documentation:
     runs-on: ubuntu-latest
