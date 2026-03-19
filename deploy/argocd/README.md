@@ -46,16 +46,21 @@ Use the `CI/CD` workflow in GitHub Actions with **Run workflow** and provide:
 
 This builds and pushes only the selected service image to GHCR.
 
-### Tag Format
+### Tag Strategy
 
-The workflow computes service-specific tags:
+**Docker image tag** (pushed to GHCR) — plain version only:
+
+- `v1.2.3` (example: `ghcr.io/org/wardseal-authsvc:v1.2.3`)
+- `latest` (if `push_latest=true`)
+
+**Git commit tag** (uniquely identifies which service and version was released):
 
 - Default: `<version>-<service>` (example: `v1.2.3-authsvc`)
 - With suffix: `<version>-<service>-<tag_suffix>` (example: `v1.2.3-authsvc-rc1`)
 
-This avoids collisions and keeps versions independently trackable per service.
+The git tag is the skip-if-exists key — if `v1.2.3-authsvc` already exists in git, the build is skipped when `skip_if_exists=true`.
 
-If `skip_if_exists=true` and the computed tag already exists, the build/push is skipped automatically.
+**Values files** store the plain docker tag (e.g. `v1.2.3`). Different services can carry independent versions.
 
 ### Deployment via Argo CD UI
 

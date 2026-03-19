@@ -1,30 +1,33 @@
 # Production service image versions (manually managed)
 # Update only the service you are promoting.
 
+# Each service can be on an independent version.
+# The tag here must match the docker image tag pushed to GHCR (plain semver, e.g. v1.2.3).
+# The git commit is separately tagged as <version>-<service> (e.g. v1.2.3-authsvc).
 authsvc:
   image:
-    tag: "v0.1.0-authsvc"
+    tag: "v0.1.0"
 
 dirsvc:
   image:
-    tag: "v0.1.0-dirsvc"
+    tag: "v0.1.0"
 
 govsvc:
   image:
-    tag: "v0.1.0-govsvc"
+    tag: "v0.1.0"
 
 policysvc:
   image:
-    tag: "v0.1.0-policysvc"
+    tag: "v0.1.0"
 
 provsvc:
   image:
-    tag: "v0.1.0-provsvc"
+    tag: "v0.1.0"
 
 adminui:
   image:
-    tag: "v0.1.0-adminui"
+    tag: "v0.1.0"
 
 landingui:
   image:
-    tag: "v0.1.0-landingui"
+    tag: "v0.1.0"

@@ -37,7 +37,7 @@ on:
         default: true
 
 permissions:
-  contents: read
+  contents: write
   packages: write
 
 jobs:
@@ -201,28 +201,35 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Compute release tag
+      - name: Compute release tags
         id: release
         run: |
           IMAGE="ghcr.io/${{ github.repository_owner }}/wardseal-${{ inputs.service }}"
-          TAG="${{ steps.semver.outputs.normalized_version }}-${{ inputs.service }}"
-          if [[ -n "${{ inputs.tag_suffix }}" ]]; then
-            TAG="${TAG}-${{ inputs.tag_suffix }}"
-          fi
-          echo "image=${IMAGE}" >> "$GITHUB_OUTPUT"
-          echo "release_tag=${TAG}" >> "$GITHUB_OUTPUT"
+          VERSION="${{ steps.semver.outputs.normalized_version }}"
 
-      - name: Check if tag already exists
+          # Docker tag: plain version only (e.g. v1.2.3)
+          DOCKER_TAG="${VERSION}"
+
+          # Git tag: version + service + optional suffix (e.g. v1.2.3-authsvc or v1.2.3-authsvc-rc1)
+          GIT_TAG="${VERSION}-${{ inputs.service }}"
+          if [[ -n "${{ inputs.tag_suffix }}" ]]; then
+            GIT_TAG="${GIT_TAG}-${{ inputs.tag_suffix }}"
+          fi
+
+          echo "image=${IMAGE}" >> "$GITHUB_OUTPUT"
+          echo "docker_tag=${DOCKER_TAG}" >> "$GITHUB_OUTPUT"
+          echo "git_tag=${GIT_TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Check if git tag already exists
         id: exists
         run: |
-          IMAGE="${{ steps.release.outputs.image }}"
-          TAG="${{ steps.release.outputs.release_tag }}"
-          if docker buildx imagetools inspect "${IMAGE}:${TAG}" >/dev/null 2>&1; then
+          GIT_TAG="${{ steps.release.outputs.git_tag }}"
+          if git ls-remote --tags origin "refs/tags/${GIT_TAG}" | grep -q "${GIT_TAG}"; then
             echo "exists=true" >> "$GITHUB_OUTPUT"
-            echo "Tag already exists: ${IMAGE}:${TAG}"
+            echo "Git tag already exists: ${GIT_TAG}"
           else
             echo "exists=false" >> "$GITHUB_OUTPUT"
-            echo "Tag does not exist yet: ${IMAGE}:${TAG}"
+            echo "Git tag does not exist yet: ${GIT_TAG}"
           fi
 
       - name: Decide build execution
@@ -243,7 +250,7 @@ jobs:
         with:
           images: ${{ steps.release.outputs.image }}
           tags: |
-            type=raw,value=${{ steps.release.outputs.release_tag }}
+            type=raw,value=${{ steps.release.outputs.docker_tag }}
             type=raw,value=latest,enable=${{ inputs.push_latest }}
 
       - name: Build and push
@@ -257,14 +264,22 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           build-args: ${{ steps.target.outputs.build_args }}
 
+      - name: Create and push git tag
+        if: steps.decision.outputs.should_build == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag "${{ steps.release.outputs.git_tag }}" -m "Release ${{ inputs.service }} ${{ steps.release.outputs.docker_tag }}"
+          git push origin "${{ steps.release.outputs.git_tag }}"
+
       - name: Release summary
         run: |
-          echo "Service: ${{ inputs.service }}"
+          echo "Service:          ${{ inputs.service }}"
           echo "Normalized version: ${{ steps.semver.outputs.normalized_version }}"
-          echo "Image: ${{ steps.release.outputs.image }}"
-          echo "Release tag: ${{ steps.release.outputs.release_tag }}"
-          echo "Tag existed: ${{ steps.exists.outputs.exists }}"
-          echo "skip_if_exists: ${{ inputs.skip_if_exists }}"
+          echo "Docker image:     ${{ steps.release.outputs.image }}:${{ steps.release.outputs.docker_tag }}"
+          echo "Git tag:          ${{ steps.release.outputs.git_tag }}"
+          echo "Git tag existed:  ${{ steps.exists.outputs.exists }}"
+          echo "skip_if_exists:   ${{ inputs.skip_if_exists }}"
           if [[ "${{ steps.decision.outputs.should_build }}" == "true" ]]; then
             echo "Result: build and push completed"
           else
