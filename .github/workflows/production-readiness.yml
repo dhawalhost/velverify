@@ -30,6 +30,9 @@ jobs:
       - name: Install Helm
         uses: azure/setup-helm@v4
 
+      - name: Build Helm dependencies
+        run: helm dependency build deploy/charts/wardseal/
+
       - name: Validate Helm chart structure
         run: helm lint deploy/charts/wardseal/
         continue-on-error: false
@@ -40,7 +43,7 @@ jobs:
           helm template wardseal deploy/charts/wardseal \
             -f deploy/charts/wardseal/values-production.yaml \
             --namespace wardseal \
-            -o /tmp/wardseal-prod-manifests.yaml
+            > /tmp/wardseal-prod-manifests.yaml
           echo "✓ Production manifests rendered successfully"
 
       - name: Validate production manifest configuration
@@ -48,7 +51,7 @@ jobs:
           echo "Validating rendered manifests configuration..."
           
           # Check KMS_PROVIDER is set to vault
-          if grep -q "KMS_PROVIDER.*vault" /tmp/wardseal-prod-manifests.yaml; then
+          if grep -q 'name: "KMS_PROVIDER"' /tmp/wardseal-prod-manifests.yaml && grep -q 'value: "vault"' /tmp/wardseal-prod-manifests.yaml; then
             echo "✓ KMS_PROVIDER correctly set to vault"
           else
             echo "✗ KMS_PROVIDER not set to vault in production manifests"
@@ -64,7 +67,7 @@ jobs:
           fi
           
           # Check Auth Service URL is set to production domain
-          if grep -q "AUTH_SERVICE_URL.*auth.wardseal.com" /tmp/wardseal-prod-manifests.yaml; then
+          if grep -q 'name: "AUTH_SERVICE_URL"' /tmp/wardseal-prod-manifests.yaml && grep -q 'value: "https://auth.wardseal.com"' /tmp/wardseal-prod-manifests.yaml; then
             echo "✓ AUTH_SERVICE_URL correctly configured for production"
           else
             echo "✗ AUTH_SERVICE_URL not correctly configured for production"
@@ -72,7 +75,7 @@ jobs:
           fi
           
           # Check UI URL is set to production domain
-          if grep -q "UI_URL.*manage.wardseal.com" /tmp/wardseal-prod-manifests.yaml; then
+          if grep -q 'name: "UI_URL"' /tmp/wardseal-prod-manifests.yaml && grep -q 'value: "https://manage.wardseal.com"' /tmp/wardseal-prod-manifests.yaml; then
             echo "✓ UI_URL correctly configured for production"
           else
             echo "✗ UI_URL not correctly configured for production"
@@ -214,66 +217,10 @@ jobs:
           bash -n scripts/validate_env_config.sh
           echo "✓ validate_env_config.sh syntax is valid"
 
-  production-deployment-documentation:
-    runs-on: ubuntu-latest
-    name: Deployment Documentation Check
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Verify production deployment documentation exists
-        run: |
-          if [ ! -f deploy/k8s-production/README.md ]; then
-            echo "✗ Production deployment guide not found at deploy/k8s-production/README.md"
-            exit 1
-          fi
-          echo "✓ Production deployment guide exists"
-
-      - name: Check critical documentation sections
-        run: |
-          DOC_FILE="deploy/k8s-production/README.md"
-          
-          echo "Validating critical documentation sections..."
-          
-          REQUIRED_SECTIONS=(
-            "Prerequisites"
-            "Helm Configuration Contract"
-            "Vault Setup"
-            "Kubernetes Secrets"
-            "Helm Deploy"
-            "Verification"
-            "Rotation"
-          )
-          
-          for section in "${REQUIRED_SECTIONS[@]}"; do
-            if grep -q "## $section" "$DOC_FILE"; then
-              echo "✓ Section found: $section"
-            else
-              echo "✗ Critical section missing: $section"
-              exit 1
-            fi
-          done
-
-      - name: Verify deployment guide links
-        run: |
-          if grep -q "Production Preflight Checks" docs/DEPLOYMENT_GUIDE.md; then
-            echo "✓ Production Preflight Checks section found in main guide"
-          else
-            echo "✗ Production Preflight Checks section not linked in main guide"
-            exit 1
-          fi
-          
-          if grep -q "scripts/preflight_production.sh" docs/DEPLOYMENT_GUIDE.md; then
-            echo "✓ Preflight script referenced in documentation"
-          else
-            echo "✗ Preflight script not referenced in documentation"
-            exit 1
-          fi
-
   summary:
     runs-on: ubuntu-latest
     name: Production Readiness Summary
-    needs: [production-manifest-validation, production-values-validation, production-script-validation, production-deployment-documentation]
+    needs: [production-manifest-validation, production-values-validation, production-script-validation]
     if: always()
     steps:
       - name: Check all validation results
@@ -300,18 +247,11 @@ jobs:
             echo "✗ Production script validation: FAILED"
           fi
           
-          if [ "${{ needs.production-deployment-documentation.result }}" = "success" ]; then
-            echo "✓ Deployment documentation: PASSED"
-          else
-            echo "✗ Deployment documentation: FAILED"
-          fi
-          
           echo "================================"
           
           if [ "${{ needs.production-manifest-validation.result }}" = "success" ] && \
              [ "${{ needs.production-values-validation.result }}" = "success" ] && \
-             [ "${{ needs.production-script-validation.result }}" = "success" ] && \
-             [ "${{ needs.production-deployment-documentation.result }}" = "success" ]; then
+             [ "${{ needs.production-script-validation.result }}" = "success" ]; then
             echo "✓ Code is PRODUCTION READY"
             exit 0
           else

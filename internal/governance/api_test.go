@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/dhawalhost/wardseal/internal/oauthclient"
+	"github.com/dhawalhost/wardseal/internal/webhook"
 	"github.com/dhawalhost/wardseal/pkg/middleware"
 	"github.com/gin-gonic/gin"
 	"github.com/lib/pq"
@@ -135,9 +136,81 @@ func newTestRouter(t *testing.T, svc Service) *gin.Engine {
 	t.Helper()
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
-	handler := NewHTTPHandler(svc, zap.NewNop())
+	handler := NewHTTPHandler(svc, &stubCampaignService{}, &stubWebhookService{}, zap.NewNop())
 	handler.RegisterRoutes(router)
 	return router
+}
+
+type stubCampaignService struct{}
+
+func (s *stubCampaignService) CreateCampaign(ctx context.Context, tenantID string, input CreateCampaignInput) (Campaign, error) {
+	return Campaign{}, nil
+}
+
+func (s *stubCampaignService) GetCampaign(ctx context.Context, tenantID, id string) (Campaign, error) {
+	return Campaign{}, nil
+}
+
+func (s *stubCampaignService) ListCampaigns(ctx context.Context, tenantID, status string) ([]Campaign, error) {
+	return []Campaign{}, nil
+}
+
+func (s *stubCampaignService) StartCampaign(ctx context.Context, tenantID, id string) error {
+	return nil
+}
+
+func (s *stubCampaignService) CompleteCampaign(ctx context.Context, tenantID, id string) error {
+	return nil
+}
+
+func (s *stubCampaignService) CancelCampaign(ctx context.Context, tenantID, id string) error {
+	return nil
+}
+
+func (s *stubCampaignService) DeleteCampaign(ctx context.Context, tenantID, id string) error {
+	return nil
+}
+
+func (s *stubCampaignService) AddReviewItem(ctx context.Context, tenantID, campaignID string, item CertificationItem) (CertificationItem, error) {
+	return CertificationItem{}, nil
+}
+
+func (s *stubCampaignService) ListPendingItems(ctx context.Context, campaignID string) ([]CertificationItem, error) {
+	return []CertificationItem{}, nil
+}
+
+func (s *stubCampaignService) ListReviewItems(ctx context.Context, tenantID, reviewerID string) ([]CertificationItem, error) {
+	return []CertificationItem{}, nil
+}
+
+func (s *stubCampaignService) ApproveItem(ctx context.Context, itemID, comment string) error {
+	return nil
+}
+
+func (s *stubCampaignService) RevokeItem(ctx context.Context, itemID, comment string) error {
+	return nil
+}
+
+type stubWebhookService struct{}
+
+func (s *stubWebhookService) CreateWebhook(ctx context.Context, tenantID, url, secret string, events []string) (string, error) {
+	return "", nil
+}
+
+func (s *stubWebhookService) GetWebhook(ctx context.Context, tenantID, id string) (*webhook.Webhook, error) {
+	return nil, nil
+}
+
+func (s *stubWebhookService) ListWebhooks(ctx context.Context, tenantID string) ([]webhook.Webhook, error) {
+	return []webhook.Webhook{}, nil
+}
+
+func (s *stubWebhookService) DeleteWebhook(ctx context.Context, tenantID, id string) error {
+	return nil
+}
+
+func (s *stubWebhookService) GetWebhooksForEvent(ctx context.Context, tenantID, event string) ([]webhook.Webhook, error) {
+	return []webhook.Webhook{}, nil
 }
 
 func performRequest(router *gin.Engine, method, path string, body []byte, headers map[string]string) *httptest.ResponseRecorder {
