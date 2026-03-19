@@ -90,16 +90,31 @@ spec:
                   key: database
             {{- end }}
             {{- if and .Values.vaultAppRole .Values.vaultAppRole.existingSecret }}
+            - name: VAULT_ADDR
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.vaultAppRole.existingSecret }}
+                  key: VAULT_ADDR
             - name: VAULT_ROLE_ID
               valueFrom:
                 secretKeyRef:
                   name: {{ .Values.vaultAppRole.existingSecret }}
-                  key: role-id
+                  key: VAULT_ROLE_ID
             - name: VAULT_SECRET_ID
               valueFrom:
                 secretKeyRef:
                   name: {{ .Values.vaultAppRole.existingSecret }}
-                  key: secret-id
+                  key: VAULT_SECRET_ID
+            - name: VAULT_KEY_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.vaultAppRole.existingSecret }}
+                  key: VAULT_KEY_NAME
+            - name: VAULT_KEY_PATH
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.vaultAppRole.existingSecret }}
+                  key: VAULT_KEY_PATH
             {{- end }}
           {{- if .Values.livenessProbe }}
           livenessProbe:
