@@ -19,6 +19,7 @@ spec:
       valueFiles:
         - values.yaml
         - values-staging.yaml
+        - values-staging-certmanager.yaml
         - values-staging-versions.yaml
 
   destination:

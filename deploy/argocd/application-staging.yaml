@@ -19,9 +19,11 @@ spec:
     path: deploy/charts/wardseal
 
     helm:
+      releaseName: wardseal
       valueFiles:
         - values.yaml
         - values-staging.yaml
+        - values-staging-certmanager.yaml
         - values-staging-versions.yaml
 
   destination:
