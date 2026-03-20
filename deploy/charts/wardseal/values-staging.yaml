@@ -152,10 +152,9 @@ provsvc:
 # Ingress - Staging
 ingress:
   enabled: true
-  className: traefik
+  className: nginx
   annotations:
-    traefik.ingress.kubernetes.io/router.entrypoints: websecure
-    traefik.ingress.kubernetes.io/router.tls: "true"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
   hosts:
     - host: auth-staging.wardseal.com
       paths:
