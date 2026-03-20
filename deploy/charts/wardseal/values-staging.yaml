@@ -22,6 +22,12 @@ authsvc:
   enabled: true
   replicaCount: 1
 
+  database:
+    existingSecret: wardseal-db-credentials-staging
+
+  vaultAppRole:
+    existingSecret: wardseal-vault-kms-staging
+
   image:
     tag: "latest"  # Base/default only; overridden by values-staging-versions.yaml in Argo CD
 
@@ -43,9 +49,6 @@ authsvc:
     - secretRef:
         name: wardseal-vault-kms-staging
 
-  vaultAppRole:
-    existingSecret: wardseal-vault-kms-staging
-
   resources:
     limits:
       cpu: 200m
@@ -58,6 +61,12 @@ authsvc:
 dirsvc:
   enabled: true
   replicaCount: 1
+
+  database:
+    existingSecret: wardseal-db-credentials-staging
+
+  vaultAppRole:
+    existingSecret: wardseal-vault-kms-staging
 
   image:
     tag: "latest"  # Base/default only; overridden by values-staging-versions.yaml in Argo CD
@@ -83,6 +92,12 @@ govsvc:
   enabled: true
   replicaCount: 1
 
+  database:
+    existingSecret: wardseal-db-credentials-staging
+
+  vaultAppRole:
+    existingSecret: wardseal-vault-kms-staging
+
   image:
     tag: "latest"  # Base/default only; overridden by values-staging-versions.yaml in Argo CD
 
@@ -105,6 +120,15 @@ govsvc:
 
 adminui:
   enabled: true
+
+  nginx:
+    authServiceHost: wardseal-authsvc
+    authServicePort: 8080
+    directoryServiceHost: wardseal-dirsvc
+    directoryServicePort: 8081
+    governanceServiceHost: wardseal-govsvc
+    governanceServicePort: 8082
+
   image:
     tag: "latest"  # Base/default only; overridden by values-staging-versions.yaml in Argo CD
 
@@ -112,6 +136,18 @@ landingui:
   enabled: true
   image:
     tag: "latest"  # Base/default only; overridden by values-staging-versions.yaml in Argo CD
+
+policysvc:
+  database:
+    existingSecret: wardseal-db-credentials-staging
+  vaultAppRole:
+    existingSecret: wardseal-vault-kms-staging
+
+provsvc:
+  database:
+    existingSecret: wardseal-db-credentials-staging
+  vaultAppRole:
+    existingSecret: wardseal-vault-kms-staging
 
 # Ingress - Staging
 ingress:

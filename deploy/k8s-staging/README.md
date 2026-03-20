@@ -63,6 +63,22 @@ The easiest way to get started is to run the deployment scripts in order:
 ./scripts/deploy_wardseal_staging.sh
 ```
 
+### Quick Start (Shared External Vault)
+
+If staging and production share the same Vault (for example `https://vault.dhawalhost.com`), skip `setup_vault_staging.sh` and deploy Wardseal directly with external Vault settings:
+
+```bash
+USE_EXTERNAL_VAULT=yes \
+VAULT_ADDR=https://vault.dhawalhost.com \
+VAULT_ROLE_ID=<staging-role-id> \
+VAULT_SECRET_ID=<staging-secret-id> \
+./scripts/deploy_wardseal_staging.sh
+```
+
+Notes:
+- `VAULT_ROLE_ID` and `VAULT_SECRET_ID` can also come from `/tmp/vault-approle-staging.json`.
+- Use a dedicated staging AppRole and staging transit key name/path where possible.
+
 ## Step-by-Step Deployment
 
 ### 1. Prepare TLS Certificates for Vault

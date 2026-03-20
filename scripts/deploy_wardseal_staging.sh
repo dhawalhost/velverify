@@ -20,6 +20,13 @@ VAULT_NAMESPACE="vault-staging"
 VAULT_ADDR="${VAULT_ADDR:-http://vault.vault-staging.svc.cluster.local:8200}"
 VAULT_KEY_PATH="${VAULT_KEY_PATH:-transit}"
 VAULT_KEY_NAME="${VAULT_KEY_NAME:-wardseal-signing-key-staging}"
+VAULT_ROLE_ID="${VAULT_ROLE_ID:-}"
+VAULT_SECRET_ID="${VAULT_SECRET_ID:-}"
+DEFAULT_EXTERNAL_VAULT="no"
+if [[ "$VAULT_ADDR" != *"vault.vault-staging.svc.cluster.local"* ]]; then
+    DEFAULT_EXTERNAL_VAULT="yes"
+fi
+USE_EXTERNAL_VAULT="${USE_EXTERNAL_VAULT:-$DEFAULT_EXTERNAL_VAULT}"
 DEPLOY_POSTGRES="${DEPLOY_POSTGRES:-yes}"  # Set to 'no' to skip PostgreSQL deployment
 EXTERNAL_DB_HOST="${EXTERNAL_DB_HOST:-}"    # Set if using external PostgreSQL
 
@@ -71,21 +78,27 @@ check_prerequisites() {
         exit 1
     fi
     
-    # Check if Vault is running
-    if ! kubectl get namespace "$VAULT_NAMESPACE" &> /dev/null; then
-        log_error "Vault namespace not found. Please run setup_vault_staging.sh first."
-        exit 1
+    if [ "$USE_EXTERNAL_VAULT" != "yes" ]; then
+        # Check if in-cluster Vault is running
+        if ! kubectl get namespace "$VAULT_NAMESPACE" &> /dev/null; then
+            log_error "Vault namespace not found. Please run setup_vault_staging.sh first."
+            exit 1
+        fi
+
+        if ! kubectl get pod vault-0 -n "$VAULT_NAMESPACE" &> /dev/null; then
+            log_error "Vault pod not found. Please run setup_vault_staging.sh first."
+            exit 1
+        fi
+    else
+        log_info "Using external/shared Vault at $VAULT_ADDR"
     fi
-    
-    if ! kubectl get pod vault-0 -n "$VAULT_NAMESPACE" &> /dev/null; then
-        log_error "Vault pod not found. Please run setup_vault_staging.sh first."
-        exit 1
-    fi
-    
-    # Check AppRole credentials
-    if [ ! -f "$APPROLE_FILE" ]; then
-        log_error "Vault AppRole credentials not found at $APPROLE_FILE"
-        log_error "Please run setup_vault_staging.sh first or set the credentials manually."
+
+    # Check AppRole credentials (environment variables or file)
+    if [ -n "$VAULT_ROLE_ID" ] && [ -n "$VAULT_SECRET_ID" ]; then
+        log_info "Using Vault AppRole credentials from environment variables"
+    elif [ ! -f "$APPROLE_FILE" ]; then
+        log_error "Vault AppRole credentials not found"
+        log_error "Provide VAULT_ROLE_ID and VAULT_SECRET_ID, or create $APPROLE_FILE"
         exit 1
     fi
     
@@ -314,23 +327,28 @@ create_secrets() {
     log_info "Service auth secret created ✓"
     
     # Create Vault KMS secret
-    if [ -f "$APPROLE_FILE" ]; then
+    ROLE_ID="$VAULT_ROLE_ID"
+    SECRET_ID="$VAULT_SECRET_ID"
+    if [ -z "$ROLE_ID" ] || [ -z "$SECRET_ID" ]; then
         ROLE_ID=$(jq -r '.role_id' "$APPROLE_FILE")
         SECRET_ID=$(jq -r '.secret_id' "$APPROLE_FILE")
-        
-        kubectl create secret generic wardseal-vault-kms-staging \
-            -n "$NAMESPACE" \
-            --from-literal=VAULT_ADDR="$VAULT_ADDR" \
-            --from-literal=VAULT_ROLE_ID="$ROLE_ID" \
-            --from-literal=VAULT_SECRET_ID="$SECRET_ID" \
-            --from-literal=VAULT_KEY_NAME="$VAULT_KEY_NAME" \
-            --from-literal=VAULT_KEY_PATH="$VAULT_KEY_PATH" \
-            --dry-run=client -o yaml | kubectl apply -f -
-        
-        log_info "Vault KMS secret created ✓"
-    else
-        log_warn "Vault AppRole file not found, skipping..."
     fi
+
+    if [ -z "$ROLE_ID" ] || [ -z "$SECRET_ID" ] || [ "$ROLE_ID" = "null" ] || [ "$SECRET_ID" = "null" ]; then
+        log_error "Vault AppRole credentials are empty. Cannot create wardseal-vault-kms-staging secret."
+        exit 1
+    fi
+
+    kubectl create secret generic wardseal-vault-kms-staging \
+        -n "$NAMESPACE" \
+        --from-literal=VAULT_ADDR="$VAULT_ADDR" \
+        --from-literal=VAULT_ROLE_ID="$ROLE_ID" \
+        --from-literal=VAULT_SECRET_ID="$SECRET_ID" \
+        --from-literal=VAULT_KEY_NAME="$VAULT_KEY_NAME" \
+        --from-literal=VAULT_KEY_PATH="$VAULT_KEY_PATH" \
+        --dry-run=client -o yaml | kubectl apply -f -
+
+    log_info "Vault KMS secret created ✓"
 }
 
 # Build Helm chart dependencies
@@ -461,6 +479,8 @@ main() {
     echo "Configuration:"
     echo "  - Deploy PostgreSQL: $DEPLOY_POSTGRES"
     echo "  - External DB Host: ${EXTERNAL_DB_HOST:-N/A}"
+    echo "  - Use External Vault: $USE_EXTERNAL_VAULT"
+    echo "  - Vault Address: $VAULT_ADDR"
     echo "  - Image Tag: $IMAGE_TAG"
     echo "  - Image Registry: $IMAGE_REGISTRY"
     echo ""
