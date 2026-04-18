@@ -3,6 +3,7 @@ package rbac
 import (
 	"context"
 	"fmt"
+	"time"
 )
 
 // Service defines RBAC service operations.
@@ -25,9 +26,11 @@ type Service interface {
 
 	// User-Role
 	AssignRoleToUser(ctx context.Context, tenantID, userID, roleID string, assignedBy *string) error
+	AssignRoleWithExpiration(ctx context.Context, tenantID, userID, roleID string, assignedBy *string, duration string) error
 	RemoveRoleFromUser(ctx context.Context, userID, roleID string) error
 	GetUserRoles(ctx context.Context, tenantID, userID string) ([]Role, error)
 	GetUserPermissions(ctx context.Context, tenantID, userID string) ([]Permission, error)
+	ListExpiredAssignments(ctx context.Context) ([]UserRole, error)
 
 	// Authorization check
 	HasPermission(ctx context.Context, tenantID, userID, resource, action string) (bool, error)
@@ -107,6 +110,26 @@ func (s *service) GetRolePermissions(ctx context.Context, roleID string) ([]Perm
 
 func (s *service) AssignRoleToUser(ctx context.Context, tenantID, userID, roleID string, assignedBy *string) error {
 	return s.store.AssignRoleToUser(ctx, tenantID, userID, roleID, assignedBy)
+}
+
+func (s *service) AssignRoleWithExpiration(ctx context.Context, tenantID, userID, roleID string, assignedBy *string, duration string) error {
+	d, err := time.ParseDuration(duration)
+	if err != nil {
+		return fmt.Errorf("invalid duration: %w", err)
+	}
+	expiresAt := time.Now().Add(d)
+
+	// We use the direct Exec in the store for this specialized case
+	_, err = s.store.(*sqlRepository).db.ExecContext(ctx,
+		`INSERT INTO user_roles (user_id, role_id, tenant_id, assigned_by, expires_at) 
+		 VALUES ($1, $2, $3, $4, $5) 
+		 ON CONFLICT (user_id, role_id) DO UPDATE SET assigned_at = NOW(), assigned_by = $4, expires_at = $5`,
+		userID, roleID, tenantID, assignedBy, expiresAt)
+	return err
+}
+
+func (s *service) ListExpiredAssignments(ctx context.Context) ([]UserRole, error) {
+	return s.store.ListExpiredAssignments(ctx)
 }
 
 func (s *service) RemoveRoleFromUser(ctx context.Context, userID, roleID string) error {

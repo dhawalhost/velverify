@@ -29,11 +29,12 @@ type Permission struct {
 
 // UserRole represents a user's role assignment.
 type UserRole struct {
-	UserID     string    `json:"user_id" db:"user_id"`
-	RoleID     string    `json:"role_id" db:"role_id"`
-	TenantID   string    `json:"tenant_id" db:"tenant_id"`
-	AssignedAt time.Time `json:"assigned_at" db:"assigned_at"`
-	AssignedBy *string   `json:"assigned_by,omitempty" db:"assigned_by"`
+	UserID     string     `json:"user_id" db:"user_id"`
+	RoleID     string     `json:"role_id" db:"role_id"`
+	TenantID   string     `json:"tenant_id" db:"tenant_id"`
+	AssignedAt time.Time  `json:"assigned_at" db:"assigned_at"`
+	AssignedBy *string    `json:"assigned_by,omitempty" db:"assigned_by"`
+	ExpiresAt  *time.Time `json:"expires_at,omitempty" db:"expires_at"`
 }
 
 // Repository defines RBAC storage operations.
@@ -60,6 +61,7 @@ type Repository interface {
 	RemoveRoleFromUser(ctx context.Context, userID, roleID string) error
 	GetUserRoles(ctx context.Context, tenantID, userID string) ([]Role, error)
 	GetUserPermissions(ctx context.Context, tenantID, userID string) ([]Permission, error)
+	ListExpiredAssignments(ctx context.Context) ([]UserRole, error)
 }
 
 type sqlRepository struct {
@@ -151,11 +153,21 @@ func (s *sqlRepository) RemovePermissionFromRole(ctx context.Context, roleID, pe
 }
 
 func (s *sqlRepository) AssignRoleToUser(ctx context.Context, tenantID, userID, roleID string, assignedBy *string) error {
+	// By default, no expiration. Specific duration is set via specialized wrapper if needed, 
+	// but here we allow it to be updated separately or we could add it to params.
+	// For simplicity in the repository, we'll add an internal method or just Exec direct.
 	_, err := s.db.ExecContext(ctx,
 		`INSERT INTO user_roles (user_id, role_id, tenant_id, assigned_by) 
-		 VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING`,
+		 VALUES ($1, $2, $3, $4) ON CONFLICT (user_id, role_id) DO UPDATE SET assigned_at = NOW(), assigned_by = $4`,
 		userID, roleID, tenantID, assignedBy)
 	return err
+}
+
+func (s *sqlRepository) ListExpiredAssignments(ctx context.Context) ([]UserRole, error) {
+	var assignments []UserRole
+	err := s.db.SelectContext(ctx, &assignments,
+		`SELECT * FROM user_roles WHERE expires_at IS NOT NULL AND expires_at < NOW()`)
+	return assignments, err
 }
 
 func (s *sqlRepository) RemoveRoleFromUser(ctx context.Context, userID, roleID string) error {

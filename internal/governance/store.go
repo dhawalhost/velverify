@@ -21,6 +21,12 @@ type Repository interface {
 	CreateIPPolicy(ctx context.Context, p IPPolicy) (string, error)
 	ListIPPolicies(ctx context.Context, tenantID string) ([]IPPolicy, error)
 	DeleteIPPolicy(ctx context.Context, tenantID, id string) error
+
+	// Safety Actions
+	CreateSafetyAction(ctx context.Context, action SafetyAction) (string, error)
+	GetSafetyAction(ctx context.Context, tenantID, id string) (SafetyAction, error)
+	ListSafetyActions(ctx context.Context, tenantID, status string) ([]SafetyAction, error)
+	UpdateSafetyActionStatus(ctx context.Context, id, status string) error
 }
 
 type sqlRepository struct {
@@ -35,9 +41,9 @@ func NewRepository(db *sqlx.DB) Repository {
 func (s *sqlRepository) CreateRequest(ctx context.Context, req AccessRequest) (string, error) {
 	var id string
 	err := s.db.QueryRowContext(ctx,
-		`INSERT INTO access_requests (tenant_id, requester_id, resource_type, resource_id, reason, status)
-		 VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
-		req.TenantID, req.RequesterID, req.ResourceType, req.ResourceID, req.Reason, "pending").Scan(&id)
+		`INSERT INTO access_requests (tenant_id, requester_id, resource_type, resource_id, reason, duration, status, device_id)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
+		req.TenantID, req.RequesterID, req.ResourceType, req.ResourceID, req.Reason, req.Duration, "pending", req.DeviceID).Scan(&id)
 	if err != nil {
 		return "", fmt.Errorf("failed to create access request: %w", err)
 	}
@@ -52,11 +58,11 @@ func (s *sqlRepository) GetRequest(ctx context.Context, tenantID, id string) (Ac
 	// Actually for simplicity, let's change struct to use time.Time or custom scanner.
 	// But since I already defined struct with string in types.go, I will Scan into time.Time and convert.
 
-	row := s.db.QueryRowxContext(ctx, `SELECT id, tenant_id, requester_id, resource_type, resource_id, status, reason, created_at, updated_at
+	row := s.db.QueryRowxContext(ctx, `SELECT id, tenant_id, requester_id, resource_type, resource_id, status, reason, duration, created_at, updated_at
 		FROM access_requests WHERE id = $1 AND tenant_id = $2`, id, tenantID)
 
 	var createdAt, updatedAt time.Time
-	err := row.Scan(&req.ID, &req.TenantID, &req.RequesterID, &req.ResourceType, &req.ResourceID, &req.Status, &req.Reason, &createdAt, &updatedAt)
+	err := row.Scan(&req.ID, &req.TenantID, &req.RequesterID, &req.ResourceType, &req.ResourceID, &req.Status, &req.Reason, &req.Duration, &createdAt, &updatedAt)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return AccessRequest{}, fmt.Errorf("request not found")
@@ -69,7 +75,7 @@ func (s *sqlRepository) GetRequest(ctx context.Context, tenantID, id string) (Ac
 }
 
 func (s *sqlRepository) ListRequests(ctx context.Context, tenantID, status string) ([]AccessRequest, error) {
-	query := `SELECT id, tenant_id, requester_id, resource_type, resource_id, status, reason, created_at, updated_at
+	query := `SELECT id, tenant_id, requester_id, resource_type, resource_id, status, reason, duration, created_at, updated_at
 		FROM access_requests WHERE tenant_id = $1`
 	args := []interface{}{tenantID}
 
@@ -89,7 +95,7 @@ func (s *sqlRepository) ListRequests(ctx context.Context, tenantID, status strin
 	for rows.Next() {
 		var req AccessRequest
 		var createdAt, updatedAt time.Time
-		if err := rows.Scan(&req.ID, &req.TenantID, &req.RequesterID, &req.ResourceType, &req.ResourceID, &req.Status, &req.Reason, &createdAt, &updatedAt); err != nil {
+		if err := rows.Scan(&req.ID, &req.TenantID, &req.RequesterID, &req.ResourceType, &req.ResourceID, &req.Status, &req.Reason, &req.Duration, &createdAt, &updatedAt); err != nil {
 			return nil, err
 		}
 		req.CreatedAt = createdAt.Format(time.RFC3339)
@@ -122,5 +128,40 @@ func (s *sqlRepository) ListIPPolicies(ctx context.Context, tenantID string) ([]
 
 func (s *sqlRepository) DeleteIPPolicy(ctx context.Context, tenantID, id string) error {
 	_, err := s.db.ExecContext(ctx, `DELETE FROM ip_policy WHERE id = $1 AND tenant_id = $2`, id, tenantID)
+	return err
+}
+
+// Safety Action Implementation
+
+func (s *sqlRepository) CreateSafetyAction(ctx context.Context, action SafetyAction) (string, error) {
+	var id string
+	query := `INSERT INTO safety_actions (tenant_id, action_type, target_id, metadata, status, reason)
+		VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`
+	err := s.db.QueryRowContext(ctx, query,
+		action.TenantID, action.ActionType, action.TargetID, action.Metadata, "pending", action.Reason).Scan(&id)
+	return id, err
+}
+
+func (s *sqlRepository) GetSafetyAction(ctx context.Context, tenantID, id string) (SafetyAction, error) {
+	var action SafetyAction
+	err := s.db.GetContext(ctx, &action, `SELECT * FROM safety_actions WHERE id = $1 AND tenant_id = $2`, id, tenantID)
+	return action, err
+}
+
+func (s *sqlRepository) ListSafetyActions(ctx context.Context, tenantID, status string) ([]SafetyAction, error) {
+	var actions []SafetyAction
+	query := `SELECT * FROM safety_actions WHERE tenant_id = $1`
+	args := []interface{}{tenantID}
+	if status != "" {
+		query += ` AND status = $2`
+		args = append(args, status)
+	}
+	query += ` ORDER BY created_at DESC`
+	err := s.db.SelectContext(ctx, &actions, query, args...)
+	return actions, err
+}
+
+func (s *sqlRepository) UpdateSafetyActionStatus(ctx context.Context, id, status string) error {
+	_, err := s.db.ExecContext(ctx, `UPDATE safety_actions SET status = $1, updated_at = NOW() WHERE id = $2`, status, id)
 	return err
 }

@@ -2,16 +2,27 @@ package main
 
 import (
 	"context"
+	"fmt"
+	"net/http"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
+	"time"
 
 	"github.com/dhawalhost/wardseal/internal/directory"
 	"github.com/dhawalhost/wardseal/internal/scim"
 	"github.com/dhawalhost/wardseal/pkg/config"
 	"github.com/dhawalhost/wardseal/pkg/database"
-	"github.com/dhawalhost/wardseal/pkg/logger"
 	"github.com/dhawalhost/wardseal/pkg/middleware"
-	"github.com/dhawalhost/wardseal/pkg/observability"
+	wardsealobs "github.com/dhawalhost/wardseal/pkg/observability"
+	gokitconfig "github.com/dhawalhost/gokit/config"
+	"github.com/dhawalhost/gokit/health"
+	"github.com/dhawalhost/gokit/logger"
+	gokitmiddleware "github.com/dhawalhost/gokit/middleware"
+	"github.com/dhawalhost/gokit/observability"
+	"github.com/dhawalhost/wardseal/pkg/eventbus"
+	"github.com/dhawalhost/wardseal/pkg/eventbus/redisbus"
 	"github.com/gin-gonic/gin"
 	"github.com/go-redis/redis/v8"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
@@ -19,18 +30,22 @@ import (
 )
 
 func main() {
-	log := logger.NewFromEnv()
-	defer func() { _ = log.Sync() }()
-
 	// Load centralized configuration
 	cfg := config.MustLoad()
+
+	log, err := logger.New(cfg.Observability.LogLevel, cfg.Environment == config.Development)
+	if err != nil {
+		fmt.Printf("Failed to initialize logger: %v\n", err)
+		os.Exit(1)
+	}
+	defer func() { _ = log.Sync() }()
 
 	// Database connection
 	dbConfig := database.Config{
 		Host:     cfg.Database.Host,
 		Port:     cfg.Database.Port,
 		User:     cfg.Database.User,
-		Password: cfg.Database.Password, // Securely injected by Vault if configured
+		Password: cfg.Database.Password.Raw(), // Securely injected by Vault if configured
 		DBName:   cfg.Database.Name,
 		SSLMode:  cfg.Database.SSLMode,
 	}
@@ -41,11 +56,27 @@ func main() {
 		os.Exit(1)
 	}
 
+	var bus eventbus.EventBus
+	if cfg.Auth.RedisAddr != "" {
+		redisClient := redis.NewClient(&redis.Options{
+			Addr:     cfg.Auth.RedisAddr,
+			Password: cfg.Auth.RedisPassword.Raw(),
+			DB:       cfg.Auth.RedisDB,
+		})
+		if err := redisClient.Ping(context.Background()).Err(); err != nil {
+			log.Warn("Redis unavailable for eventbus; events will be dropped", zap.Error(err))
+		} else {
+			bus = redisbus.NewRedisEventBus(redisClient, log)
+		}
+	} else {
+		log.Warn("No Redis configured; eventbus disabled")
+	}
+
 	repo := directory.NewRepository(db)
-	svc := directory.NewService(repo)
+	svc := directory.NewService(repo, bus)
 
 	serviceToken := cfg.Directory.ServiceAuthToken
-	if serviceToken == "" {
+	if serviceToken.IsEmpty() {
 		serviceToken = "dev-internal-token" //nolint:gosec // G101: dev-only fallback, not production credentials
 		log.Warn("SERVICE_AUTH_TOKEN not set, using development default")
 	}
@@ -76,31 +107,31 @@ func main() {
 	}
 
 	// Initialize OpenTelemetry tracing
-	shutdownTracer, err := observability.InitTracer(context.Background(), observability.TracerConfig{
-		ServiceName:    cfg.Observability.ServiceName,
-		ServiceVersion: cfg.Observability.ServiceVersion,
-		Environment:    string(cfg.Environment),
-	}, log)
+	shutdownTracer, err := observability.InitTracer(context.Background(), gokitconfig.TelemetryConfig{
+		Enabled:      cfg.Observability.OTELEndpoint != "",
+		OTLPEndpoint: cfg.Observability.OTELEndpoint,
+		ServiceName:  cfg.Observability.ServiceName,
+	})
 	if err != nil {
 		log.Error("Failed to initialize tracer", zap.Error(err))
 	}
 	defer func() { _ = shutdownTracer(context.Background()) }()
 
 	// Initialize and apply observability middleware
-	metrics := observability.NewMetrics()
+	metrics := wardsealobs.NewMetrics()
 	router.Use(otelgin.Middleware("dirsvc"))
-	router.Use(observability.PrometheusMiddleware(metrics))
-	router.Use(observability.PrometheusMiddleware(metrics))
-	router.Use(logger.RequestLogger(log))
+	router.Use(wardsealobs.PrometheusMiddleware(metrics))
+	router.Use(middleware.Wrap(gokitmiddleware.RequestID())) // Inject tracing ID
+	router.Use(middleware.APILogger(nil, log))
 
 	// Security Middleware
-	router.Use(middleware.SecurityHeadersMiddleware())
+	router.Use(middleware.Wrap(gokitmiddleware.SecureHeaders()))
 
 	var rateLimitRedisClient *redis.Client
 	if cfg.Auth.RedisAddr != "" {
 		rateLimitRedisClient = redis.NewClient(&redis.Options{
 			Addr:     cfg.Auth.RedisAddr,
-			Password: cfg.Auth.RedisPassword,
+			Password: cfg.Auth.RedisPassword.Raw(),
 			DB:       cfg.Auth.RedisDB,
 		})
 		if err := rateLimitRedisClient.Ping(context.Background()).Err(); err != nil {
@@ -147,23 +178,51 @@ func main() {
 	router.Use(middleware.APILogger(db, log))
 
 	// Register Prometheus metrics handler
-	router.GET("/metrics", gin.WrapH(observability.PrometheusHandler()))
+	router.GET("/metrics", gin.WrapH(wardsealobs.PrometheusHandler()))
+
+	// Register standardized health checks
+	healthHandler := health.NewHandler()
+	router.GET("/healthz", gin.WrapF(healthHandler.LiveHandler()))
+	router.GET("/readyz", gin.WrapF(healthHandler.ReadyHandler()))
 
 	// Register service routes
 	api := directory.NewHTTPHandler(svc, log, directory.HTTPHandlerConfig{
-		ServiceAuthToken:  serviceToken,
+		ServiceAuthToken:  serviceToken.Raw(),
 		ServiceAuthHeader: serviceHeader,
 	})
 	api.RegisterRoutes(router)
 
 	// Register SCIM routes
 	scimSvc := scim.NewService(svc)
-	scimHandlers := scim.NewHTTPHandler(scimSvc, repo, serviceToken, log)
+	scimHandlers := scim.NewHTTPHandler(scimSvc, repo, serviceToken.Raw(), log)
 	scimHandlers.RegisterRoutes(router)
 
-	log.Info("HTTP server starting", zap.String("addr", ":8081"))
-	if err := router.Run(":8081"); err != nil {
-		log.Error("HTTP server failed", zap.Error(err))
-		os.Exit(1)
+	// Server Configuration with Graceful Shutdown
+	srv := &http.Server{
+		Addr:         ":8081",
+		Handler:      router,
+		ReadTimeout:  30 * time.Second,
+		WriteTimeout: 30 * time.Second,
+		IdleTimeout:  120 * time.Second,
 	}
+
+	go func() {
+		log.Info("Directory service starting", zap.String("addr", ":8081"))
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Error("Directory service failed", zap.Error(err))
+			os.Exit(1)
+		}
+	}()
+
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+	log.Info("Shutting down directory service...")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	if err := srv.Shutdown(ctx); err != nil {
+		log.Error("Directory service forced to shutdown", zap.Error(err))
+	}
+	log.Info("Directory service exited gracefully")
 }

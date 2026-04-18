@@ -194,11 +194,17 @@ func (env *TestEnv) setupServers(t *testing.T) {
 	clientStore := oauthclient.NewRepository(env.DB)
 	reqStore := governance.NewRepository(env.DB)
 	orgRepo := governance.NewOrganizationRepository(env.DB)
+	endpointRepo := governance.NewEndpointRepository(env.DB)
 	dirClient := governance.NewDirectoryClient(env.DirServer.URL, "", "")
-	policyEngine := policy.NewSimpleEngine()
+	
+	policyRepo := policy.NewRepository(env.DB)
+	policyEngine := policy.NewSimpleEngine(policyRepo)
 
-	govSvc := governance.NewService(clientStore, reqStore, orgRepo, dirClient, policyEngine)
-	campaignSvc := governance.NewCampaignService(governance.NewCampaignRepository(env.DB), dirClient)
+	rbacRepo := rbac.NewRepository(env.DB)
+	rbacSvc := rbac.NewService(rbacRepo)
+
+	govSvc := governance.NewService(clientStore, reqStore, orgRepo, endpointRepo, dirClient, policyEngine, rbacSvc, nil)
+	campaignSvc := governance.NewCampaignService(governance.NewCampaignRepository(env.DB), dirClient, nil)
 	webhookSvc := webhook.NewService(env.DB)
 
 	govHandler := governance.NewHTTPHandler(govSvc, campaignSvc, webhookSvc, env.Logger)

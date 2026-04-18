@@ -19,6 +19,9 @@ type Service interface {
 
 	// GetEvent retrieves a single audit event.
 	GetEvent(ctx context.Context, tenantID, id string) (Event, error)
+
+	// GetStats retrieves statistics for the audit logs.
+	GetStats(ctx context.Context, tenantID string, lookbackDays int) (Stats, error)
 }
 
 type service struct {
@@ -96,4 +99,14 @@ func (s *service) Export(ctx context.Context, params QueryParams) ([]Event, erro
 
 func (s *service) GetEvent(ctx context.Context, tenantID, id string) (Event, error) {
 	return s.store.GetEvent(ctx, tenantID, id)
+}
+
+func (s *service) GetStats(ctx context.Context, tenantID string, lookbackDays int) (Stats, error) {
+	if lookbackDays <= 0 {
+		lookbackDays = 7 // Default to 7 days
+	}
+	if lookbackDays > 90 {
+		lookbackDays = 90 // Max 90 days for performance
+	}
+	return s.store.GetStats(ctx, tenantID, lookbackDays)
 }

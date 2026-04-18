@@ -1,6 +1,11 @@
 package governance
 
-import "github.com/dhawalhost/wardseal/internal/oauthclient"
+import (
+	"encoding/json"
+	"time"
+
+	"github.com/dhawalhost/wardseal/internal/oauthclient"
+)
 
 // OAuthClientResponse is the wire format for OAuth clients.
 type OAuthClientResponse struct {
@@ -57,8 +62,10 @@ type AccessRequest struct {
 	ResourceID   string `json:"resource_id"`
 	Status       string `json:"status"`
 	Reason       string `json:"reason"`
+	Duration     string `json:"duration,omitempty"` // e.g. "4h", "1d"
 	CreatedAt    string `json:"created_at"` // ISO8601
 	UpdatedAt    string `json:"updated_at"`
+	DeviceID     string `json:"device_id,omitempty"`
 }
 
 type CreateAccessRequest struct {
@@ -66,6 +73,8 @@ type CreateAccessRequest struct {
 	ResourceType string `json:"resource_type"`
 	ResourceID   string `json:"resource_id"`
 	Reason       string `json:"reason"`
+	Duration     string `json:"duration,omitempty"` // "1h", "4h", "24h", etc.
+	DeviceID     string `json:"device_id,omitempty"`
 }
 
 type AccessRequestList struct {
@@ -93,4 +102,28 @@ type CreateIPPolicyRequest struct {
 	CIDR        string `json:"cidr"`
 	CountryCode string `json:"country_code"`
 	Reason      string `json:"reason"`
+}
+// Safety Action types
+
+type SafetyAction struct {
+	ID         string          `json:"id" db:"id"`
+	TenantID   string          `json:"tenant_id" db:"tenant_id"`
+	ActionType string          `json:"action_type" db:"action_type"` // e.g., "revoke_all_access"
+	TargetID   string          `json:"target_id" db:"target_id"`     // user_id
+	Metadata   json.RawMessage `json:"metadata" db:"metadata"`       // stores org_ids or other context
+	Status     string          `json:"status" db:"status"`           // pending, confirmed, rejected
+	Reason     string          `json:"reason" db:"reason"`
+	CreatedAt  time.Time       `json:"created_at" db:"created_at"`
+	UpdatedAt  time.Time       `json:"updated_at" db:"updated_at"`
+}
+
+type ProposeSafetyActionInput struct {
+	ActionType string          `json:"action_type"`
+	TargetID   string          `json:"target_id"`
+	Metadata   json.RawMessage `json:"metadata"`
+	Reason     string          `json:"reason"`
+}
+
+type ConfirmSafetyActionRequest struct {
+	Comment string `json:"comment"`
 }

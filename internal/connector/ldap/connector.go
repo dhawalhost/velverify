@@ -355,6 +355,60 @@ func (c *Connector) GetGroupMembers(ctx context.Context, groupID string) ([]conn
 	return users, nil
 }
 
+func (c *Connector) DiscoverResources(ctx context.Context) ([]connector.Resource, error) {
+	if c.conn == nil {
+		if err := c.connect(); err != nil {
+			return nil, err
+		}
+	}
+
+	resources := []connector.Resource{}
+
+	// 1. Discover OUs (Potential Resource Containers)
+	ouResult, err := c.conn.Search(&ldap.SearchRequest{
+		BaseDN:     c.baseDN,
+		Scope:      ldap.ScopeWholeSubtree,
+		Filter:     "(objectClass=organizationalUnit)",
+		Attributes: []string{"ou", "description"},
+	})
+	if err == nil {
+		for _, entry := range ouResult.Entries {
+			resources = append(resources, connector.Resource{
+				ExternalID: entry.DN,
+				Type:       "ou",
+				Name:       entry.GetAttributeValue("ou"),
+				Metadata: map[string]string{
+					"dn":          entry.DN,
+					"description": entry.GetAttributeValue("description"),
+				},
+			})
+		}
+	}
+
+	// 2. Discover Groups (Potential Application access points)
+	groupResult, err := c.conn.Search(&ldap.SearchRequest{
+		BaseDN:     c.baseDN,
+		Scope:      ldap.ScopeWholeSubtree,
+		Filter:     "(objectClass=groupOfNames)",
+		Attributes: []string{"cn", "description"},
+	})
+	if err == nil {
+		for _, entry := range groupResult.Entries {
+			resources = append(resources, connector.Resource{
+				ExternalID: entry.DN,
+				Type:       "group",
+				Name:       entry.GetAttributeValue("cn"),
+				Metadata: map[string]string{
+					"dn":          entry.DN,
+					"description": entry.GetAttributeValue("description"),
+				},
+			})
+		}
+	}
+
+	return resources, nil
+}
+
 func (c *Connector) getUsersOU() string {
 	if ou, ok := c.config.Settings["users_ou"]; ok {
 		return ou

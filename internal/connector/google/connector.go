@@ -378,6 +378,11 @@ func (c *Connector) GetGroupMembers(ctx context.Context, groupID string) ([]conn
 	return users, nil
 }
 
+func (c *Connector) DiscoverResources(ctx context.Context) ([]connector.Resource, error) {
+	// Future implementation: Discover Google Workspace Groups and Organizational Units as resources
+	return []connector.Resource{}, nil
+}
+
 type googleUserResponse struct {
 	ID           string `json:"id"`
 	PrimaryEmail string `json:"primaryEmail"`

@@ -3,7 +3,9 @@ package connector
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 
+	"github.com/dhawalhost/wardseal/pkg/kms"
 	"github.com/jmoiron/sqlx"
 )
 
@@ -18,20 +20,30 @@ type Repository interface {
 }
 
 type sqlRepository struct {
-	db *sqlx.DB
+	db     *sqlx.DB
+	cipher kms.Cipher
 }
 
-// NewRepository creates a new connector repository.
-func NewRepository(db *sqlx.DB) Repository {
-	return &sqlRepository{db: db}
+// NewRepository creates a new connector repository with encryption support.
+func NewRepository(db *sqlx.DB, cipher kms.Cipher) Repository {
+	return &sqlRepository{
+		db:     db,
+		cipher: cipher,
+	}
 }
 
 func (s *sqlRepository) Create(ctx context.Context, config Config) (string, error) {
 	var id string
-	credentials, _ := json.Marshal(config.Credentials) // Should be encrypted in real app
+
+	credsJSON, _ := json.Marshal(config.Credentials)
+	credentials, err := s.cipher.Encrypt(ctx, credsJSON)
+	if err != nil {
+		return "", fmt.Errorf("failed to encrypt credentials: %w", err)
+	}
+
 	settings, _ := json.Marshal(config.Settings)
 
-	err := s.db.QueryRowxContext(ctx,
+	err = s.db.QueryRowxContext(ctx,
 		`INSERT INTO connectors (tenant_id, name, type, enabled, endpoint, credentials, settings)
 		VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
 		config.TenantID, config.Name, config.Type, config.Enabled, config.Endpoint, credentials, settings,
@@ -53,7 +65,13 @@ func (s *sqlRepository) Get(ctx context.Context, tenantID, id string) (Config, e
 
 	c.Credentials = make(map[string]string)
 	c.Settings = make(map[string]string)
-	_ = json.Unmarshal(c.CredentialsRaw, &c.Credentials)
+
+	if len(c.CredentialsRaw) > 0 {
+		decrypted, err := s.cipher.Decrypt(ctx, c.CredentialsRaw)
+		if err == nil {
+			_ = json.Unmarshal(decrypted, &c.Credentials)
+		}
+	}
 	_ = json.Unmarshal(c.SettingsRaw, &c.Settings)
 
 	return c.Config, nil
@@ -75,7 +93,13 @@ func (s *sqlRepository) List(ctx context.Context, tenantID string) ([]Config, er
 	for i, r := range rows {
 		r.Credentials = make(map[string]string)
 		r.Settings = make(map[string]string)
-		_ = json.Unmarshal(r.CredentialsRaw, &r.Credentials)
+
+		if len(r.CredentialsRaw) > 0 {
+			decrypted, err := s.cipher.Decrypt(ctx, r.CredentialsRaw)
+			if err == nil {
+				_ = json.Unmarshal(decrypted, &r.Credentials)
+			}
+		}
 		_ = json.Unmarshal(r.SettingsRaw, &r.Settings)
 		configs[i] = r.Config
 	}
@@ -83,10 +107,15 @@ func (s *sqlRepository) List(ctx context.Context, tenantID string) ([]Config, er
 }
 
 func (s *sqlRepository) Update(ctx context.Context, config Config) error {
-	credentials, _ := json.Marshal(config.Credentials)
+	credsJSON, _ := json.Marshal(config.Credentials)
+	credentials, err := s.cipher.Encrypt(ctx, credsJSON)
+	if err != nil {
+		return fmt.Errorf("failed to encrypt credentials: %w", err)
+	}
+
 	settings, _ := json.Marshal(config.Settings)
 
-	_, err := s.db.ExecContext(ctx,
+	_, err = s.db.ExecContext(ctx,
 		`UPDATE connectors SET 
 			name = $1, enabled = $2, endpoint = $3, credentials = $4, settings = $5, updated_at = NOW()
 		WHERE id = $6 AND tenant_id = $7`,

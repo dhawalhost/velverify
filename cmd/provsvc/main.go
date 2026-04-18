@@ -4,14 +4,13 @@ import (
 	"os"
 
 	"github.com/dhawalhost/wardseal/internal/provisioning"
-	"github.com/dhawalhost/wardseal/pkg/logger"
+	"github.com/dhawalhost/gokit/logger"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 )
 
 func main() {
-	log := logger.New(zapcore.DebugLevel)
+	log, _ := logger.New("debug", true)
 	defer func() { _ = log.Sync() }()
 
 	svc := provisioning.NewService()

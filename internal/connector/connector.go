@@ -36,7 +36,8 @@ type Connector interface {
 	// Group membership
 	AddUserToGroup(ctx context.Context, userID, groupID string) error
 	RemoveUserFromGroup(ctx context.Context, userID, groupID string) error
-	GetGroupMembers(ctx context.Context, groupID string) ([]User, error)
+	// Discovery
+	DiscoverResources(ctx context.Context) ([]Resource, error)
 }
 
 // Config holds connector configuration.
@@ -64,6 +65,14 @@ type User struct {
 	DisplayName string            `json:"display_name,omitempty"`
 	Active      bool              `json:"active"`
 	Attributes  map[string]string `json:"attributes,omitempty"`
+}
+
+// Resource represents a discovered asset in an external system.
+type Resource struct {
+	ExternalID string            `json:"external_id"`
+	Type       string            `json:"type"` // app, server, group, ou
+	Name       string            `json:"name"`
+	Metadata   map[string]string `json:"metadata,omitempty"`
 }
 
 // Group represents a group in an external system.

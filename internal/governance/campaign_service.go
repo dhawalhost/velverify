@@ -2,11 +2,15 @@ package governance
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"time"
+
+	"github.com/dhawalhost/wardseal/pkg/eventbus"
 )
 
-// CampaignService defines campaign-related operations.
 type CampaignService interface {
+	SetGovernanceService(svc Service)
 	CreateCampaign(ctx context.Context, tenantID string, input CreateCampaignInput) (Campaign, error)
 	GetCampaign(ctx context.Context, tenantID, id string) (Campaign, error)
 	ListCampaigns(ctx context.Context, tenantID, status string) ([]Campaign, error)
@@ -21,16 +25,60 @@ type CampaignService interface {
 	ListReviewItems(ctx context.Context, tenantID, reviewerID string) ([]CertificationItem, error)
 	ApproveItem(ctx context.Context, itemID, comment string) error
 	RevokeItem(ctx context.Context, itemID, comment string) error
+
+	// Automation
+	GenerateRecertificationCampaign(ctx context.Context, tenantID, name string) error
 }
 
 type campaignService struct {
 	store     CampaignRepository
 	dirClient DirectoryClient
+	bus       eventbus.EventBus
+	govSvc    Service
 }
 
 // NewCampaignService creates a new campaign service.
-func NewCampaignService(store CampaignRepository, dirClient DirectoryClient) CampaignService {
-	return &campaignService{store: store, dirClient: dirClient}
+func NewCampaignService(store CampaignRepository, dirClient DirectoryClient, bus eventbus.EventBus) CampaignService {
+	s := &campaignService{store: store, dirClient: dirClient, bus: bus}
+	// Note: govSvc will be set later to avoid circular initialization issues in main.go
+	if bus != nil {
+		s.initSubscriptions()
+	}
+	return s
+}
+
+func (s *campaignService) SetGovernanceService(svc Service) {
+	s.govSvc = svc
+}
+
+func (s *campaignService) initSubscriptions() {
+	_ = s.bus.Subscribe(context.Background(), "UserDeactivated", func(ctx context.Context, payload []byte) error {
+		var event struct {
+			TenantID string `json:"tenant_id"`
+			UserID   string `json:"user_id"`
+		}
+		if err := json.Unmarshal(payload, &event); err != nil {
+			return err
+		}
+		
+		// One-Click Offboarding trigger (Safe Mode):
+		// Fetch tracked access and propose a safety action in the DB.
+		orgIDs, err := s.dirClient.ListUserOrganizations(ctx, event.TenantID, event.UserID)
+		if err == nil && len(orgIDs) > 0 && s.govSvc != nil {
+			metadata, _ := json.Marshal(map[string]interface{}{
+				"org_ids": orgIDs,
+			})
+			_, _ = s.govSvc.ProposeSafetyAction(ctx, event.TenantID, ProposeSafetyActionInput{
+				ActionType: "revoke_all_access",
+				TargetID:   event.UserID,
+				Metadata:   metadata,
+				Reason:     "User deactivation safety check",
+			})
+		}
+		
+		// In a fully automated system, we might also auto-cancel or auto-revoke pending campaign items here.
+		return nil
+	})
 }
 
 func (s *campaignService) CreateCampaign(ctx context.Context, tenantID string, input CreateCampaignInput) (Campaign, error) {
@@ -133,4 +181,27 @@ func (s *campaignService) RevokeItem(ctx context.Context, itemID, comment string
 	}
 
 	return s.store.UpdateItemDecision(ctx, itemID, "revoke", comment)
+}
+
+func (s *campaignService) GenerateRecertificationCampaign(ctx context.Context, tenantID, name string) error {
+	now := time.Now()
+	endDate := now.AddDate(0, 0, 14) // 2 weeks review window
+
+	// 1. Create the campaign
+	campaign, err := s.CreateCampaign(ctx, tenantID, CreateCampaignInput{
+		Name:        name,
+		Description: "Auto-generated quarterly access review.",
+		ReviewerID:  "admin", // Placeholder for actual security officer ID
+		StartDate:   &now,
+		EndDate:     &endDate,
+	})
+	if err != nil {
+		return err
+	}
+
+	// 2. Fetch list of something to review (e.g. all users in the organization)
+	// For MVP, we'll just log and assume items are added via other event hooks 
+	// or we could query dirClient here.
+	
+	return s.StartCampaign(ctx, tenantID, campaign.ID)
 }

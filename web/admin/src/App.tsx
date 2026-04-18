@@ -15,6 +15,7 @@ import RequestAccess from './pages/RequestAccess';
 import Roles from './pages/Roles';
 import AuditLogs from './pages/AuditLogs';
 import Campaigns from './pages/Campaigns';
+import SafetyInbox from './pages/SafetyInbox';
 
 import SSOConfig from './pages/SSOConfig';
 import Connectors from './pages/Connectors';
@@ -26,6 +27,8 @@ import MFASetup from './pages/MFASetup';
 import Organizations from './pages/Organizations';
 import DeveloperApps from './pages/DeveloperApps';
 import DeveloperAnalytics from './pages/DeveloperAnalytics';
+import Discovery from '@/pages/Discovery';
+import Policies from '@/pages/Policies';
 
 import PortalLayout from './layouts/PortalLayout';
 import PortalDashboard from './pages/PortalDashboard';
@@ -82,6 +85,7 @@ const App: React.FC = () => {
             <Route path="/request-access" element={<RequestAccess />} />
             <Route path="/roles" element={<Roles />} />
             <Route path="/audit" element={<AuditLogs />} />
+            <Route path="/safety" element={<SafetyInbox />} />
             <Route path="/campaigns" element={<Campaigns />} />
             <Route path="/sso" element={<SSOConfig />} />
             <Route path="/connectors" element={<Connectors />} />
@@ -94,6 +98,8 @@ const App: React.FC = () => {
             <Route path="/mfa" element={<MFASetup />} />
             <Route path="/organizations" element={<Organizations />} />
             <Route path="/apps" element={<DeveloperApps />} />
+            <Route path="/discovery" element={<Discovery />} />
+            <Route path="/policies" element={<Policies />} />
           </Route>
         </Routes>
       </Router >

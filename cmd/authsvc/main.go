@@ -2,8 +2,13 @@ package main
 
 import (
 	"context"
+	"fmt"
+	"net/http"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
+	"time"
 
 	"github.com/dhawalhost/wardseal/internal/auth"
 	"github.com/dhawalhost/wardseal/internal/license"
@@ -12,9 +17,13 @@ import (
 	"github.com/dhawalhost/wardseal/pkg/config"
 	"github.com/dhawalhost/wardseal/pkg/database"
 	"github.com/dhawalhost/wardseal/pkg/kms"
-	"github.com/dhawalhost/wardseal/pkg/logger"
 	"github.com/dhawalhost/wardseal/pkg/middleware"
-	"github.com/dhawalhost/wardseal/pkg/observability"
+	wardsealobs "github.com/dhawalhost/wardseal/pkg/observability"
+	gokitconfig "github.com/dhawalhost/gokit/config"
+	"github.com/dhawalhost/gokit/health"
+	"github.com/dhawalhost/gokit/logger"
+	gokitmiddleware "github.com/dhawalhost/gokit/middleware"
+	"github.com/dhawalhost/gokit/observability"
 	"github.com/gin-gonic/gin"
 	"github.com/go-redis/redis/v8"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
@@ -22,11 +31,15 @@ import (
 )
 
 func main() {
-	log := logger.NewFromEnv()
-	defer func() { _ = log.Sync() }()
-
-	// Load centralized configuration (handles defaults, .env, OS env, and Vault)
+	// Load centralized configuration
 	cfg := config.MustLoad()
+
+	log, err := logger.New(cfg.Observability.LogLevel, cfg.Environment == config.Development)
+	if err != nil {
+		fmt.Printf("Failed to initialize logger: %v\n", err)
+		os.Exit(1)
+	}
+	defer func() { _ = log.Sync() }()
 
 	// Enterprise License Verification
 	if cfg.License.Required {
@@ -46,7 +59,7 @@ func main() {
 			log.Fatal("LICENSE_KEY environment variable/vault secret is required for enterprise edition")
 		}
 
-		lic, err := mgr.Verify(cfg.License.Key)
+		lic, err := mgr.Verify(cfg.License.Key.Raw())
 		if err != nil {
 			log.Fatal("Invalid license key", zap.Error(err))
 		}
@@ -59,7 +72,7 @@ func main() {
 
 	directoryServiceURL := cfg.Auth.DirectoryServiceURL
 	serviceToken := cfg.Auth.ServiceAuthToken
-	if serviceToken == "" {
+	if serviceToken.IsEmpty() {
 		serviceToken = "dev-internal-token" //nolint:gosec // G101: dev-only fallback, not production credentials
 		log.Warn("SERVICE_AUTH_TOKEN not set, using development default")
 	}
@@ -69,7 +82,7 @@ func main() {
 		Host:     cfg.Database.Host,
 		Port:     cfg.Database.Port,
 		User:     cfg.Database.User,
-		Password: cfg.Database.Password, // Securely injected by Vault if configured
+		Password: cfg.Database.Password.Raw(), // Securely injected by Vault if configured
 		DBName:   cfg.Database.Name,
 		SSLMode:  cfg.Database.SSLMode,
 	}
@@ -121,7 +134,7 @@ func main() {
 
 	svc, err := auth.NewService(auth.Config{
 		DirectoryServiceURL: directoryServiceURL,
-		ServiceAuthToken:    serviceToken,
+		ServiceAuthToken:    serviceToken.Raw(),
 		ServiceAuthHeader:   serviceHeader,
 		ClientStore:         clientStore,
 		SAMLStore:           samlStore,
@@ -173,30 +186,31 @@ func main() {
 	}
 
 	// Initialize OpenTelemetry tracing
-	shutdownTracer, err := observability.InitTracer(context.Background(), observability.TracerConfig{
-		ServiceName:    cfg.Observability.ServiceName,
-		ServiceVersion: cfg.Observability.ServiceVersion,
-		Environment:    string(cfg.Environment),
-	}, log)
+	shutdownTracer, err := observability.InitTracer(context.Background(), gokitconfig.TelemetryConfig{
+		Enabled:      cfg.Observability.OTELEndpoint != "",
+		OTLPEndpoint: cfg.Observability.OTELEndpoint,
+		ServiceName:  cfg.Observability.ServiceName,
+	})
 	if err != nil {
 		log.Error("Failed to initialize tracer", zap.Error(err))
 	}
 	defer func() { _ = shutdownTracer(context.Background()) }()
 
 	// Initialize and apply observability middleware
-	metrics := observability.NewMetrics()
+	metrics := wardsealobs.NewMetrics()
 	router.Use(otelgin.Middleware("authsvc"))
-	router.Use(observability.PrometheusMiddleware(metrics))
-	router.Use(logger.RequestLogger(log))
+	router.Use(wardsealobs.PrometheusMiddleware(metrics))
+	router.Use(middleware.Wrap(gokitmiddleware.RequestID())) // Inject tracing ID
+	router.Use(middleware.APILogger(nil, log)) // Simplified request logging
 
 	// Security Middleware
-	router.Use(middleware.SecurityHeadersMiddleware())
+	router.Use(middleware.Wrap(gokitmiddleware.SecureHeaders()))
 
 	var rateLimitRedisClient *redis.Client
 	if cfg.Auth.RedisAddr != "" {
 		rateLimitRedisClient = redis.NewClient(&redis.Options{
 			Addr:     cfg.Auth.RedisAddr,
-			Password: cfg.Auth.RedisPassword,
+			Password: cfg.Auth.RedisPassword.Raw(),
 			DB:       cfg.Auth.RedisDB,
 		})
 		if err := rateLimitRedisClient.Ping(context.Background()).Err(); err != nil {
@@ -249,7 +263,7 @@ func main() {
 	if cfg.Auth.RedisAddr != "" {
 		webAuthnSessionStore, err := auth.NewRedisWebAuthnSessionRepository(auth.RedisWebAuthnSessionStoreConfig{
 			Addr:      cfg.Auth.RedisAddr,
-			Password:  cfg.Auth.RedisPassword,
+			Password:  cfg.Auth.RedisPassword.Raw(),
 			DB:        cfg.Auth.RedisDB,
 			TTL:       cfg.Auth.WebAuthnSessionTTL,
 			KeyPrefix: "authsvc:webauthn:session:",
@@ -279,7 +293,12 @@ func main() {
 	authHandlers.RegisterBrandingRoutes(router.Group("/"))
 
 	// Register Prometheus metrics handler
-	router.GET("/metrics", gin.WrapH(observability.PrometheusHandler()))
+	router.GET("/metrics", gin.WrapH(wardsealobs.PrometheusHandler()))
+
+	// Register standardized health checks
+	healthHandler := health.NewHandler()
+	router.GET("/healthz", gin.WrapF(healthHandler.LiveHandler()))
+	router.GET("/readyz", gin.WrapF(healthHandler.ReadyHandler()))
 
 	// SAML Setup
 
@@ -293,9 +312,32 @@ func main() {
 
 	// Register IdP-initiated endpoint logic is handled inside authHandlers.RegisterRoutes -> svc.SAML()
 
-	log.Info("Auth service starting", zap.String("addr", ":8080"))
-	if err := router.Run(":8080"); err != nil {
-		log.Error("Auth service failed", zap.Error(err))
-		os.Exit(1)
+	// Server Configuration with Graceful Shutdown
+	srv := &http.Server{
+		Addr:         ":8080",
+		Handler:      router,
+		ReadTimeout:  30 * time.Second,
+		WriteTimeout: 30 * time.Second,
+		IdleTimeout:  120 * time.Second,
 	}
+
+	go func() {
+		log.Info("Auth service starting", zap.String("addr", ":8080"))
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Error("Auth service failed", zap.Error(err))
+			os.Exit(1)
+		}
+	}()
+
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+	log.Info("Shutting down auth service...")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	if err := srv.Shutdown(ctx); err != nil {
+		log.Error("Auth service forced to shutdown", zap.Error(err))
+	}
+	log.Info("Auth service exited gracefully")
 }

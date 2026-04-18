@@ -66,6 +66,9 @@ func (m *mockRBACRepo) AssignRoleToUser(ctx context.Context, tenantID, userID, r
 func (m *mockRBACRepo) RemoveRoleFromUser(ctx context.Context, userID, roleID string) error {
 	return nil
 }
+func (m *mockRBACRepo) ListExpiredAssignments(ctx context.Context) ([]rbac.UserRole, error) {
+	return nil, nil
+}
 
 func TestZeroTrust_RBACClaimsInJWT(t *testing.T) {
 	rbacStore := &mockRBACRepo{

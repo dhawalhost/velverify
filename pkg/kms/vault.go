@@ -77,16 +77,16 @@ func NewVaultSigner(cfg Config) (*VaultSigner, error) {
 // authenticateVault handles Vault authentication (token or AppRole).
 func authenticateVault(client *vault.Client, cfg Config) error {
 	// If token is provided, use it directly
-	if cfg.VaultToken != "" {
-		client.SetToken(cfg.VaultToken)
+	if !cfg.VaultToken.IsEmpty() {
+		client.SetToken(cfg.VaultToken.Raw())
 		return nil
 	}
 
 	// Use AppRole authentication
-	if cfg.VaultRoleID != "" && cfg.VaultSecretID != "" {
+	if cfg.VaultRoleID != "" && !cfg.VaultSecretID.IsEmpty() {
 		appRoleAuth, err := vaultauth.NewAppRoleAuth(
 			cfg.VaultRoleID,
-			&vaultauth.SecretID{FromString: cfg.VaultSecretID},
+			&vaultauth.SecretID{FromString: cfg.VaultSecretID.Raw()},
 		)
 		if err != nil {
 			return fmt.Errorf("failed to create AppRole auth: %w", err)

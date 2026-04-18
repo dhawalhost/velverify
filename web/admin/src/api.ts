@@ -201,27 +201,44 @@ export const completePasswordSetup = async (token: string, password: string) => 
     return response.data;
 };
 
-export const createAccessRequest = async (resourceType: string, resourceID: string, reason: string) => {
-    const response = await govApi.post('/api/v1/governance/requests', {
-        resource_type: resourceType,
-        resource_id: resourceID,
-        reason: reason
-    });
-    return response.data;
-};
+// Access Requests
+export interface AccessRequest {
+    id: string;
+    tenant_id: string;
+    requester_id: string;
+    resource_type: string;
+    resource_id: string;
+    status: string;
+    reason: string;
+    duration?: string;
+    created_at: string;
+    updated_at: string;
+}
 
 export const getAccessRequests = async (status?: string) => {
     const params = status ? { status } : {};
     const response = await govApi.get('/api/v1/governance/requests', { params });
+    const data = response.data;
+    // Handle different response formats if legacy
+    return data.requests || data;
+};
+
+export const createAccessRequest = async (resourceType: string, resourceID: string, reason: string, duration?: string) => {
+    const response = await govApi.post('/api/v1/governance/requests', {
+        resource_type: resourceType,
+        resource_id: resourceID,
+        reason: reason,
+        duration: duration
+    });
     return response.data;
 };
 
-export const approveAccessRequest = async (id: string, comment: string) => {
+export const approveAccessRequest = async (id: string, comment?: string) => {
     const response = await govApi.post(`/api/v1/governance/requests/${id}/approve`, { comment });
     return response.data;
 };
 
-export const rejectAccessRequest = async (id: string, comment: string) => {
+export const rejectAccessRequest = async (id: string, comment?: string) => {
     const response = await govApi.post(`/api/v1/governance/requests/${id}/reject`, { comment });
     return response.data;
 };
@@ -299,6 +316,48 @@ export const exportAuditLogs = async (params?: Record<string, unknown>) => {
         params,
         responseType: 'blob'
     });
+    return response.data;
+};
+
+export const getAuditStats = async (lookbackDays: number = 7) => {
+    const response = await govApi.get('/api/v1/audit/stats', {
+        params: { lookback_days: lookbackDays }
+    });
+    return response.data;
+};
+
+// Safety Store
+export const getSafetyActions = async (status?: string) => {
+    const params = status ? { status } : {};
+    const response = await govApi.get('/api/v1/safety/actions', { params });
+    return response.data;
+};
+
+export const confirmSafetyAction = async (id: string, comment: string) => {
+    const response = await govApi.post(`/api/v1/safety/actions/${id}/confirm`, { comment });
+    return response.data;
+};
+
+// Endpoints (Device Trust)
+export interface Device {
+    id: string;
+    tenant_id: string;
+    user_id: string;
+    serial: string;
+    platform: string;
+    os_version: string;
+    trust_status: 'pending' | 'trusted' | 'untrusted';
+    last_scan_at: string;
+    created_at: string;
+}
+
+export const getEndpoints = async () => {
+    const response = await govApi.get('/api/v1/governance/endpoints');
+    return response.data.devices;
+};
+
+export const updateEndpointStatus = async (id: string, status: string) => {
+    const response = await govApi.put(`/api/v1/governance/endpoints/${id}/status`, { status });
     return response.data;
 };
 
@@ -497,6 +556,67 @@ export const generateDomainToken = async (orgId: string) => {
 
 export const verifyDomain = async (orgId: string) => {
     const response = await govApi.post(`/api/v1/organizations/${orgId}/domain-verification/verify`);
+    return response.data;
+};
+
+// Discovery
+export interface DiscoveredResource {
+    id: string;
+    tenant_id: string;
+    source: string;
+    resource_type: string;
+    external_id: string;
+    name: string;
+    metadata: any;
+    status: 'discovered' | 'promoted' | 'ignored';
+    discovered_at: string;
+}
+
+export interface DiscoveryJobStatus {
+    id: string;
+    tenant_id: string;
+    status: 'queued' | 'processing' | 'completed' | 'failed';
+    progress: number;
+    message?: string;
+    started_at: string;
+    finished_at?: string;
+}
+
+export const getDiscoveredResources = async (filter?: string) => {
+    const params = filter ? { filter } : {};
+    const response = await govApi.get('/api/v1/governance/discovery/resources', { params });
+    return response.data.resources;
+};
+
+export const triggerDiscoveryScan = async () => {
+    const response = await govApi.post('/api/v1/governance/discovery/scan');
+    return response.data;
+};
+
+export const getDiscoveryJobStatus = async (jobId: string) => {
+    const response = await govApi.get(`/api/v1/governance/discovery/jobs/${jobId}`);
+    return response.data as DiscoveryJobStatus;
+};
+
+// Security Policies (MTPM)
+export interface Policy {
+    id: string;
+    tenant_id: string;
+    name: string;
+    rule_type: string;
+    rule_data: any;
+    is_enabled: boolean;
+    created_at: string;
+    updated_at: string;
+}
+
+export const getPolicies = async () => {
+    const response = await govApi.get('/api/v1/policies');
+    return response.data.policies;
+};
+
+export const createPolicy = async (policy: Partial<Policy>) => {
+    const response = await govApi.post('/api/v1/policies', policy);
     return response.data;
 };
 

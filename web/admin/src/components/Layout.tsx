@@ -40,9 +40,12 @@ const Layout: React.FC = () => {
     const menuItems = [
         { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
         { path: '/requests', label: 'Access Requests', icon: ClipboardList },
+        { path: '/discovery', label: 'Discovery', icon: Search },
+        { path: '/safety', label: 'Safety Inbox', icon: ShieldAlert },
         { path: '/campaigns', label: 'Campaigns', icon: Target },
         { path: '/roles', label: 'Roles & Permissions', icon: ShieldCheck },
         { path: '/organizations', label: 'Organizations', icon: Building2 },
+        { path: '/policies', label: 'Security Policies', icon: ShieldCheck },
         { path: '/sso', label: 'SSO Config', icon: KeyRound },
         { path: '/connectors', label: 'Connectors', icon: Plug },
         { path: '/mfa', label: 'MFA Setup', icon: ShieldAlert },
@@ -51,7 +54,7 @@ const Layout: React.FC = () => {
         { path: '/apps', label: 'Applications', icon: Code2 },
         { path: '/webhooks', label: 'Webhooks', icon: Webhook },
         { path: '/branding', label: 'Branding', icon: Palette },
-        { path: '/audit', label: 'Audit Logs', icon: FileText },
+        { path: '/audit', label: 'Observability', icon: FileText },
         { path: '/developer', label: 'API Reference', icon: Settings },
         { path: '/developer/analytics', label: 'API Analytics', icon: Activity },
     ];
@@ -82,7 +85,7 @@ const Layout: React.FC = () => {
 
                 <nav className="flex-1 overflow-y-auto py-8 px-4 space-y-1.5">
                     <div className="text-xs font-semibold text-muted-foreground mb-4 px-2 tracking-wider uppercase">Platform</div>
-                    {menuItems.slice(0, 5).map((item) => {
+                    {menuItems.slice(0, 6).map((item) => {
                         const isActive = location.pathname.startsWith(item.path);
                         const Icon = item.icon;
                         return (
@@ -105,7 +108,7 @@ const Layout: React.FC = () => {
                     <Separator className="my-4 mx-2 bg-border/50" />
 
                     <div className="text-xs font-semibold text-muted-foreground mb-4 px-2 tracking-wider uppercase">Configuration</div>
-                    {menuItems.slice(5).map((item) => {
+                    {menuItems.slice(6).map((item) => {
                         const isActive = location.pathname.startsWith(item.path);
                         const Icon = item.icon;
                         return (

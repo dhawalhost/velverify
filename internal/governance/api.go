@@ -18,7 +18,13 @@ type HTTPHandler struct {
 	campaignHandler *CampaignHTTPHandler
 	webhookHandler  *WebhookHTTPHandler
 	orgHandler      *OrganizationHandler
+	safetyHandler   *SafetyHandler
+	endpointHandler *EndpointHandler
 	logger          *zap.Logger
+}
+
+type HealthCheckResponse struct {
+	Healthy bool `json:"healthy"`
 }
 
 // NewHTTPHandler creates a new HTTPHandler.
@@ -28,6 +34,8 @@ func NewHTTPHandler(svc Service, campaignSvc CampaignService, webhookSvc webhook
 		campaignHandler: NewCampaignHTTPHandler(campaignSvc, logger),
 		webhookHandler:  NewWebhookHTTPHandler(webhookSvc, logger),
 		orgHandler:      NewOrganizationHandler(svc, logger),
+		safetyHandler:   NewSafetyHandler(svc, logger),
+		endpointHandler: NewEndpointHandler(svc, logger),
 		logger:          logger,
 	}
 }
@@ -68,6 +76,8 @@ func (h *HTTPHandler) RegisterRoutes(router *gin.Engine) {
 	h.orgHandler.RegisterRoutes(tenantGroup)
 	h.campaignHandler.RegisterRoutes(tenantGroup)
 	h.webhookHandler.RegisterRoutes(tenantGroup)
+	h.safetyHandler.RegisterRoutes(tenantGroup)
+	h.endpointHandler.RegisterRoutes(tenantGroup)
 }
 
 func (h *HTTPHandler) healthCheck(c *gin.Context) {
@@ -177,6 +187,9 @@ func (h *HTTPHandler) createAccessRequest(c *gin.Context) {
 	}
 	if req.RequesterID == "" {
 		req.RequesterID = actorIDFromRequest(c)
+	}
+	if req.DeviceID == "" {
+		req.DeviceID = c.GetHeader("X-Device-ID")
 	}
 	resp, err := h.svc.CreateAccessRequest(c.Request.Context(), tenantID, req)
 	if err != nil {

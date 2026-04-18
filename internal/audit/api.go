@@ -27,6 +27,7 @@ func (h *HTTPHandler) RegisterRoutes(rg *gin.RouterGroup) {
 	audit := rg.Group("/audit")
 	{
 		audit.GET("", h.queryLogs)
+		audit.GET("/stats", h.getStats)
 		audit.GET("/export", h.exportLogs)
 		audit.GET("/:id", h.getEvent)
 	}
@@ -114,6 +115,29 @@ func (h *HTTPHandler) getEvent(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, event)
+}
+
+func (h *HTTPHandler) getStats(c *gin.Context) {
+	tenantID, ok := h.tenantID(c)
+	if !ok {
+		return
+	}
+
+	lookbackDays := 7
+	if v := c.Query("lookback_days"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			lookbackDays = n
+		}
+	}
+
+	stats, err := h.svc.GetStats(c.Request.Context(), tenantID, lookbackDays)
+	if err != nil {
+		h.logger.Error("Failed to get audit stats", zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, stats)
 }
 
 func (h *HTTPHandler) exportLogs(c *gin.Context) {

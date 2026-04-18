@@ -3,11 +3,18 @@ package config
 import (
 	"context"
 	"fmt"
+	"os"
 	"time"
 
 	vault "github.com/hashicorp/vault/api"
 	vaultauth "github.com/hashicorp/vault/api/auth/approle"
 )
+
+// VaultClient interface for Vault operations.
+type VaultClient interface {
+	ReadSecret(path string) (map[string]string, error)
+	Close() error
+}
 
 // vaultClientImpl implements VaultClient interface.
 type vaultClientImpl struct {
@@ -108,13 +115,6 @@ func (v *vaultClientImpl) Close() error {
 
 // getEnv is a helper to get environment variable.
 func getEnv(key string) string {
-	return lookupEnv(key)
+	return os.Getenv(key)
 }
 
-// lookupEnv returns environment variable value.
-func lookupEnv(key string) string {
-	// Import os at top of file is already done in config.go
-	// This is just a helper wrapper
-	val, _ := lookupEnvOS(key)
-	return val
-}

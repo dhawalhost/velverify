@@ -2,8 +2,11 @@ package directory
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"strings"
+
+	"github.com/dhawalhost/wardseal/pkg/eventbus"
 
 	"github.com/jmoiron/sqlx"
 	"golang.org/x/crypto/bcrypt"
@@ -50,6 +53,7 @@ type Service interface {
 
 type directoryService struct {
 	repo Repository
+	bus  eventbus.EventBus
 }
 
 var ErrInvalidCredentials = errors.New("invalid credentials")
@@ -57,8 +61,8 @@ var ErrAlreadyExists = errors.New("already exists")
 var ErrEmailAlreadyExistsGlobally = errors.New("email already in use globally")
 
 // NewService creates a new directory service.
-func NewService(repo Repository) Service {
-	return &directoryService{repo: repo}
+func NewService(repo Repository, bus eventbus.EventBus) Service {
+	return &directoryService{repo: repo, bus: bus}
 }
 
 func (s *directoryService) HealthCheck(ctx context.Context) (bool, error) {
@@ -92,6 +96,14 @@ func (s *directoryService) CreateUser(ctx context.Context, tenantID string, user
 		return nil
 	})
 
+	if err == nil && s.bus != nil {
+		payload, _ := json.Marshal(map[string]string{
+			"tenant_id": tenantID,
+			"user_id":   userID,
+			"email":     user.Email,
+		})
+		_ = s.bus.Publish(ctx, "UserCreated", payload)
+	}
 	return userID, err
 }
 
@@ -127,7 +139,15 @@ func (s *directoryService) UpdateUser(ctx context.Context, tenantID, id string, 
 }
 
 func (s *directoryService) DeleteUser(ctx context.Context, tenantID, id string) error {
-	return s.repo.DeleteIdentity(ctx, tenantID, id)
+	err := s.repo.DeleteIdentity(ctx, tenantID, id)
+	if err == nil && s.bus != nil {
+		payload, _ := json.Marshal(map[string]string{
+			"tenant_id": tenantID,
+			"user_id":   id,
+		})
+		_ = s.bus.Publish(ctx, "UserDeactivated", payload)
+	}
+	return err
 }
 
 func (s *directoryService) CreateGroup(ctx context.Context, tenantID string, group Group) (string, error) {
@@ -151,11 +171,31 @@ func (s *directoryService) DeleteGroup(ctx context.Context, tenantID, id string)
 }
 
 func (s *directoryService) AddUserToGroup(ctx context.Context, tenantID, userID, groupID string) error {
-	return s.repo.AddUserToGroup(ctx, tenantID, userID, groupID)
+	err := s.repo.AddUserToGroup(ctx, tenantID, userID, groupID)
+	if err == nil && s.bus != nil {
+		payload, _ := json.Marshal(map[string]string{
+			"tenant_id": tenantID,
+			"user_id":   userID,
+			"group_id":  groupID,
+			"action":    "add",
+		})
+		_ = s.bus.Publish(ctx, "GroupMembershipChanged", payload)
+	}
+	return err
 }
 
 func (s *directoryService) RemoveUserFromGroup(ctx context.Context, tenantID, userID, groupID string) error {
-	return s.repo.RemoveUserFromGroup(ctx, tenantID, userID, groupID)
+	err := s.repo.RemoveUserFromGroup(ctx, tenantID, userID, groupID)
+	if err == nil && s.bus != nil {
+		payload, _ := json.Marshal(map[string]string{
+			"tenant_id": tenantID,
+			"user_id":   userID,
+			"group_id":  groupID,
+			"action":    "remove",
+		})
+		_ = s.bus.Publish(ctx, "GroupMembershipChanged", payload)
+	}
+	return err
 }
 
 func (s *directoryService) VerifyCredentials(ctx context.Context, tenantID, email, password string) (User, error) {

@@ -467,6 +467,11 @@ func (c *Connector) GetGroupMembers(ctx context.Context, groupID string) ([]conn
 	return users, nil
 }
 
+func (c *Connector) DiscoverResources(ctx context.Context) ([]connector.Resource, error) {
+	// Future implementation: Discover Azure AD Registered Apps and Groups as resources
+	return []connector.Resource{}, nil
+}
+
 func (c *Connector) setHeaders(req *http.Request) {
 	req.Header.Set("Authorization", "Bearer "+c.accessToken)
 	req.Header.Set("Content-Type", "application/json")

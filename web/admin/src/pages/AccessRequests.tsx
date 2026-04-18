@@ -78,6 +78,7 @@ const AccessRequests: React.FC = () => {
                                 <TableHead>ID</TableHead>
                                 <TableHead>Requester</TableHead>
                                 <TableHead>Resource</TableHead>
+                                <TableHead>Duration</TableHead>
                                 <TableHead>Reason</TableHead>
                                 <TableHead>Status</TableHead>
                                 <TableHead>Created At</TableHead>
@@ -102,6 +103,15 @@ const AccessRequests: React.FC = () => {
                                             <Badge variant="outline" className="font-mono">
                                                 {req.resource_type}:{req.resource_id}
                                             </Badge>
+                                        </TableCell>
+                                        <TableCell>
+                                            {req.duration ? (
+                                                <Badge variant="secondary" className="font-mono text-xs">
+                                                    {req.duration}
+                                                </Badge>
+                                            ) : (
+                                                <span className="text-muted-foreground text-xs italic">Indefinite</span>
+                                            )}
                                         </TableCell>
                                         <TableCell className="max-w-xs truncate" title={req.reason}>
                                             {req.reason}

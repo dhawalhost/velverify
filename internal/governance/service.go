@@ -2,6 +2,7 @@ package governance
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/url"
@@ -10,6 +11,8 @@ import (
 
 	"github.com/dhawalhost/wardseal/internal/oauthclient"
 	"github.com/dhawalhost/wardseal/internal/policy"
+	"github.com/dhawalhost/wardseal/internal/rbac"
+	"github.com/dhawalhost/wardseal/pkg/eventbus"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -47,6 +50,18 @@ type Service interface {
 	CreateIPPolicy(ctx context.Context, tenantID string, req CreateIPPolicyRequest) (IPPolicy, error)
 	ListIPPolicies(ctx context.Context, tenantID string) ([]IPPolicy, error)
 	DeleteIPPolicy(ctx context.Context, tenantID, id string) error
+
+	// Safety Actions
+	ProposeSafetyAction(ctx context.Context, tenantID string, input ProposeSafetyActionInput) (SafetyAction, error)
+	ListSafetyActions(ctx context.Context, tenantID, status string) ([]SafetyAction, error)
+	ConfirmSafetyAction(ctx context.Context, tenantID, actionID, approverID, comment string) error
+	RejectSafetyAction(ctx context.Context, tenantID, actionID, approverID, comment string) error
+
+	// Endpoints (Device Trust)
+	RegisterDevice(ctx context.Context, tenantID string, d Device) (string, error)
+	ListDevices(ctx context.Context, tenantID string) ([]Device, error)
+	GetDevice(ctx context.Context, tenantID, id string) (Device, error)
+	UpdateDeviceStatus(ctx context.Context, tenantID, id, status string) error
 }
 
 type CreateOAuthClientInput struct {
@@ -74,16 +89,22 @@ type governanceService struct {
 	orgStore     OrganizationRepository
 	dirClient    DirectoryClient
 	policyEngine policy.Engine
+	rbacSvc       rbac.Service
+	endpointStore EndpointRepository
+	bus           eventbus.EventBus
 }
 
 // NewService creates a new governance service.
-func NewService(clientStore oauthclient.Repository, reqStore Repository, orgStore OrganizationRepository, dirClient DirectoryClient, policyEngine policy.Engine) Service {
+func NewService(clientStore oauthclient.Repository, reqStore Repository, orgStore OrganizationRepository, endpointStore EndpointRepository, dirClient DirectoryClient, policyEngine policy.Engine, rbacSvc rbac.Service, bus eventbus.EventBus) Service {
 	return &governanceService{
-		clientStore:  clientStore,
-		reqStore:     reqStore,
-		orgStore:     orgStore,
-		dirClient:    dirClient,
-		policyEngine: policyEngine,
+		clientStore:   clientStore,
+		reqStore:      reqStore,
+		orgStore:      orgStore,
+		endpointStore: endpointStore,
+		dirClient:     dirClient,
+		policyEngine:  policyEngine,
+		rbacSvc:       rbacSvc,
+		bus:           bus,
 	}
 }
 
@@ -203,11 +224,23 @@ func (s *governanceService) CreateAccessRequest(ctx context.Context, tenantID st
 		ResourceType: input.ResourceType,
 		ResourceID:   input.ResourceID,
 		Reason:       input.Reason,
+		Duration:     input.Duration,
+		DeviceID:     input.DeviceID,
 	}
 	id, err := s.reqStore.CreateRequest(ctx, req)
 	if err != nil {
 		return AccessRequest{}, err
 	}
+	
+	s.publishEvent(ctx, "AccessRequestCreated", map[string]interface{}{
+		"tenant_id":     tenantID,
+		"request_id":    id,
+		"requester_id":  req.RequesterID,
+		"resource_type": req.ResourceType,
+		"resource_id":   req.ResourceID,
+		"device_id":     req.DeviceID,
+	})
+
 	return s.reqStore.GetRequest(ctx, tenantID, id)
 }
 
@@ -228,12 +261,24 @@ func (s *governanceService) ApproveAccessRequest(ctx context.Context, tenantID, 
 		return fmt.Errorf("failed to get request: %w", err)
 	}
 
-	// Evaluate policy
+	// Evaluate policy with Device Posture context
+	deviceTrust := "unknown"
+	if req.DeviceID != "" {
+		device, err := s.endpointStore.GetDevice(ctx, tenantID, req.DeviceID)
+		if err == nil {
+			deviceTrust = device.TrustStatus
+		}
+	}
+
 	input := policy.Input{
 		Subject:  policy.Subject{ID: approverID},
 		Action:   "approve",
 		Resource: policy.Resource{Type: "access_request", ID: requestID},
-		Context:  map[string]interface{}{"requester_id": req.RequesterID},
+		Context: map[string]interface{}{
+			"requester_id": req.RequesterID,
+			"device_id":    req.DeviceID,
+			"device_trust": deviceTrust,
+		},
 	}
 	allowed, reason, err := s.policyEngine.Evaluate(ctx, input)
 	if err != nil {
@@ -251,12 +296,33 @@ func (s *governanceService) ApproveAccessRequest(ctx context.Context, tenantID, 
 		}
 	case "app":
 		return validationError("resource_type 'app' is not supported yet")
+	case "role":
+		// Assign role to user via RBAC service
+		if req.Duration != "" {
+			if err := s.rbacSvc.AssignRoleWithExpiration(ctx, tenantID, req.RequesterID, req.ResourceID, &approverID, req.Duration); err != nil {
+				return fmt.Errorf("temporal role assignment failed: %w", err)
+			}
+		} else {
+			if err := s.rbacSvc.AssignRoleToUser(ctx, tenantID, req.RequesterID, req.ResourceID, &approverID); err != nil {
+				return fmt.Errorf("role assignment failed: %w", err)
+			}
+		}
 	}
 
 	// Update status to approved
 	if err := s.reqStore.UpdateRequestStatus(ctx, requestID, "approved"); err != nil {
 		return err
 	}
+
+	s.publishEvent(ctx, "AccessRequestApproved", map[string]interface{}{
+		"tenant_id":    tenantID,
+		"request_id":   requestID,
+		"approver_id":  approverID,
+		"requester_id": req.RequesterID,
+		"resource_id":  req.ResourceID,
+		"device_id":    req.DeviceID,
+	})
+
 	return nil
 }
 
@@ -264,7 +330,16 @@ func (s *governanceService) RejectAccessRequest(ctx context.Context, tenantID, r
 	if err := requireTenant(tenantID); err != nil {
 		return err
 	}
-	return s.reqStore.UpdateRequestStatus(ctx, requestID, "rejected")
+	if err := s.reqStore.UpdateRequestStatus(ctx, requestID, "rejected"); err != nil {
+		return err
+	}
+
+	s.publishEvent(ctx, "AccessRequestRejected", map[string]interface{}{
+		"tenant_id":   tenantID,
+		"request_id":  requestID,
+		"approver_id": approverID,
+	})
+	return nil
 }
 
 func (s *governanceService) ListOrganizations(ctx context.Context, tenantID string, limit, offset int) ([]Organization, error) {
@@ -472,4 +547,133 @@ func (s *governanceService) DeleteIPPolicy(ctx context.Context, tenantID, id str
 func generateShortID() string {
 	// Simple random ID for internal use if not using UUID
 	return fmt.Sprintf("pol_%d", time.Now().UnixNano())
+}
+
+// Safety Action Implementations
+
+func (s *governanceService) ProposeSafetyAction(ctx context.Context, tenantID string, input ProposeSafetyActionInput) (SafetyAction, error) {
+	if err := requireTenant(tenantID); err != nil {
+		return SafetyAction{}, err
+	}
+
+	action := SafetyAction{
+		TenantID:   tenantID,
+		ActionType: input.ActionType,
+		TargetID:   input.TargetID,
+		Metadata:   input.Metadata,
+		Reason:     input.Reason,
+	}
+
+	id, err := s.reqStore.CreateSafetyAction(ctx, action)
+	if err != nil {
+		return SafetyAction{}, err
+	}
+
+	action, err = s.reqStore.GetSafetyAction(ctx, tenantID, id)
+	if err == nil && s.bus != nil {
+		// Emit event for subscribers (like Slack)
+		payload, _ := json.Marshal(action)
+		_ = s.bus.Publish(ctx, "ProposedRevocation", payload)
+	}
+
+	return action, err
+}
+
+func (s *governanceService) ListSafetyActions(ctx context.Context, tenantID, status string) ([]SafetyAction, error) {
+	if err := requireTenant(tenantID); err != nil {
+		return nil, err
+	}
+	return s.reqStore.ListSafetyActions(ctx, tenantID, status)
+}
+
+func (s *governanceService) ConfirmSafetyAction(ctx context.Context, tenantID, actionID, approverID, comment string) error {
+	if err := requireTenant(tenantID); err != nil {
+		return err
+	}
+
+	action, err := s.reqStore.GetSafetyAction(ctx, tenantID, actionID)
+	if err != nil {
+		return err
+	}
+
+	if action.Status != "pending" {
+		return fmt.Errorf("action is already %s", action.Status)
+	}
+
+	// Execution
+	switch action.ActionType {
+	case "revoke_all_access":
+		var metadata struct {
+			OrgIDs []string `json:"org_ids"`
+		}
+		if err := json.Unmarshal(action.Metadata, &metadata); err != nil {
+			return fmt.Errorf("failed to unmarshal metadata: %w", err)
+		}
+
+		for _, orgID := range metadata.OrgIDs {
+			_ = s.dirClient.RemoveUserFromOrganization(ctx, tenantID, action.TargetID, orgID)
+		}
+	default:
+		return fmt.Errorf("unsupported action type: %s", action.ActionType)
+	}
+
+	return s.reqStore.UpdateSafetyActionStatus(ctx, actionID, "confirmed")
+}
+
+func (s *governanceService) RejectSafetyAction(ctx context.Context, tenantID, actionID, approverID, comment string) error {
+	if err := requireTenant(tenantID); err != nil {
+		return err
+	}
+	return s.reqStore.UpdateSafetyActionStatus(ctx, actionID, "rejected")
+}
+
+// Endpoint (Device Trust) Implementations
+
+func (s *governanceService) RegisterDevice(ctx context.Context, tenantID string, d Device) (string, error) {
+	if err := requireTenant(tenantID); err != nil {
+		return "", err
+	}
+	d.TenantID = tenantID
+	return s.endpointStore.RegisterDevice(ctx, d)
+}
+
+func (s *governanceService) ListDevices(ctx context.Context, tenantID string) ([]Device, error) {
+	if err := requireTenant(tenantID); err != nil {
+		return nil, err
+	}
+	return s.endpointStore.ListDevices(ctx, tenantID)
+}
+
+func (s *governanceService) GetDevice(ctx context.Context, tenantID, id string) (Device, error) {
+	if err := requireTenant(tenantID); err != nil {
+		return Device{}, err
+	}
+	return s.endpointStore.GetDevice(ctx, tenantID, id)
+}
+
+func (s *governanceService) UpdateDeviceStatus(ctx context.Context, tenantID, id, status string) error {
+	if err := requireTenant(tenantID); err != nil {
+		return err
+	}
+	if err := s.endpointStore.UpdateDeviceStatus(ctx, tenantID, id, status); err != nil {
+		return err
+	}
+	
+	s.publishEvent(ctx, "EndpointTrustUpdated", map[string]interface{}{
+		"tenant_id": tenantID,
+		"device_id": id,
+		"status":    status,
+	})
+	return nil
+}
+
+func (s *governanceService) publishEvent(ctx context.Context, topic string, data map[string]interface{}) {
+	if s.bus == nil {
+		return
+	}
+	payload, err := json.Marshal(data)
+	if err != nil {
+		return
+	}
+	_ = s.bus.Publish(ctx, topic, payload)
 }

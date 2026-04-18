@@ -191,6 +191,13 @@ func (s *stubCampaignService) RevokeItem(ctx context.Context, itemID, comment st
 	return nil
 }
 
+func (s *stubCampaignService) GenerateRecertificationCampaign(ctx context.Context, tenantID, userID string) error {
+	return nil
+}
+
+func (s *stubCampaignService) SetGovernanceService(service Service) {
+}
+
 type stubWebhookService struct{}
 
 func (s *stubWebhookService) CreateWebhook(ctx context.Context, tenantID, url, secret string, events []string) (string, error) {
@@ -272,6 +279,42 @@ type stubService struct {
 	createIPPolicyFn        func(ctx context.Context, tenantID string, req CreateIPPolicyRequest) (IPPolicy, error)
 	listIPPoliciesFn        func(ctx context.Context, tenantID string) ([]IPPolicy, error)
 	deleteIPPolicyFn        func(ctx context.Context, tenantID, ipPolicyID string) error
+	confirmSafetyActionFn   func(ctx context.Context, tenantID, userID, actionID, comment string) error
+}
+
+// GetDevice implements [Service].
+func (s *stubService) GetDevice(ctx context.Context, tenantID string, id string) (Device, error) {
+	panic("unimplemented")
+}
+
+// ListDevices implements [Service].
+func (s *stubService) ListDevices(ctx context.Context, tenantID string) ([]Device, error) {
+	panic("unimplemented")
+}
+
+// ListSafetyActions implements [Service].
+func (s *stubService) ListSafetyActions(ctx context.Context, tenantID string, status string) ([]SafetyAction, error) {
+	panic("unimplemented")
+}
+
+// ProposeSafetyAction implements [Service].
+func (s *stubService) ProposeSafetyAction(ctx context.Context, tenantID string, input ProposeSafetyActionInput) (SafetyAction, error) {
+	panic("unimplemented")
+}
+
+// RegisterDevice implements [Service].
+func (s *stubService) RegisterDevice(ctx context.Context, tenantID string, d Device) (string, error) {
+	panic("unimplemented")
+}
+
+// RejectSafetyAction implements [Service].
+func (s *stubService) RejectSafetyAction(ctx context.Context, tenantID string, actionID string, approverID string, comment string) error {
+	panic("unimplemented")
+}
+
+// UpdateDeviceStatus implements [Service].
+func (s *stubService) UpdateDeviceStatus(ctx context.Context, tenantID string, id string, status string) error {
+	panic("unimplemented")
 }
 
 func (s *stubService) HealthCheck(ctx context.Context) (bool, error) {
@@ -431,6 +474,13 @@ func (s *stubService) ListIPPolicies(ctx context.Context, tenantID string) ([]IP
 func (s *stubService) DeleteIPPolicy(ctx context.Context, tenantID, ipPolicyID string) error {
 	if s.deleteIPPolicyFn != nil {
 		return s.deleteIPPolicyFn(ctx, tenantID, ipPolicyID)
+	}
+	return nil
+}
+
+func (s *stubService) ConfirmSafetyAction(ctx context.Context, tenantID, actionID, approverID, comment string) error {
+	if s.confirmSafetyActionFn != nil {
+		return s.confirmSafetyActionFn(ctx, tenantID, actionID, approverID, comment)
 	}
 	return nil
 }

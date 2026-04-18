@@ -60,6 +60,26 @@ type Repository interface {
 	Log(ctx context.Context, e Event) (string, error)
 	Query(ctx context.Context, params QueryParams) ([]Event, int, error)
 	GetEvent(ctx context.Context, tenantID, id string) (Event, error)
+	GetStats(ctx context.Context, tenantID string, lookbackDays int) (Stats, error)
+}
+
+// Stats models for the dashboard
+type Stats struct {
+	TotalEvents      int             `json:"total_events"`
+	FailureCount     int             `json:"failure_count"`
+	ActivityTrend    []ActivityTrend `json:"activity_trend"`
+	ActionDist       []Distribution  `json:"action_distribution"`
+	ResourceTypeDist []Distribution  `json:"resource_type_distribution"`
+}
+
+type ActivityTrend struct {
+	Date  string `json:"date"`
+	Count int    `json:"count"`
+}
+
+type Distribution struct {
+	Key   string `json:"key"`
+	Value int    `json:"value"`
 }
 
 type sqlRepository struct {
@@ -160,6 +180,41 @@ func (s *sqlRepository) GetEvent(ctx context.Context, tenantID, id string) (Even
 	var e Event
 	err := s.db.GetContext(ctx, &e, `SELECT * FROM audit_logs WHERE id = $1 AND tenant_id = $2`, id, tenantID)
 	return e, err
+}
+
+func (s *sqlRepository) GetStats(ctx context.Context, tenantID string, lookbackDays int) (Stats, error) {
+	var stats Stats
+	lookback := time.Now().AddDate(0, 0, -lookbackDays)
+
+	// Total and failures
+	err := s.db.GetContext(ctx, &stats.TotalEvents, `SELECT COUNT(*) FROM audit_logs WHERE tenant_id = $1 AND timestamp >= $2`, tenantID, lookback)
+	if err != nil {
+		return stats, err
+	}
+	_ = s.db.GetContext(ctx, &stats.FailureCount, `SELECT COUNT(*) FROM audit_logs WHERE tenant_id = $1 AND outcome = 'failure' AND timestamp >= $2`, tenantID, lookback)
+
+	// Activity Trend (Daily)
+	err = s.db.SelectContext(ctx, &stats.ActivityTrend,
+		`SELECT TO_CHAR(timestamp, 'YYYY-MM-DD') as date, COUNT(*) as count 
+		 FROM audit_logs WHERE tenant_id = $1 AND timestamp >= $2
+		 GROUP BY date ORDER BY date`, tenantID, lookback)
+	if err != nil {
+		return stats, err
+	}
+
+	// Action Distribution
+	_ = s.db.SelectContext(ctx, &stats.ActionDist,
+		`SELECT action as key, COUNT(*) as value 
+		 FROM audit_logs WHERE tenant_id = $1 AND timestamp >= $2
+		 GROUP BY key ORDER BY value DESC LIMIT 10`, tenantID, lookback)
+
+	// Resource Type Distribution
+	_ = s.db.SelectContext(ctx, &stats.ResourceTypeDist,
+		`SELECT resource_type as key, COUNT(*) as value 
+		 FROM audit_logs WHERE tenant_id = $1 AND timestamp >= $2
+		 GROUP BY key ORDER BY value DESC LIMIT 10`, tenantID, lookback)
+
+	return stats, nil
 }
 
 func itoa(i int) string {

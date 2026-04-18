@@ -14,6 +14,7 @@ const RequestAccess: React.FC = () => {
     const [resourceType, setResourceType] = useState('group');
     const [resourceID, setResourceID] = useState('');
     const [reason, setReason] = useState('');
+    const [duration, setDuration] = useState('4h');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
@@ -23,7 +24,7 @@ const RequestAccess: React.FC = () => {
         setError('');
         setLoading(true);
         try {
-            await createAccessRequest(resourceType, resourceID, reason);
+            await createAccessRequest(resourceType, resourceID, reason, duration === 'indefinite' ? undefined : duration);
             navigate('/requests');
         } catch (err: any) {
             console.error(err);
@@ -63,6 +64,7 @@ const RequestAccess: React.FC = () => {
                                     </SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="group">Group</SelectItem>
+                                        <SelectItem value="role">Role (RBAC)</SelectItem>
                                         <SelectItem value="app">Application</SelectItem>
                                     </SelectContent>
                                 </Select>
@@ -77,7 +79,25 @@ const RequestAccess: React.FC = () => {
                                     required
                                 />
                                 <p className="text-[0.8rem] text-muted-foreground">
-                                    Enter the exact identifier of the resource.
+                                    Enter the exact identifier (e.g. 'admin', 'eng-lead').
+                                </p>
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label>Duration (Just-In-Time)</Label>
+                                <Select value={duration} onValueChange={setDuration}>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select duration" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="1h">1 Hour (Quick Tasks)</SelectItem>
+                                        <SelectItem value="4h">4 Hours (Standard Session)</SelectItem>
+                                        <SelectItem value="24h">24 Hours (Daily Access)</SelectItem>
+                                        <SelectItem value="indefinite">Indefinite (Static RBAC)</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                                <p className="text-[0.8rem] text-muted-foreground">
+                                    Zero Trust recommendation: Choose the shortest duration needed.
                                 </p>
                             </div>
 

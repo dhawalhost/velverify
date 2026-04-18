@@ -378,6 +378,11 @@ func (c *Connector) GetGroupMembers(ctx context.Context, groupID string) ([]conn
 	return members, nil
 }
 
+func (c *Connector) DiscoverResources(ctx context.Context) ([]connector.Resource, error) {
+	// Future implementation: Discover SCIM Groups and Entitlements as resources
+	return []connector.Resource{}, nil
+}
+
 func (c *Connector) setHeaders(req *http.Request) {
 	req.Header.Set("Content-Type", "application/scim+json")
 	req.Header.Set("Accept", "application/scim+json")
