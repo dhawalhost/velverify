@@ -151,6 +151,14 @@ go test -v -tags=integration ./tests/integration/...
 | :--- | :---: | :--- | :--- |
 | `DIRECTORY_SERVICE_URL` | ❌ | `http://dirsvc:8081` | URL of directory service |
 | `WEBHOOK_SECRET` | ⚠️ | - | Secret for signing webhooks |
+| **`WARDSEAL_MASTER_KEY`** | ✅ | - | **CRITICAL**. A 32-byte hex string used for field-level encryption (Connectors, Slack). |
+| `KMS_PROVIDER` | ❌ | `local` | Encryption provider: `local` (AES) or `vault` (Transit). |
+| `REDIS_ADDR` | ✅ | `localhost:6379` | Required for async discovery jobs and ChatOps state. |
+| `REDIS_PASSWORD` | ❌ | - | Optional Redis auth. |
+| `REDIS_DB` | ❌ | `0` | Redis database index. |
+| `VAULT_ADDR` | ⚠️ | - | Required if `KMS_PROVIDER=vault`. |
+| `VAULT_TOKEN` | ⚠️ | - | Vault auth token. |
+| `VAULT_KEY_NAME` | ❌ | `wardseal-master` | Transit engine key name. |
 
 ---
 
@@ -169,23 +177,15 @@ go test -v -tags=integration ./tests/integration/...
 > Never use default values in production!
 
 1. **Use environment-appropriate key management:**
-   - Local: file-based key paths via `JWT_PRIVATE_KEY_PATH` and `JWT_PUBLIC_KEY_PATH`
-   - Staging/Production: Vault Transit (`KMS_PROVIDER=vault`) with `VAULT_KEY_NAME` and AppRole/token auth
+   - Local: `WARDSEAL_MASTER_KEY` must be a cryptographically strong 32-byte hex string.
+   - Staging/Production: Vault Transit (`KMS_PROVIDER=vault`) is highly recommended for multi-tenant isolation.
 
 2. **Generate strong secrets:**
    ```bash
-   # Generate local JWT signing key pair (local mode only)
-   openssl genpkey -algorithm RSA -out jwt_private.pem -pkeyopt rsa_keygen_bits:2048
-   openssl rsa -pubout -in jwt_private.pem -out jwt_public.pem
-   
-   # Generate random tokens
+   # Generate a 32-byte Master Key
    openssl rand -hex 32
    ```
 
-3. **Use secrets management:**
-   - Kubernetes: Use Secrets or external secrets operator
-   - CircleCI: Use Contexts for sensitive values
-   - Production: Consider HashiCorp Vault or AWS Secrets Manager
-
-4. **Enable SSL for database:**
-   - Set `DB_SSLMODE=verify-full` in production
+3. **Infrastructure Isolation:**
+   - Ensure `Redis` is configured with TLS in production if accessed over network.
+   - Use `DB_SSLMODE=verify-full` for all PostgreSQL connections.

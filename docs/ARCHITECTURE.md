@@ -9,6 +9,8 @@ erDiagram
     TENANTS ||--o{ OAUTH_CLIENTS : has
     TENANTS ||--o{ SAML_PROVIDERS : has
     TENANTS ||--o{ WEBHOOKS : has
+    TENANTS ||--o{ CHATOPS_SLACK_INTEGRATIONS : has
+    TENANTS ||--o{ POLICIES : has
     
     IDENTITIES ||--o{ WEBAUTHN_CREDENTIALS : has
     IDENTITIES ||--o{ TOTP_SECRETS : has
@@ -109,6 +111,24 @@ erDiagram
         string username
         timestamp locked_until
     }
+
+    CHATOPS_SLACK_INTEGRATIONS {
+        uuid id PK
+        uuid tenant_id FK
+        string team_id
+        bytes bot_token // Encrypted
+        bytes signing_secret // Encrypted
+        boolean is_enabled
+    }
+
+    POLICIES {
+        uuid id PK
+        uuid tenant_id FK
+        string name
+        string rule_type // simple, cel, rego
+        jsonb rule_data
+        boolean is_enabled
+    }
     
     AUDIT_LOGS {
         uuid id PK
@@ -143,13 +163,15 @@ flowchart TB
     
     subgraph Data["Data Layer"]
         Postgres[(PostgreSQL)]
-        Redis[(Redis Cache)]
+        Redis[(Redis JobStore)]
+        KMS["KMS (Vault/AES)"]
     end
     
     subgraph External["External Services"]
         DNS["DNS (TXT Lookup)"]
         SAML["SAML IdPs"]
         Social["OAuth Providers"]
+        Slack["Slack Platform"]
     end
     
     Browser --> LB
@@ -169,6 +191,9 @@ flowchart TB
     GovSvc --> Postgres
     GovSvc --> DirSvc
     GovSvc --> DNS
+    GovSvc --> KMS
+    GovSvc --> Redis
+    GovSvc --> Slack
 ```
 
 ### Service Responsibilities
@@ -177,7 +202,7 @@ flowchart TB
 |---------|------|------------------|
 | **authsvc** | 8080 | OAuth2/OIDC, Login, MFA (TOTP, WebAuthn), SAML SSO, Tokens |
 | **dirsvc** | 8081 | Identity CRUD, Password validation, SCIM 2.0 provisioning |
-| **govsvc** | 8082 | Access Requests, Campaigns, Roles, Audit, Organizations |
+| **govsvc** | 8082 | Access Requests, Policies, Organizations, Discovery Jobs, ChatOps Integrations |
 
 ---
 
@@ -227,6 +252,8 @@ flowchart LR
 | SQL Injection | Parameterized Queries | `sqlx` with `$1, $2` placeholders |
 | Token Theft | MFA | TOTP + WebAuthn enforcement |
 | Token Theft | Rotation | Refresh tokens rotated on use |
+| Secret Theft | KMS | AES-256-GCM field-level encryption for sensitive tokens |
+| Slack Spoofing | Signatures | HMAC-SHA256 verification on all incoming callbacks |
 | Session Hijack | Device Binding | Device fingerprint + trust scoring |
 
 ---
@@ -292,14 +319,35 @@ func (s *authorizationCodeStore) Save(ctx context.Context, code authorizationCod
 
 ---
 
+## 5. Multi-Tenant Integration Model
+
+WardSeal uses a **Dynamic Tenant Resolution** model for all third-party integrations (Slack, Connectors).
+
+1.  **Stateless Callbacks**: Incoming Slack events contain a `team_id`.
+2.  **Context Resolution**: The `chatops.Repository` lookups the `SigningSecret` for that `team_id`.
+3.  **Cryptographic Isolation**: All per-tenant secrets are stored in the database, encrypted using a tenant-agnostic `WARDSEAL_MASTER_KEY` or a Vault-managed key.
+
+## 6. Tiered Policy Engine
+
+The governance layer supports three levels of policy sophistication:
+
+| Tier | Language | Best For | Implementation |
+|---|---|---|---|
+| **Simple** | JSON/YAML | Attribute-based access (MFA, Geo, Device) | `SimpleEvaluator` |
+| **Advanced** | CEL | Complex boolean logic (Google CEL) | `CELEvaluator` |
+| **Enterprise** | Rego | Full RBAC/ABAC compliance logic | `RegoEvaluator` (Coming Soon) |
+
+---
+
 ## Quick Reference
 
 | Metric | Value |
 |--------|-------|
 | Services | 3 (authsvc, dirsvc, govsvc) |
-| Database Tables | 20+ |
-| API Endpoints | 50+ |
-| Auth Methods | Password, TOTP, WebAuthn, SAML, Social |
+| Database Tables | 22+ |
+| API Endpoints | 60+ |
+| Cryptography | AES-256-GCM, HMAC-SHA256, RSA-4096 |
+| Policy Engines | SimpleABAC, CEL |
 | Rate Limit | 20 req/s per IP |
 | Lockout Threshold | 5 failed attempts |
 | Token Expiry | Access: 1h, Refresh: 7d |
