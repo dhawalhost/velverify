@@ -179,11 +179,40 @@ export const getSCIMUsers = async () => {
     return response.data;
 };
 
-export const createUser = async (userData: any) => {
+export const getSCIMUser = async (userId: string) => {
+    const response = await dirApi.get(`/scim/v2/Users/${userId}`)
+    return response.data;
+}
+
+export const updateSCIMUser = async (userId: string, userData: any) => {
+    const response = await dirApi.put(`/scim/v2/Users/${userId}`, {
+        schemas: ["urn:ietf:params:scim:schemas:core:2.0:User"],
+        ...userData
+    });
+    return response.data;
+}
+
+export const createSCIMUser = async (userData: any) => {
     const response = await dirApi.post('/scim/v2/Users', {
         schemas: ["urn:ietf:params:scim:schemas:core:2.0:User"],
         ...userData
     });
+    return response.data;
+}
+
+export const deleteSCIMUser = async (userId: string) => {
+    const response = await dirApi.delete(`/scim/v2/Users/${userId}`);
+    return response.data;
+}
+
+// SCIM Configuration
+export const getSCIMConfig = async () => {
+    const response = await dirApi.get('/scim/v2/ServiceProviderConfig');
+    return response.data;
+};
+
+export const getSCIMSchemas = async () => {
+    const response = await dirApi.get('/scim/v2/Schemas');
     return response.data;
 };
 
@@ -243,6 +272,36 @@ export const rejectAccessRequest = async (id: string, comment?: string) => {
     return response.data;
 };
 
+// IP Policies
+export interface IPPolicy {
+    id: string;
+    tenant_id: string;
+    type: 'allow' | 'block';
+    cidr: string;
+    country_code?: string;
+    reason?: string;
+    created_at: string;
+}
+
+export const getIPPolicies = async () => {
+    const response = await govApi.get('/api/v1/governance/ip-policies');
+    return response.data.policies;
+};
+
+export const createIPPolicy = async (policy: {
+    type: 'allow' | 'block';
+    cidr: string;
+    country?: string;
+    reason?: string;
+}) => {
+    const response = await govApi.post('/api/v1/governance/ip-policies', policy);
+    return response.data;
+};
+
+export const deleteIPPolicy = async (id: string) => {
+    await govApi.delete(`/api/v1/governance/ip-policies/${id}`);
+};
+
 // RBAC - Roles
 export const getRoles = async () => {
     const response = await govApi.get('/api/v1/roles');
@@ -298,6 +357,50 @@ export const removeRoleFromUser = async (userId: string, roleId: string) => {
     return response.data;
 };
 
+// Groups
+export interface Group {
+    id: string;
+    tenant_id: string;
+    name: string;
+    description?: string;
+    created_at: string;
+    updated_at: string;
+}
+
+export const getGroups = async (limit: number = 20, offset: number = 0) => {
+    const response = await dirApi.get('/groups', { params: { limit, offset } });
+    return response.data;
+};
+
+export const getGroupMembers = async (groupId: string) => {
+    const response = await dirApi.get(`/groups/${groupId}/users`);
+    return response.data.users;
+};
+
+export const createGroup = async (group: { name: string; description?: string }) => {
+    const response = await dirApi.post('/groups', { group });
+    return response.data;
+};
+
+export const updateGroup = async (id: string, group: { name: string; description?: string }) => {
+    const response = await dirApi.put(`/groups/${id}`, { group });
+    return response.data;
+};
+
+export const deleteGroup = async (id: string) => {
+    await dirApi.delete(`/groups/${id}`);
+};
+
+export const addUserToGroup = async (groupId: string, userId: string) => {
+    const response = await dirApi.post(`/groups/${groupId}/users`, { user_id: userId });
+    return response.data;
+};
+
+export const removeUserFromGroup = async (groupId: string, userId: string) => {
+    const response = await dirApi.delete(`/groups/${groupId}/users/${userId}`);
+    return response.data;
+};
+
 // Audit Logs
 export const getAuditLogs = async (params?: {
     action?: string;
@@ -335,6 +438,11 @@ export const getSafetyActions = async (status?: string) => {
 
 export const confirmSafetyAction = async (id: string, comment: string) => {
     const response = await govApi.post(`/api/v1/safety/actions/${id}/confirm`, { comment });
+    return response.data;
+};
+
+export const rejectSafetyAction = async (id: string, comment: string) => {
+    const response = await govApi.post(`/api/v1/safety/actions/${id}/reject`, { comment });
     return response.data;
 };
 
@@ -442,6 +550,38 @@ export const toggleSSOProvider = async (id: string, enabled: boolean) => {
     return response.data;
 };
 
+// Graph Traversal
+export const getGraphTraversal = async (subjectID: string) => {
+    const response = await govApi.get(`/api/v1/governance/graph/traverse?subject_id=${subjectID}`);
+    return response.data;
+};
+
+// SAML Service Providers (WardSeal as IdP)
+export interface SAMLServiceProvider {
+    entity_id: string;
+    metadata_url?: string;
+    acs_url?: string;
+    certificate?: string;
+    encrypt_assertions: boolean;
+    sign_assertions: boolean;
+    created_at?: string;
+    updated_at?: string;
+}
+
+export const getSAMLProviders = async () => {
+    const response = await govApi.get('/api/v1/saml/providers');
+    return response.data;
+};
+
+export const createSAMLProvider = async (provider: SAMLServiceProvider) => {
+    const response = await govApi.post('/api/v1/saml/providers', provider);
+    return response.data;
+};
+
+export const deleteSAMLProvider = async (entityID: string) => {
+    await govApi.delete(`/api/v1/saml/providers/${encodeURIComponent(entityID)}`);
+};
+
 // Connectors
 export const getConnectors = async () => {
     const response = await govApi.get('/api/v1/connectors');
@@ -505,17 +645,17 @@ export const socialLogin = async (provider: string, email?: string, external_id?
 
 // Webhooks
 export const getWebhooks = async () => {
-    const response = await govApi.get('/webhooks');
+    const response = await govApi.get('/api/v1/governance/webhooks');
     return response.data;
 };
 
 export const createWebhook = async (url: string, events: string[]) => {
-    const response = await govApi.post('/webhooks', { url, events });
+    const response = await govApi.post('/api/v1/governance/webhooks', { url, events });
     return response.data;
 };
 
 export const deleteWebhook = async (id: string) => {
-    await govApi.delete(`/webhooks/${id}`);
+    await govApi.delete(`/api/v1/governance/webhooks/${id}`);
 };
 
 // Device Management - Auth Service
@@ -639,6 +779,80 @@ export const getAPIKeyLogs = async (keyId: string) => {
 export const getUserApps = async () => {
     const response = await api.get('/api/v1/user/apps');
     return response.data;
+};
+
+// Slack Integration
+export interface SlackIntegration {
+    enabled: boolean;
+    team_id?: string;
+    app_id?: string;
+    webhook_url?: string;
+    status: 'not_configured' | 'ready' | 'error';
+    error_message?: string;
+}
+
+export const getSlackStatus = async () => {
+    const response = await govApi.get('/api/v1/integrations/slack');
+    return response.data as SlackIntegration;
+};
+
+export const configureSlack = async (config: {
+    team_id: string;
+    app_id: string;
+    bot_token?: string;
+    signing_secret?: string;
+    webhook_url?: string;
+    enabled: boolean;
+}) => {
+    const response = await govApi.put('/api/v1/integrations/slack', config);
+    return response.data;
+};
+
+export const disconnectSlack = async () => {
+    const response = await govApi.delete('/api/v1/integrations/slack');
+    return response.data;
+};
+
+// Governance Dashboards & Workloads
+export interface DashboardStats {
+    active_users: number;
+    total_groups: number;
+    pending_requests: number;
+    active_workloads: number;
+    risk_profile: Record<string, number>;
+    hygiene_score: number;
+    connected_orgs: number;
+    active_ip_policies: number;
+}
+
+export const getGovernanceStats = async () => {
+    const response = await govApi.get('/api/v1/governance/stats');
+    return response.data as DashboardStats;
+};
+
+export const getWorkloads = async () => {
+    const response = await govApi.get('/api/v1/governance/workloads');
+    return response.data.workloads;
+};
+
+export const createWorkload = async (workload: {
+    name: string;
+    service_handle: string;
+    metadata?: Record<string, any>;
+}) => {
+    const response = await govApi.post('/api/v1/governance/workloads', workload);
+    return response.data;
+};
+
+export const getRelationships = async (query?: {
+    namespace?: string;
+    object_id?: string;
+    relation?: string;
+    subject_type?: string;
+    subject_id?: string;
+}) => {
+    const response = await govApi.get('/api/v1/governance/relationships', { params: query });
+    return response.data.relationships;
 };
 
 export default api;

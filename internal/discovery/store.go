@@ -33,10 +33,10 @@ func (r *sqlRepository) Upsert(ctx context.Context, res DiscoveredResource) erro
 
 func (r *sqlRepository) List(ctx context.Context, tenantID string, filter string) ([]DiscoveredResource, error) {
 	var resources []DiscoveredResource
-	
+
 	// Basic implementation, in a real scenario we'd handle the filter properly
 	query := `SELECT * FROM discovered_resources WHERE tenant_id = $1 ORDER BY last_discovered_at DESC`
 	err := r.db.SelectContext(ctx, &resources, query, tenantID)
-	
+
 	return resources, err
 }

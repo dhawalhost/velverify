@@ -7,7 +7,8 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Trash2, Edit } from 'lucide-react';
+import { Plus, Trash2, Edit, ShieldCheck, Lock, Fingerprint, Activity, Terminal, ArrowLeft, Loader2 } from 'lucide-react';
+import { PageHeader, GlassCard, GlassCardHeader, GlassCardTitle, GlassCardContent, GlassTable, GlassTableHeader, GlassTableHead, GlassTableRow, GlassCardDescription } from '@/components/layout';
 
 interface SSOProvider {
     id: string;
@@ -28,6 +29,7 @@ interface SSOProvider {
     saml_certificate?: string;
     saml_sign_requests?: boolean;
     saml_sign_assertions?: boolean;
+    saml_encrypt_assertions?: boolean;
 
     auto_create_users: boolean;
 }
@@ -91,187 +93,303 @@ export default function SSOConfig() {
         }
     };
 
-    if (loading) return <div className="p-8 text-center text-muted-foreground">Loading configurations...</div>;
+    if (loading) return <div className="h-[400px] flex items-center justify-center"><Loader2 className="h-10 w-10 animate-spin text-primary opacity-20" /></div>;
 
     return (
-        <div className="space-y-6">
-            <div className="flex justify-between items-center">
-                <h1 className="text-3xl font-bold tracking-tight">SSO Configuration</h1>
-                {!editingProvider && (
-                    <div className="flex gap-2">
-                        <Button onClick={() => { setEditingProvider({ type: 'oidc', enabled: true, auto_create_users: true }); setIsCreating(true); }}>
-                            <Plus className="mr-2 h-4 w-4" /> Add OIDC
-                        </Button>
-                        <Button variant="secondary" onClick={() => { setEditingProvider({ type: 'saml', enabled: true, auto_create_users: true }); setIsCreating(true); }}>
-                            <Plus className="mr-2 h-4 w-4" /> Add SAML
-                        </Button>
-                    </div>
-                )}
-            </div>
+        <div className="space-y-12 animate-in fade-in duration-700">
+            <PageHeader
+                icon={<Fingerprint className="w-10 h-10 text-primary" />}
+                title="SSO infrastructure"
+                description="Manage enterprise identity federation and SAML/OIDC protocols. Architect secure authentication handshakes across distributed clusters."
+                actions={
+                    !editingProvider && (
+                         <div className="flex gap-4">
+                            <Button
+                                onClick={() => { setEditingProvider({ type: 'oidc', enabled: true, auto_create_users: true }); setIsCreating(true); }}
+                                className="h-11 rounded-xl font-bold text-[12px] tracking-tight px-8 shadow-sm transition-all"
+                            >
+                                <Plus className="mr-2 h-4 w-4" /> Integrate OIDC
+                            </Button>
+                            <Button
+                                variant="outline"
+                                onClick={() => { setEditingProvider({ type: 'saml', enabled: true, auto_create_users: true }); setIsCreating(true); }}
+                                className="h-11 rounded-xl bg-white ring-1 ring-on-surface/5 font-bold text-[12px] tracking-tight px-8 shadow-sm transition-all hover:bg-surface-container"
+                            >
+                                <Plus className="mr-2 h-4 w-4" /> Integrate SAML
+                            </Button>
+                        </div>
+                    )
+                }
+            />
 
             {!editingProvider ? (
-                <Card>
-                    <CardContent className="p-0">
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Name</TableHead>
-                                    <TableHead>Type</TableHead>
-                                    <TableHead>Status</TableHead>
-                                    <TableHead className="text-right">Actions</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {providers.length === 0 ? (
-                                    <TableRow>
-                                        <TableCell colSpan={4} className="text-center text-muted-foreground h-32">
-                                            No SSO providers configured. Add one to get started.
-                                        </TableCell>
-                                    </TableRow>
-                                ) : (
-                                    providers.map(p => (
-                                        <TableRow key={p.id}>
-                                            <TableCell className="font-medium">{p.name}</TableCell>
-                                            <TableCell>
-                                                <Badge variant="outline" className={p.type === 'oidc' ? 'border-blue-200 bg-blue-50 text-blue-700' : 'border-orange-200 bg-orange-50 text-orange-700'}>
-                                                    {p.type.toUpperCase()}
-                                                </Badge>
+                <GlassCard className="border-none shadow-2xl shadow-on-surface/5 bg-white overflow-hidden rounded-[32px]">
+                    <GlassCardHeader className="py-8 px-10 border-b border-on-surface/5">
+                        <div className="flex items-center gap-5">
+                            <div className="p-3.5 bg-primary/5 rounded-2xl">
+                                <ShieldCheck className="w-7 h-7 text-primary" />
+                            </div>
+                             <div>
+                                <GlassCardTitle className="text-2xl font-bold tracking-tight text-on-surface">Trust anchors</GlassCardTitle>
+                                <p className="text-on-surface-variant/60 font-medium text-[11px] mt-1.5 italic">Connected identity providers ({providers.length}) authenticated for enterprise access.</p>
+                            </div>
+                        </div>
+                    </GlassCardHeader>
+                    <GlassCardContent className="p-0">
+                        <div className="overflow-x-auto">
+                            <GlassTable>
+                                <GlassTableHeader>
+                                     <GlassTableRow className="hover:bg-transparent border-b border-on-surface/5">
+                                        <GlassTableHead className="py-6 pl-10 font-bold text-[12px] tracking-tight text-on-surface-variant/40">Provider alias</GlassTableHead>
+                                        <GlassTableHead className="font-bold text-[12px] tracking-tight text-on-surface-variant/40">Protocol stack</GlassTableHead>
+                                        <GlassTableHead className="font-bold text-[12px] tracking-tight text-on-surface-variant/40">Status</GlassTableHead>
+                                        <GlassTableHead className="text-right pr-10 font-bold text-[12px] tracking-tight text-on-surface-variant/40">Actions</GlassTableHead>
+                                    </GlassTableRow>
+                                </GlassTableHeader>
+                                <TableBody>
+                                    {providers.length === 0 ? (
+                                        <GlassTableRow>
+                                            <TableCell colSpan={4} className="py-32 text-center text-sm font-medium text-on-surface-variant/30 italic">
+                                                No SSO infrastructure established. Federation awaiting deployment.
                                             </TableCell>
-                                            <TableCell>
-                                                <div className="flex items-center gap-2">
-                                                    <Switch
-                                                        checked={p.enabled}
-                                                        onCheckedChange={(checked) => handleToggle(p.id, checked)}
-                                                    />
-                                                    <span className="text-sm text-muted-foreground">{p.enabled ? 'Enabled' : 'Disabled'}</span>
-                                                </div>
-                                            </TableCell>
-                                            <TableCell className="text-right">
-                                                <Button size="icon" variant="ghost" onClick={() => { setEditingProvider(p); setIsCreating(false); }}>
-                                                    <Edit className="h-4 w-4" />
-                                                </Button>
-                                                <Button size="icon" variant="ghost" className="text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => handleDelete(p.id)}>
-                                                    <Trash2 className="h-4 w-4" />
-                                                </Button>
-                                            </TableCell>
-                                        </TableRow>
-                                    ))
-                                )}
-                            </TableBody>
-                        </Table>
-                    </CardContent>
-                </Card>
+                                        </GlassTableRow>
+                                    ) : (
+                                        providers.map(p => (
+                                            <GlassTableRow key={p.id} className="hover:bg-surface-container/10 transition-all border-b border-on-surface/5 last:border-0 group">
+                                                <TableCell className="py-8 pl-10">
+                                                    <span className="text-lg font-bold tracking-tight text-on-surface group-hover:text-primary transition-colors">{p.name}</span>
+                                                </TableCell>
+                                                 <TableCell className="py-8">
+                                                    <Badge className={`rounded-lg font-bold text-[10px] tracking-tight border-none px-3 py-1 transition-all ${p.type === 'oidc' ? 'bg-primary/10 text-primary' : 'bg-amber-500/10 text-amber-600'}`}>
+                                                        {p.type.toUpperCase()}
+                                                    </Badge>
+                                                </TableCell>
+                                                <TableCell className="py-8">
+                                                    <div className="flex items-center gap-4">
+                                                         <Switch
+                                                            checked={p.enabled}
+                                                            onCheckedChange={(checked) => handleToggle(p.id, checked)}
+                                                            className="data-[state=checked]:bg-emerald-500"
+                                                        />
+                                                        <span className={`text-[10px] font-bold tracking-tight transition-all uppercase ${p.enabled ? 'text-emerald-600' : 'text-on-surface-variant/40'}`}>
+                                                            {p.enabled ? 'Live' : 'Inactive'}
+                                                        </span>
+                                                    </div>
+                                                </TableCell>
+                                                <TableCell className="py-8 text-right pr-10">
+                                                    <div className="flex justify-end gap-2">
+                                                        <Button size="icon" variant="ghost" className="h-11 w-11 rounded-xl text-on-surface-variant/40 hover:text-on-surface hover:bg-surface-container transition-all" onClick={() => { setEditingProvider(p); setIsCreating(false); }}>
+                                                            <Edit className="h-5 w-5" />
+                                                        </Button>
+                                                        <Button size="icon" variant="ghost" className="h-11 w-11 rounded-xl text-on-surface-variant/40 hover:text-red-500 hover:bg-red-50 transition-all" onClick={() => handleDelete(p.id)}>
+                                                            <Trash2 className="h-5 w-5" />
+                                                        </Button>
+                                                    </div>
+                                                </TableCell>
+                                            </GlassTableRow>
+                                        ))
+                                    )}
+                                </TableBody>
+                            </GlassTable>
+                        </div>
+                    </GlassCardContent>
+                </GlassCard>
             ) : (
-                <Card className="max-w-2xl mx-auto">
-                    <CardHeader>
-                        <CardTitle>{isCreating ? 'Add' : 'Edit'} {editingProvider.type?.toUpperCase()} Provider</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <form id="sso-form" onSubmit={handleSave} className="space-y-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="name">Provider Name</Label>
+                <GlassCard className="max-w-4xl mx-auto border-none shadow-2xl shadow-on-surface/10 bg-white overflow-hidden rounded-[32px]">
+                    <GlassCardHeader className="py-12 px-10 border-b border-on-surface/5 bg-surface-container/10">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-6">
+                                <div className="p-4 bg-primary rounded-2xl text-white shadow-lg shadow-primary/20">
+                                    <Fingerprint className="w-7 h-7" />
+                                </div>
+                                 <div>
+                                    <GlassCardTitle className="text-3xl font-bold tracking-tight text-on-surface">
+                                        {isCreating ? 'Provision' : 'Architect'} {editingProvider.type?.toUpperCase()}
+                                    </GlassCardTitle>
+                                    <p className="text-on-surface-variant/60 font-medium text-[11px] mt-2 italic">Configure federation tunnel protocol logic.</p>
+                                </div>
+                            </div>
+                             <Button
+                                variant="outline"
+                                size="sm"
+                                className="bg-white rounded-xl font-bold text-[11px] h-10 px-6 ring-1 ring-on-surface/5 shadow-sm hover:bg-surface-container transition-all"
+                                onClick={() => setEditingProvider(null)}
+                            >
+                                <ArrowLeft className="mr-2 h-4 w-4" /> Cancel
+                            </Button>
+                        </div>
+                    </GlassCardHeader>
+                    <GlassCardContent className="p-10 space-y-10">
+                         <form id="sso-form" onSubmit={handleSave} className="space-y-10">
+                            <div className="space-y-4">
+                                <Label htmlFor="name" className="text-[11px] font-bold tracking-tight text-on-surface-variant/40 ml-1 italic">01 // Operational alias</Label>
                                 <Input
                                     id="name"
                                     value={editingProvider.name || ''}
                                     onChange={(e) => setEditingProvider({ ...editingProvider, name: e.target.value })}
                                     required
-                                    placeholder="e.g. Corporate Okta"
+                                    className="h-14 border-none rounded-2xl bg-surface-container/50 ring-1 ring-on-surface/5 focus-visible:ring-2 focus-visible:ring-primary/20 transition-all font-medium px-6"
+                                    placeholder="e.g., Okta Enterprise"
                                 />
                             </div>
 
-                            {editingProvider.type === 'oidc' && (
-                                <>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="issuer">Issuer URL</Label>
-                                        <Input
-                                            id="issuer"
-                                            type="url"
-                                            value={editingProvider.oidc_issuer_url || ''}
-                                            onChange={(e) => setEditingProvider({ ...editingProvider, oidc_issuer_url: e.target.value })}
-                                            required
-                                            placeholder="https://dev-xxxx.okta.com"
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="client_id">Client ID</Label>
-                                        <Input
-                                            id="client_id"
-                                            value={editingProvider.oidc_client_id || ''}
-                                            onChange={(e) => setEditingProvider({ ...editingProvider, oidc_client_id: e.target.value })}
-                                            required
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="client_secret">Client Secret {isCreating ? '' : '(Leave blank to keep unchanged)'}</Label>
-                                        <Input
-                                            id="client_secret"
-                                            type="password"
-                                            value={editingProvider.oidc_client_secret || ''}
-                                            onChange={(e) => setEditingProvider({ ...editingProvider, oidc_client_secret: e.target.value })}
-                                            required={isCreating}
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="scopes">Scopes</Label>
-                                        <Input
-                                            id="scopes"
-                                            value={editingProvider.oidc_scopes || 'openid profile email'}
-                                            onChange={(e) => setEditingProvider({ ...editingProvider, oidc_scopes: e.target.value })}
-                                        />
-                                    </div>
-                                </>
-                            )}
+                            <div className="h-px bg-on-surface/5" />
 
-                            {editingProvider.type === 'saml' && (
-                                <>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="entity_id">Entity ID</Label>
-                                        <Input
-                                            id="entity_id"
-                                            value={editingProvider.saml_entity_id || ''}
-                                            onChange={(e) => setEditingProvider({ ...editingProvider, saml_entity_id: e.target.value })}
-                                            required
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="sso_url">SSO URL</Label>
-                                        <Input
-                                            id="sso_url"
-                                            type="url"
-                                            value={editingProvider.saml_sso_url || ''}
-                                            onChange={(e) => setEditingProvider({ ...editingProvider, saml_sso_url: e.target.value })}
-                                            required
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="cert">Certificate (PEM)</Label>
-                                        <textarea
-                                            id="cert"
-                                            className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                                            value={editingProvider.saml_certificate || ''}
-                                            onChange={(e) => setEditingProvider({ ...editingProvider, saml_certificate: e.target.value })}
-                                            rows={5}
-                                            placeholder="-----BEGIN CERTIFICATE-----..."
-                                        />
-                                    </div>
-                                </>
-                            )}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                 {editingProvider.type === 'oidc' && (
+                                    <>
+                                        <div className="space-y-4 md:col-span-2">
+                                            <Label htmlFor="issuer" className="text-[11px] font-bold tracking-tight text-on-surface-variant/40 ml-1 italic">02 // Discovery endpoint</Label>
+                                            <div className="relative">
+                                                <Activity className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-on-surface-variant/40" />
+                                                <Input
+                                                    id="issuer"
+                                                    type="url"
+                                                    value={editingProvider.oidc_issuer_url || ''}
+                                                    onChange={(e) => setEditingProvider({ ...editingProvider, oidc_issuer_url: e.target.value })}
+                                                    required
+                                                    className="h-12 border-none rounded-xl bg-surface-container/30 ring-1 ring-on-surface/5 focus-visible:ring-2 focus-visible:ring-primary/20 transition-all font-mono text-xs pl-12"
+                                                    placeholder="https://idp.discovery.url"
+                                                />
+                                            </div>
+                                         </div>
+                                        <div className="space-y-4">
+                                            <Label htmlFor="client_id" className="text-[11px] font-bold tracking-tight text-on-surface-variant/40 ml-1 italic">03 // Handshake uid</Label>
+                                            <Input
+                                                id="client_id"
+                                                value={editingProvider.oidc_client_id || ''}
+                                                onChange={(e) => setEditingProvider({ ...editingProvider, oidc_client_id: e.target.value })}
+                                                required
+                                                className="h-12 border-none rounded-xl bg-surface-container/30 ring-1 ring-on-surface/5 focus-visible:ring-2 focus-visible:ring-primary/20 transition-all font-mono text-xs px-5"
+                                                placeholder="Client ID"
+                                            />
+                                         </div>
+                                        <div className="space-y-4">
+                                            <Label htmlFor="client_secret" className="text-[11px] font-bold tracking-tight text-on-surface-variant/40 ml-1 italic">04 // Secret entropy {isCreating ? '' : '(locked)'}</Label>
+                                            <Input
+                                                id="client_secret"
+                                                type="password"
+                                                value={editingProvider.oidc_client_secret || ''}
+                                                onChange={(e) => setEditingProvider({ ...editingProvider, oidc_client_secret: e.target.value })}
+                                                required={isCreating}
+                                                className="h-12 border-none rounded-xl bg-surface-container/30 ring-1 ring-on-surface/5 focus-visible:ring-2 focus-visible:ring-primary/20 transition-all text-xs px-5"
+                                                placeholder="••••••••••••••••"
+                                            />
+                                         </div>
+                                        <div className="space-y-4 md:col-span-2">
+                                            <Label htmlFor="scopes" className="text-[11px] font-bold tracking-tight text-on-surface-variant/40 ml-1 italic">05 // Claim scopes</Label>
+                                            <Input
+                                                id="scopes"
+                                                value={editingProvider.oidc_scopes || 'openid profile email'}
+                                                onChange={(e) => setEditingProvider({ ...editingProvider, oidc_scopes: e.target.value })}
+                                                className="h-12 border-none rounded-xl bg-surface-container/30 ring-1 ring-on-surface/5 focus-visible:ring-2 focus-visible:ring-primary/20 transition-all font-mono text-xs px-5"
+                                            />
+                                        </div>
+                                    </>
+                                )}
 
-                            <div className="flex items-center space-x-2 pt-2">
+                                 {editingProvider.type === 'saml' && (
+                                    <>
+                                        <div className="space-y-4 md:col-span-2">
+                                            <Label htmlFor="entity_id" className="text-[11px] font-bold tracking-tight text-on-surface-variant/40 ml-1 italic">02 // Subject identifier</Label>
+                                            <Input
+                                                id="entity_id"
+                                                value={editingProvider.saml_entity_id || ''}
+                                                onChange={(e) => setEditingProvider({ ...editingProvider, saml_entity_id: e.target.value })}
+                                                required
+                                                className="h-12 border-none rounded-xl bg-surface-container/30 ring-1 ring-on-surface/5 focus-visible:ring-2 focus-visible:ring-primary/20 transition-all font-mono text-xs px-5"
+                                                placeholder="SAML Entity ID"
+                                            />
+                                         </div>
+                                        <div className="space-y-4 md:col-span-2">
+                                            <Label htmlFor="sso_url" className="text-[11px] font-bold tracking-tight text-on-surface-variant/40 ml-1 italic">03 // Sso vector url</Label>
+                                            <div className="relative">
+                                                <Activity className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-on-surface-variant/40" />
+                                                <Input
+                                                    id="sso_url"
+                                                    type="url"
+                                                    value={editingProvider.saml_sso_url || ''}
+                                                    onChange={(e) => setEditingProvider({ ...editingProvider, saml_sso_url: e.target.value })}
+                                                    required
+                                                    className="h-12 border-none rounded-xl bg-surface-container/30 ring-1 ring-on-surface/5 focus-visible:ring-2 focus-visible:ring-primary/20 transition-all font-mono text-xs pl-12"
+                                                    placeholder="https://idp.saml.endpoint"
+                                                />
+                                            </div>
+                                         </div>
+                                        <div className="space-y-4 md:col-span-2">
+                                            <Label htmlFor="cert" className="text-[11px] font-bold tracking-tight text-on-surface-variant/40 ml-1 italic">04 // Pem certification logic</Label>
+                                            <textarea
+                                                id="cert"
+                                                className="flex min-h-[200px] w-full border-none rounded-2xl bg-surface-container/50 ring-1 ring-on-surface/5 p-6 font-mono text-[11px] leading-relaxed focus:outline-none focus:ring-2 focus:ring-primary/20 custom-scrollbar-dark text-on-surface"
+                                                value={editingProvider.saml_certificate || ''}
+                                                onChange={(e) => setEditingProvider({ ...editingProvider, saml_certificate: e.target.value })}
+                                                rows={8}
+                                                placeholder="-----BEGIN CERTIFICATE-----..."
+                                            />
+                                        </div>
+
+                                        <div className="flex flex-wrap gap-8 pt-4 md:col-span-2">
+                                            <div className="flex items-center space-x-3 group cursor-pointer">
+                                                <Switch
+                                                    id="saml-sign-assertions"
+                                                    checked={editingProvider.saml_sign_assertions ?? true}
+                                                    onCheckedChange={checked => setEditingProvider({ ...editingProvider, saml_sign_assertions: checked })}
+                                                    className="data-[state=checked]:bg-primary"
+                                                />
+                                                 <Label htmlFor="saml-sign-assertions" className="flex items-center gap-2 cursor-pointer">
+                                                    <ShieldCheck className="h-4 w-4 text-primary" />
+                                                    <span className="text-[11px] font-bold tracking-tight text-on-surface-variant/60 group-hover:text-on-surface transition-colors">Sign assertions</span>
+                                                </Label>
+                                            </div>
+                                            <div className="flex items-center space-x-3 group cursor-pointer">
+                                                <Switch
+                                                    id="saml-encrypt-assertions"
+                                                    checked={editingProvider.saml_encrypt_assertions ?? false}
+                                                    onCheckedChange={checked => setEditingProvider({ ...editingProvider, saml_encrypt_assertions: checked })}
+                                                    className="data-[state=checked]:bg-amber-500"
+                                                />
+                                                 <Label htmlFor="saml-encrypt-assertions" className="flex items-center gap-2 cursor-pointer">
+                                                    <Lock className="h-4 w-4 text-amber-500" />
+                                                    <span className="text-[11px] font-bold tracking-tight text-on-surface-variant/60 group-hover:text-on-surface transition-colors">Encrypt assertions</span>
+                                                </Label>
+                                            </div>
+                                        </div>
+                                    </>
+                                )}
+                            </div>
+
+                            <div className="flex items-center space-x-5 p-6 rounded-2xl bg-primary/5 ring-1 ring-primary/10 border-none shadow-sm">
                                 <Switch
                                     id="auto-create"
                                     checked={editingProvider.auto_create_users ?? true}
                                     onCheckedChange={(checked) => setEditingProvider({ ...editingProvider, auto_create_users: checked })}
+                                    className="data-[state=checked]:bg-primary"
                                 />
-                                <Label htmlFor="auto-create">Auto-create users on successful login</Label>
+                                 <div className="space-y-1">
+                                    <Label htmlFor="auto-create" className="text-[12px] font-bold cursor-pointer leading-none text-on-surface">Auto-provision sync cells</Label>
+                                    <p className="text-[10px] font-medium text-on-surface-variant/40 italic">Automatically instantiate user records upon successful federation handshake.</p>
+                                </div>
+                            </div>
+
+                            <div className="flex justify-end gap-4 pt-10 border-t border-on-surface/5">
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    onClick={() => setEditingProvider(null)}
+                                    className="h-12 px-10 rounded-xl font-bold text-[12px] tracking-tight text-on-surface-variant/40 hover:text-on-surface hover:bg-surface-container transition-all"
+                                >
+                                    Discard
+                                </Button>
+                                <Button
+                                    type="submit"
+                                    className="h-12 rounded-xl font-bold text-[12px] tracking-tight px-12 shadow-xl shadow-primary/20 transition-all"
+                                >
+                                    Save architecture
+                                </Button>
                             </div>
                         </form>
-                    </CardContent>
-                    <CardFooter className="flex justify-between">
-                        <Button variant="ghost" onClick={() => setEditingProvider(null)}>Cancel</Button>
-                        <Button type="submit" form="sso-form">Save Configuration</Button>
-                    </CardFooter>
-                </Card>
+                    </GlassCardContent>
+                </GlassCard>
             )}
         </div>
     );

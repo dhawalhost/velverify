@@ -7,10 +7,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dhawalhost/wardseal/internal/oauthclient"
-	"github.com/dhawalhost/wardseal/internal/saml"
 	"github.com/gin-gonic/gin"
 	"github.com/lib/pq"
+
+	"github.com/dhawalhost/wardseal/internal/oauthclient"
+	"github.com/dhawalhost/wardseal/internal/saml"
 )
 
 func TestPKCEFlowWithClientStore(t *testing.T) {
@@ -116,7 +117,7 @@ func newServiceWithStore(t *testing.T, store oauthclient.Repository) Service {
 		BaseURL:             "http://wardseal.com",
 		DirectoryServiceURL: "http://dir-service",
 		ClientStore:         store,
-		SAMLStore:           saml.NewStore(nil),
+		SAMLStore:           saml.NewStore(nil, "", "", ""),
 	})
 	if err != nil {
 		t.Fatalf("failed to create auth service with store: %v", err)

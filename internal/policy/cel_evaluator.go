@@ -51,7 +51,7 @@ func (e *CELEvaluator) Evaluate(ctx context.Context, input Input, p *Policy) (bo
 	// 1. Compile the expression
 	ast, iss := e.env.Compile(rule)
 	if iss.Err() != nil {
-		return false, "", fmt.Errorf("failed to compile CEL expression: %v", iss.Err())
+		return false, "", fmt.Errorf("failed to compile CEL expression: %w", iss.Err())
 	}
 
 	// 2. Create the program

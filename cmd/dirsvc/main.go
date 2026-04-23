@@ -6,27 +6,29 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
 	"time"
 
-	"github.com/dhawalhost/wardseal/internal/directory"
-	"github.com/dhawalhost/wardseal/internal/scim"
-	"github.com/dhawalhost/wardseal/pkg/config"
-	"github.com/dhawalhost/wardseal/pkg/database"
-	"github.com/dhawalhost/wardseal/pkg/middleware"
-	wardsealobs "github.com/dhawalhost/wardseal/pkg/observability"
 	gokitconfig "github.com/dhawalhost/gokit/config"
 	"github.com/dhawalhost/gokit/health"
 	"github.com/dhawalhost/gokit/logger"
 	gokitmiddleware "github.com/dhawalhost/gokit/middleware"
 	"github.com/dhawalhost/gokit/observability"
-	"github.com/dhawalhost/wardseal/pkg/eventbus"
-	"github.com/dhawalhost/wardseal/pkg/eventbus/redisbus"
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/go-redis/redis/v8"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 	"go.uber.org/zap"
+
+	"github.com/dhawalhost/wardseal/internal/audit"
+	"github.com/dhawalhost/wardseal/internal/directory"
+	"github.com/dhawalhost/wardseal/internal/scim"
+	"github.com/dhawalhost/wardseal/pkg/config"
+	"github.com/dhawalhost/wardseal/pkg/database"
+	"github.com/dhawalhost/wardseal/pkg/eventbus"
+	"github.com/dhawalhost/wardseal/pkg/eventbus/redisbus"
+	"github.com/dhawalhost/wardseal/pkg/middleware"
+	wardsealobs "github.com/dhawalhost/wardseal/pkg/observability"
 )
 
 func main() {
@@ -75,6 +77,10 @@ func main() {
 	repo := directory.NewRepository(db)
 	svc := directory.NewService(repo, bus)
 
+	// Initialize Audit service for SCIM and administration logging
+	auditRepo := audit.NewRepository(db)
+	auditSvc := audit.NewService(auditRepo)
+
 	serviceToken := cfg.Directory.ServiceAuthToken
 	if serviceToken.IsEmpty() {
 		serviceToken = "dev-internal-token" //nolint:gosec // G101: dev-only fallback, not production credentials
@@ -84,27 +90,20 @@ func main() {
 
 	router := gin.Default()
 
-	// CORS configuration
-	if len(cfg.Governance.CORSAllowedOrigins) > 0 {
-		origins := cfg.Governance.CORSAllowedOrigins
-		router.Use(func(c *gin.Context) {
-			origin := c.Request.Header.Get("Origin")
-			for _, allowed := range origins {
-				if strings.TrimSpace(allowed) == origin {
-					c.Header("Access-Control-Allow-Origin", origin)
-					c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
-					c.Header("Access-Control-Allow-Headers", "Origin, Content-Type, Authorization, X-Tenant-ID, X-User-ID, X-Device-ID, X-OS-Version")
-					c.Header("Access-Control-Allow-Credentials", "true")
-					break
-				}
-			}
-			if c.Request.Method == "OPTIONS" {
-				c.AbortWithStatus(204)
-				return
-			}
-			c.Next()
-		})
+	// Standardized CORS configuration (Must be at the TOP for Pre-flights)
+	origins := cfg.Governance.CORSAllowedOrigins
+	if len(origins) == 0 {
+		origins = []string{"http://localhost:5173", "http://127.0.0.1:5173"}
 	}
+
+	router.Use(cors.New(cors.Config{
+		AllowOrigins:     origins,
+		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization", "X-Tenant-ID", "X-User-ID", "X-Device-ID", "X-OS-Version", "X-Tenant-Role", "Accept", "X-Requested-With", "Accept-Encoding", "Cache-Control"},
+		ExposeHeaders:    []string{"Content-Length", "Access-Control-Allow-Origin", "X-Service-Auth"},
+		AllowCredentials: true,
+		MaxAge:           12 * time.Hour,
+	}))
 
 	// Initialize OpenTelemetry tracing
 	shutdownTracer, err := observability.InitTracer(context.Background(), gokitconfig.TelemetryConfig{
@@ -122,7 +121,6 @@ func main() {
 	router.Use(otelgin.Middleware("dirsvc"))
 	router.Use(wardsealobs.PrometheusMiddleware(metrics))
 	router.Use(middleware.Wrap(gokitmiddleware.RequestID())) // Inject tracing ID
-	router.Use(middleware.APILogger(nil, log))
 
 	// Security Middleware
 	router.Use(middleware.Wrap(gokitmiddleware.SecureHeaders()))
@@ -193,7 +191,7 @@ func main() {
 	api.RegisterRoutes(router)
 
 	// Register SCIM routes
-	scimSvc := scim.NewService(svc)
+	scimSvc := scim.NewService(svc, auditSvc)
 	scimHandlers := scim.NewHTTPHandler(scimSvc, repo, serviceToken.Raw(), log)
 	scimHandlers.RegisterRoutes(router)
 

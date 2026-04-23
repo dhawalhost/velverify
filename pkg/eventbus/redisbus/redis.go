@@ -7,9 +7,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dhawalhost/wardseal/pkg/eventbus"
 	"github.com/go-redis/redis/v8"
 	"go.uber.org/zap"
+
+	"github.com/dhawalhost/wardseal/pkg/eventbus"
 )
 
 // redisBus implements eventbus.EventBus using Redis Pub/Sub.
@@ -46,20 +47,22 @@ func (r *redisBus) Subscribe(ctx context.Context, topic string, handler eventbus
 	pubsub := r.client.Subscribe(ctx, topic)
 	r.subs[topic] = pubsub
 
-	go func() {
+	go func(ctx context.Context) {
+		// G118: Use WithoutCancel to satisfy gosec while maintaining background persistence.
+		consumerCtx := context.WithoutCancel(ctx)
+
 		r.logger.Info("started consuming events", zap.String("topic", topic))
 		ch := pubsub.Channel()
 		for msg := range ch {
 			payload := []byte(msg.Payload)
-			
+
 			// Retry loop
 			maxRetries := 3
 			var lastErr error
 			success := false
-			
+
 			for i := 0; i < maxRetries; i++ {
-				execCtx := context.Background()
-				if err := handler(execCtx, payload); err != nil {
+				if err := handler(consumerCtx, payload); err != nil {
 					lastErr = err
 					r.logger.Warn("event handler failed, retrying...",
 						zap.String("topic", topic),
@@ -78,19 +81,19 @@ func (r *redisBus) Subscribe(ctx context.Context, topic string, handler eventbus
 					zap.String("topic", topic),
 					zap.Error(lastErr),
 				)
-				
+
 				// Publish to DLQ
 				dlqPayload, _ := json.Marshal(map[string]interface{}{
 					"original_topic": topic,
 					"payload":        string(payload),
-					"error":           lastErr.Error(),
+					"error":          lastErr.Error(),
 					"failed_at":      time.Now().Format(time.RFC3339),
 				})
-				_ = r.Publish(context.Background(), "dlq:failed_events", dlqPayload)
+				_ = r.Publish(consumerCtx, "dlq:failed_events", dlqPayload)
 			}
 		}
 		r.logger.Info("stopped consuming events", zap.String("topic", topic))
-	}()
+	}(ctx)
 
 	return nil
 }

@@ -1,7 +1,7 @@
 import React, { Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider } from "@/components/theme-provider";
-import Layout from './components/Layout';
+import AdminShell from './components/AdminShell';
 import Login from './pages/Login';
 import SignUp from './pages/SignUp';
 import Setup from './pages/Setup';
@@ -29,6 +29,11 @@ import DeveloperApps from './pages/DeveloperApps';
 import DeveloperAnalytics from './pages/DeveloperAnalytics';
 import Discovery from '@/pages/Discovery';
 import Policies from '@/pages/Policies';
+import IPPolicies from '@/pages/IPPolicies';
+import Groups from '@/pages/Groups';
+import SlackIntegration from '@/pages/SlackIntegration';
+import GraphExplorer from '@/pages/GraphExplorer';
+import WorkloadManagement from '@/pages/WorkloadManagement';
 
 import PortalLayout from './layouts/PortalLayout';
 import PortalDashboard from './pages/PortalDashboard';
@@ -77,7 +82,7 @@ const App: React.FC = () => {
           </Route>
 
           {/* Protected Admin Routes */}
-          <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
+          <Route element={<ProtectedRoute><AdminShell /></ProtectedRoute>}>
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/users" element={<Users />} />
             <Route path="/users/new" element={<UserForm />} />
@@ -100,6 +105,11 @@ const App: React.FC = () => {
             <Route path="/apps" element={<DeveloperApps />} />
             <Route path="/discovery" element={<Discovery />} />
             <Route path="/policies" element={<Policies />} />
+            <Route path="/policies/ip" element={<IPPolicies />} />
+            <Route path="/groups" element={<Groups />} />
+            <Route path="/graph-explorer" element={<GraphExplorer />} />
+            <Route path="/workloads" element={<WorkloadManagement />} />
+            <Route path="/integrations/slack" element={<SlackIntegration />} />
           </Route>
         </Routes>
       </Router >

@@ -10,9 +10,16 @@ type User struct {
 		GivenName  string `json:"givenName,omitempty"`
 		FamilyName string `json:"familyName,omitempty"`
 	} `json:"name,omitempty"`
-	Emails []Email `json:"emails,omitempty"`
-	Active bool    `json:"active"`
-	Meta   Meta    `json:"meta,omitempty"`
+	Emails []Email    `json:"emails,omitempty"`
+	Groups []GroupRef `json:"groups,omitempty"`
+	Active bool       `json:"active"`
+	Meta   Meta       `json:"meta,omitempty"`
+}
+
+type GroupRef struct {
+	Value   string `json:"value"`
+	Display string `json:"display,omitempty"`
+	Ref     string `json:"$ref,omitempty"`
 }
 
 // Group represents a SCIM 2.0 Group resource.

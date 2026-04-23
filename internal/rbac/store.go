@@ -153,7 +153,7 @@ func (s *sqlRepository) RemovePermissionFromRole(ctx context.Context, roleID, pe
 }
 
 func (s *sqlRepository) AssignRoleToUser(ctx context.Context, tenantID, userID, roleID string, assignedBy *string) error {
-	// By default, no expiration. Specific duration is set via specialized wrapper if needed, 
+	// By default, no expiration. Specific duration is set via specialized wrapper if needed,
 	// but here we allow it to be updated separately or we could add it to params.
 	// For simplicity in the repository, we'll add an internal method or just Exec direct.
 	_, err := s.db.ExecContext(ctx,

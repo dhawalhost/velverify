@@ -5,10 +5,11 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/dhawalhost/wardseal/internal/directory"
-	"github.com/dhawalhost/wardseal/pkg/middleware"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
+
+	"github.com/dhawalhost/wardseal/internal/directory"
+	"github.com/dhawalhost/wardseal/pkg/middleware"
 )
 
 // HTTPHandler handles SCIM HTTP requests.
@@ -31,6 +32,11 @@ func (h *HTTPHandler) RegisterRoutes(router *gin.Engine) {
 	// Apply SCIM specific Bearer token authentication
 	group.Use(directory.RequireSCIMBearerToken(h.repo, h.logger, h.serviceAuthToken))
 	group.Use(scimContentType())
+
+	// SCIM Metadata Endpoints
+	group.GET("/ServiceProviderConfig", h.getServiceProviderConfig)
+	group.GET("/ResourceTypes", h.getResourceTypes)
+	group.GET("/Schemas", h.getSchemas)
 
 	group.GET("/Users", h.listUsers)
 	group.GET("/Users/:id", h.getUser)

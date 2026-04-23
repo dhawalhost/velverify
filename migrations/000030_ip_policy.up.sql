@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS ip_policy (
     id UUID PRIMARY KEY,
-    tenant_id UUID NOT NULL,
+    tenant_id VARCHAR(255) NOT NULL,
     type VARCHAR(10) NOT NULL CHECK (type IN ('ALLOW', 'BLOCK')),
     cidr VARCHAR(50),
     country VARCHAR(2),

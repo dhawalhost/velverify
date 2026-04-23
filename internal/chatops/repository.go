@@ -5,22 +5,23 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/dhawalhost/wardseal/pkg/kms"
 	"github.com/jmoiron/sqlx"
+
+	"github.com/dhawalhost/wardseal/pkg/kms"
 )
 
 // SlackIntegration represents a tenant's connection to a Slack workspace.
 type SlackIntegration struct {
-	ID             string    `db:"id"`
-	TenantID       string    `db:"tenant_id"`
-	TeamID         string    `db:"team_id"` // Slack's internal workspace ID
-	AppID          string    `db:"app_id"`
-	BotTokenEnc    []byte    `db:"bot_token_enc"`
-	SigningSecretEnc []byte  `db:"signing_secret_enc"`
-	WebhookURL     string    `db:"webhook_url"`
-	IsEnabled      bool      `db:"is_enabled"`
-	CreatedAt      time.Time `db:"created_at"`
-	UpdatedAt      time.Time `db:"updated_at"`
+	ID               string    `db:"id"`
+	TenantID         string    `db:"tenant_id"`
+	TeamID           string    `db:"team_id"` // Slack's internal workspace ID
+	AppID            string    `db:"app_id"`
+	BotTokenEnc      []byte    `db:"bot_token_enc"`
+	SigningSecretEnc []byte    `db:"signing_secret_enc"`
+	WebhookURL       string    `db:"webhook_url"`
+	IsEnabled        bool      `db:"is_enabled"`
+	CreatedAt        time.Time `db:"created_at"`
+	UpdatedAt        time.Time `db:"updated_at"`
 
 	// Decrypted fields (not persisted)
 	BotToken      string `db:"-"`
@@ -74,8 +75,8 @@ func (r *sqlRepository) Upsert(ctx context.Context, si SlackIntegration) error {
 			webhook_url = EXCLUDED.webhook_url,
 			is_enabled = EXCLUDED.is_enabled,
 			updated_at = NOW()`
-	
-	_, err := r.db.ExecContext(ctx, query, 
+
+	_, err := r.db.ExecContext(ctx, query,
 		si.TenantID, si.TeamID, si.AppID, si.BotTokenEnc, si.SigningSecretEnc, si.WebhookURL, si.IsEnabled)
 	return err
 }

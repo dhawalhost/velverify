@@ -32,9 +32,9 @@ type Repository interface {
 	UpdateGroup(ctx context.Context, tenantID, id, name string) error
 	DeleteGroup(ctx context.Context, tenantID, id string) error
 
-	// Membership
 	AddUserToGroup(ctx context.Context, tenantID, userID, groupID string) error
 	RemoveUserFromGroup(ctx context.Context, tenantID, userID, groupID string) error
+	ListGroupMembers(ctx context.Context, tenantID, groupID string) ([]User, error)
 
 	// Organization
 	AddUserToOrganization(ctx context.Context, tenantID, userID, orgID, role string) error
@@ -240,6 +240,17 @@ func (r *sqlRepository) AddUserToGroup(ctx context.Context, tenantID, userID, gr
 func (r *sqlRepository) RemoveUserFromGroup(ctx context.Context, tenantID, userID, groupID string) error {
 	_, err := r.db.ExecContext(ctx, `DELETE FROM identity_groups WHERE identity_id = $1 AND group_id = $2 AND tenant_id = $3`, userID, groupID, tenantID)
 	return err
+}
+
+func (r *sqlRepository) ListGroupMembers(ctx context.Context, tenantID, groupID string) ([]User, error) {
+	var users []User
+	query := `SELECT i.id, i.tenant_id, a.login AS email, i.status, i.created_at, i.updated_at
+		FROM identities i
+		JOIN accounts a ON i.id = a.identity_id
+		JOIN identity_groups ig ON i.id = ig.identity_id
+		WHERE ig.group_id = $1 AND i.tenant_id = $2`
+	err := r.db.SelectContext(ctx, &users, query, groupID, tenantID)
+	return users, err
 }
 
 func (r *sqlRepository) AddUserToOrganization(ctx context.Context, tenantID, userID, orgID, role string) error {

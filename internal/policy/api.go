@@ -21,7 +21,7 @@ func NewHTTPHandler(svc Service, logger *zap.Logger) *HTTPHandler {
 // RegisterRoutes registers the policy routes.
 func (h *HTTPHandler) RegisterRoutes(router *gin.Engine) {
 	router.GET("/health", h.healthCheck)
-	
+
 	api := router.Group("/api/v1/policies")
 	{
 		api.GET("", h.listPolicies)

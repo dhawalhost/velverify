@@ -13,6 +13,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gin-gonic/gin"
+	"github.com/jmoiron/sqlx"
+	"go.uber.org/zap"
+
 	"github.com/dhawalhost/wardseal/internal/audit"
 	"github.com/dhawalhost/wardseal/internal/auth"
 	"github.com/dhawalhost/wardseal/internal/connector"
@@ -21,14 +25,11 @@ import (
 	"github.com/dhawalhost/wardseal/internal/oauthclient"
 	"github.com/dhawalhost/wardseal/internal/policy"
 	"github.com/dhawalhost/wardseal/internal/rbac"
+	"github.com/dhawalhost/wardseal/internal/saml"
 	"github.com/dhawalhost/wardseal/internal/sso"
 	"github.com/dhawalhost/wardseal/internal/webhook"
-	"github.com/dhawalhost/wardseal/internal/saml"
 	"github.com/dhawalhost/wardseal/pkg/database"
 	"github.com/dhawalhost/wardseal/pkg/middleware"
-	"github.com/gin-gonic/gin"
-	"github.com/jmoiron/sqlx"
-	"go.uber.org/zap"
 )
 
 // TestEnv holds the test environment configuration.
@@ -196,7 +197,7 @@ func (env *TestEnv) setupServers(t *testing.T) {
 	orgRepo := governance.NewOrganizationRepository(env.DB)
 	endpointRepo := governance.NewEndpointRepository(env.DB)
 	dirClient := governance.NewDirectoryClient(env.DirServer.URL, "", "")
-	
+
 	policyRepo := policy.NewRepository(env.DB)
 	policyEngine := policy.NewSimpleEngine(policyRepo)
 

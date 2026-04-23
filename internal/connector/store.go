@@ -5,8 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/dhawalhost/wardseal/pkg/kms"
 	"github.com/jmoiron/sqlx"
+
+	"github.com/dhawalhost/wardseal/pkg/kms"
 )
 
 // Repository defines connector storage operations.

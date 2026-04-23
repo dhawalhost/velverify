@@ -14,7 +14,7 @@ func (e *DeviceTrustEvaluator) Name() string {
 
 func (e *DeviceTrustEvaluator) Evaluate(ctx context.Context, input Input, p *Policy) (bool, string, error) {
 	trustStatus, ok := input.Context["device_trust"].(string)
-	
+
 	// If the context is missing or status is not 'trusted', fail the policy
 	if !ok || trustStatus != "trusted" {
 		displayReason := fmt.Sprintf("Tenant Policy Violation: %s - A trusted device is required for this action", p.Name)

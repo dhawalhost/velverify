@@ -20,10 +20,35 @@ type SecurityEvent struct {
 	CreatedAt time.Time `db:"created_at" json:"created_at"`
 }
 
-// SignalRepository defines storage for security events.
+// LoginSignal specifically tracks authentication success.
+type LoginSignal struct {
+	ID        string    `db:"id"`
+	TenantID  string    `db:"tenant_id"`
+	SubjectID string    `db:"subject_id"`
+	IPAddress string    `db:"ip_address"`
+	Timestamp time.Time `db:"timestamp"`
+}
+
+// UserRisk represents the current security posture of a user.
+type UserRisk struct {
+	UserID          string    `db:"user_id"`
+	TenantID        string    `db:"tenant_id"`
+	Score           int       `db:"score"`
+	Level           string    `db:"level"`
+	Factors         string    `db:"factors"` // JSONB string
+	LastEvaluatedAt time.Time `db:"last_evaluated_at"`
+}
+
+// SignalRepository defines storage for security events and risk state.
 type SignalRepository interface {
 	Ingest(ctx context.Context, event *SecurityEvent) error
+	IngestLogin(ctx context.Context, signal *LoginSignal) error
 	GetLatestCriticalEvent(ctx context.Context, subjectID string, since time.Time) (*SecurityEvent, error)
+	GetLatestSuccess(ctx context.Context, subjectID string) (*LoginSignal, error)
+
+	// Risk Persistence
+	UpdateUserRisk(ctx context.Context, risk UserRisk) error
+	GetHighRiskUsers(ctx context.Context, tenantID string, threshold int) ([]UserRisk, error)
 }
 
 type sqlSignalRepository struct {
@@ -53,9 +78,6 @@ func (r *sqlSignalRepository) Ingest(ctx context.Context, event *SecurityEvent) 
 }
 
 func (r *sqlSignalRepository) GetLatestCriticalEvent(ctx context.Context, subjectID string, since time.Time) (*SecurityEvent, error) {
-	// Check for events that revoke access (password changes, compromised sessions/devices)
-	// For MVP, we check ANY event in this table for the subject since the time.
-	// In reality, we'd filter by critical types.
 	query := `
 		SELECT * FROM security_events 
 		WHERE subject_id = $1 AND event_time > $2
@@ -65,7 +87,66 @@ func (r *sqlSignalRepository) GetLatestCriticalEvent(ctx context.Context, subjec
 	var event SecurityEvent
 	err := r.db.GetContext(ctx, &event, query, subjectID, since)
 	if err != nil {
-		return nil, err // Returns error if no rows, likely sql.ErrNoRows which caller handles
+		return nil, err
 	}
 	return &event, nil
+}
+
+func (r *sqlSignalRepository) IngestLogin(ctx context.Context, s *LoginSignal) error {
+	if s.ID == "" {
+		s.ID = uuid.New().String()
+	}
+	if s.Timestamp.IsZero() {
+		s.Timestamp = time.Now()
+	}
+	query := `
+		INSERT INTO login_signals (id, tenant_id, subject_id, ip_address, timestamp)
+		VALUES ($1, $2, $3, $4, $5)
+	`
+	_, err := r.db.ExecContext(ctx, query, s.ID, s.TenantID, s.SubjectID, s.IPAddress, s.Timestamp)
+	return err
+}
+
+func (r *sqlSignalRepository) GetLatestSuccess(ctx context.Context, subjectID string) (*LoginSignal, error) {
+	query := `
+		SELECT * FROM login_signals 
+		WHERE subject_id = $1 
+		ORDER BY timestamp DESC
+		LIMIT 1
+	`
+	var s LoginSignal
+	err := r.db.GetContext(ctx, &s, query, subjectID)
+	if err != nil {
+		return nil, err
+	}
+	return &s, nil
+}
+
+func (r *sqlSignalRepository) UpdateUserRisk(ctx context.Context, risk UserRisk) error {
+	query := `
+		INSERT INTO user_risk_levels (user_id, tenant_id, score, level, factors, last_evaluated_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, NOW())
+		ON CONFLICT (user_id) DO UPDATE SET
+			score = EXCLUDED.score,
+			level = EXCLUDED.level,
+			factors = EXCLUDED.factors,
+			last_evaluated_at = EXCLUDED.last_evaluated_at,
+			updated_at = NOW()
+	`
+	_, err := r.db.ExecContext(ctx, query,
+		risk.UserID,
+		risk.TenantID,
+		risk.Score,
+		risk.Level,
+		risk.Factors,
+		risk.LastEvaluatedAt,
+	)
+	return err
+}
+
+func (r *sqlSignalRepository) GetHighRiskUsers(ctx context.Context, tenantID string, threshold int) ([]UserRisk, error) {
+	var risks []UserRisk
+	query := `SELECT * FROM user_risk_levels WHERE score >= $1 AND tenant_id = $2 ORDER BY score DESC`
+	err := r.db.SelectContext(ctx, &risks, query, threshold, tenantID)
+	return risks, err
 }

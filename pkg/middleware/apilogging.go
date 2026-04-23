@@ -72,7 +72,9 @@ func APILogger(db *sqlx.DB, logger *zap.Logger) gin.HandlerFunc {
 		path := c.Request.URL.Path
 		ip := c.ClientIP()
 
-		go logToDB(db, logger, tenantID, clientID, method, path, statusCode, latency, ip, reqBodyBytes, resBody.Bytes())
+		if db != nil {
+			go logToDB(db, logger, tenantID, clientID, method, path, statusCode, latency, ip, reqBodyBytes, resBody.Bytes())
+		}
 	}
 }
 

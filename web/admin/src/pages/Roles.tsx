@@ -1,13 +1,12 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { getRoles, createRole, deleteRole, getPermissions, createPermission, getRolePermissions, assignPermissionToRole } from '../api';
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@/components/ui/table';
-import { Loader2, Plus, Trash2, Shield, Lock, ChevronRight } from 'lucide-react';
-import { Separator } from '@/components/ui/separator';
+import { TableBody, TableCell } from '@/components/ui/table';
+import { Loader2, Plus, Trash2, Shield, Lock, ChevronRight, ShieldCheck, Fingerprint, Command } from 'lucide-react';
+import { PageHeader, GlassCard, GlassCardHeader, GlassCardTitle, GlassCardContent, GlassTable, GlassTableHeader, GlassTableHead, GlassTableRow } from '@/components/layout';
 
 interface Role {
     id: string;
@@ -23,7 +22,7 @@ interface Permission {
     description: string;
 }
 
-export default function Roles() {
+const Roles: React.FC = () => {
     const [roles, setRoles] = useState<Role[]>([]);
     const [permissions, setPermissions] = useState<Permission[]>([]);
     const [selectedRole, setSelectedRole] = useState<Role | null>(null);
@@ -33,9 +32,7 @@ export default function Roles() {
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<'roles' | 'permissions'>('roles');
 
-    useEffect(() => {
-        loadData();
-    }, []);
+    useEffect(() => { loadData(); }, []);
 
     useEffect(() => {
         if (selectedRole) {
@@ -109,257 +106,319 @@ export default function Roles() {
         }
     };
 
-    if (loading) return <div className="p-8 flex items-center justify-center h-96"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>;
+    if (loading) return <div className="h-[400px] flex items-center justify-center"><Loader2 className="h-10 w-10 animate-spin text-primary opacity-20" /></div>;
 
     return (
-        <div className="space-y-6">
-            <div className="flex justify-between items-center">
-                <div>
-                    <h1 className="text-3xl font-bold tracking-tight">Roles & Permissions</h1>
-                    <p className="text-muted-foreground mt-1">
-                        Define roles and assign fine-grained permissions.
-                    </p>
-                </div>
-                <div className="flex bg-muted p-1 rounded-lg">
-                    <Button
-                        variant={activeTab === 'roles' ? 'default' : 'ghost'}
-                        size="sm"
-                        onClick={() => setActiveTab('roles')}
-                        className="rounded-md"
-                    >
-                        <Shield className="mr-2 h-4 w-4" />
-                        Roles
-                    </Button>
-                    <Button
-                        variant={activeTab === 'permissions' ? 'default' : 'ghost'}
-                        size="sm"
-                        onClick={() => setActiveTab('permissions')}
-                        className="rounded-md"
-                    >
-                        <Lock className="mr-2 h-4 w-4" />
-                        Permissions
-                    </Button>
-                </div>
-            </div>
-
-            <Separator />
+        <div className="space-y-10 animate-in fade-in duration-700">
+            <PageHeader
+                icon={<Shield className="w-8 h-8 text-primary" />}
+                title="Sentry & Access"
+                description="Orchestrate security roles and cryptographic permission protocols across the administrative matrix."
+                actions={
+                    <div className="flex bg-surface-container/50 p-1 rounded-2xl ring-1 ring-on-surface/5">
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setActiveTab('roles')}
+                            className={`rounded-xl font-bold tracking-tight text-[11px] h-10 px-6 transition-all ${activeTab === 'roles' ? 'bg-white text-primary shadow-sm' : 'text-on-surface-variant/40 hover:text-on-surface'}`}
+                        >
+                            Roles Registry
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setActiveTab('permissions')}
+                            className={`rounded-xl font-bold tracking-tight text-[11px] h-10 px-6 transition-all ${activeTab === 'permissions' ? 'bg-white text-primary shadow-sm' : 'text-on-surface-variant/40 hover:text-on-surface'}`}
+                        >
+                            Permission Vectors
+                        </Button>
+                    </div>
+                }
+            />
 
             {activeTab === 'roles' ? (
-                <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
-
-                    {/* LEFT: ROLES LIST */}
-                    <div className="md:col-span-4 space-y-6">
-                        <Card>
-                            <CardHeader>
-                                <CardTitle className="text-lg">Create Role</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <form onSubmit={handleCreateRole} className="space-y-4">
-                                    <div className="space-y-2">
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-10 items-start">
+                    {/* LEFT: ROLES MANAGEMENT */}
+                    <div className="md:col-span-4 space-y-10">
+                        <GlassCard className="border-none shadow-xl shadow-on-surface/5 bg-white overflow-hidden rounded-[24px]">
+                            <GlassCardHeader className="bg-primary p-8 text-white">
+                                <div className="flex items-center gap-4">
+                                    <div className="p-2.5 bg-white/20 rounded-xl backdrop-blur-md">
+                                        <Plus className="w-5 h-5 text-white" />
+                                    </div>
+                                    <GlassCardTitle className="text-xl font-bold tracking-tight">Define Role</GlassCardTitle>
+                                </div>
+                            </GlassCardHeader>
+                            <GlassCardContent className="p-8">
+                                <form onSubmit={handleCreateRole} className="space-y-8">
+                                    <div className="space-y-2.5">
+                                        <Label className="text-[12px] font-bold tracking-tight text-on-surface-variant/40 ml-1">Role Identifier</Label>
                                         <Input
-                                            placeholder="Role Name"
+                                            placeholder="e.g. CORE_OPERATOR"
                                             value={newRole.name}
                                             onChange={(e) => setNewRole({ ...newRole, name: e.target.value })}
+                                            className="h-12 border-none rounded-xl bg-surface-container/30 ring-1 ring-on-surface/5 focus-visible:ring-2 focus-visible:ring-primary/20 font-medium transition-all"
                                             required
                                         />
+                                    </div>
+                                     <div className="space-y-2.5">
+                                         <Label className="text-[12px] font-bold tracking-tight text-on-surface-variant/40 ml-1">System metadata</Label>
                                         <Input
-                                            placeholder="Description"
+                                            placeholder="Operational privilege set..."
                                             value={newRole.description}
                                             onChange={(e) => setNewRole({ ...newRole, description: e.target.value })}
+                                            className="h-12 border-none rounded-xl bg-surface-container/30 ring-1 ring-on-surface/5 focus-visible:ring-2 focus-visible:ring-primary/20 font-medium transition-all"
                                         />
-                                        <Button type="submit" className="w-full">
-                                            <Plus className="mr-2 h-4 w-4" /> Add Role
-                                        </Button>
                                     </div>
+                                     <Button type="submit" className="w-full h-12 rounded-xl font-bold text-sm shadow-md shadow-primary/10">
+                                         Initialize role
+                                     </Button>
                                 </form>
-                            </CardContent>
-                        </Card>
+                            </GlassCardContent>
+                        </GlassCard>
 
-                        <Card className="h-[calc(100vh-400px)] flex flex-col">
-                            <CardHeader className="pb-3 border-b">
-                                <CardTitle className="text-lg">Roles</CardTitle>
-                            </CardHeader>
-                            <div className="flex-1 overflow-y-auto p-2 space-y-2">
+                        <GlassCard className="border-none shadow-xl shadow-on-surface/5 bg-white overflow-hidden flex flex-col h-[600px] rounded-[24px]">
+                            <GlassCardHeader className="py-8 px-8 border-b border-on-surface/5">
+                                 <GlassCardTitle className="text-lg font-bold tracking-tight text-on-surface">Roles index</GlassCardTitle>
+                                 <p className="text-[12px] font-bold text-on-surface-variant/40 mt-1 tracking-tight">{roles.length} Registered identifiers</p>
+                            </GlassCardHeader>
+                            <div className="flex-1 overflow-y-auto p-4 space-y-2 custom-scrollbar">
                                 {roles.map(role => (
                                     <div
                                         key={role.id}
                                         onClick={() => setSelectedRole(role)}
                                         className={`
-                                            group flex items-center justify-between p-3 rounded-md cursor-pointer transition-all border
+                                            group flex items-center justify-between p-5 cursor-pointer transition-all rounded-2xl
                                             ${selectedRole?.id === role.id
-                                                ? 'bg-primary/5 border-primary/20 shadow-sm'
-                                                : 'hover:bg-muted border-transparent hover:border-border'}
+                                                ? 'bg-primary/5 ring-1 ring-primary/20'
+                                                : 'bg-white hover:bg-surface-container/30 ring-1 ring-on-surface/5 hover:ring-on-surface/10'}
                                         `}
                                     >
-                                        <div className="min-w-0 flex-1 mr-2">
-                                            <div className="font-medium truncate flex items-center gap-2">
-                                                <Shield className="h-3 w-3 text-muted-foreground" />
+                                        <div className="min-w-0 pr-4">
+                                            <div className={`font-bold text-sm tracking-tight truncate flex items-center gap-3 transition-colors ${selectedRole?.id === role.id ? 'text-primary' : 'text-on-surface'}`}>
+                                                <Fingerprint className={`h-4 w-4 opacity-40 ${selectedRole?.id === role.id ? 'text-primary' : ''}`} />
                                                 {role.name}
                                             </div>
-                                            <div className="text-xs text-muted-foreground truncate mt-1">
-                                                {role.description || 'No description'}
+                                            <div className="text-[10px] font-medium text-on-surface-variant/40 truncate mt-1.5 tracking-tight">
+                                                {role.description || 'No system metadata provided'}
                                             </div>
                                         </div>
-                                        <div className="flex items-center gap-1">
-                                            {selectedRole?.id === role.id && <ChevronRight className="h-4 w-4 text-primary animate-in fade-in slide-in-from-left-2" />}
+                                        <div className="flex items-center gap-2">
+                                            {selectedRole?.id === role.id && <ChevronRight className="h-5 w-5 text-primary/40 animate-in fade-in slide-in-from-left-2" />}
                                             <Button
                                                 size="icon"
                                                 variant="ghost"
-                                                className="h-7 w-7 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
+                                                className={`h-9 w-9 rounded-xl hover:bg-red-50 hover:text-red-500 transition-all ${selectedRole?.id === role.id ? 'opacity-20' : 'opacity-0 group-hover:opacity-40'}`}
                                                 onClick={(e) => handleDeleteRole(role.id, e)}
                                             >
-                                                <Trash2 className="h-3 w-3" />
+                                                <Trash2 className="h-4 w-4" />
                                             </Button>
                                         </div>
                                     </div>
                                 ))}
                             </div>
-                        </Card>
+                        </GlassCard>
                     </div>
 
-                    {/* RIGHT: DETAILS */}
+                    {/* RIGHT: BINDING CONTROLS */}
                     <div className="md:col-span-8">
                         {selectedRole ? (
-                            <Card className="h-full">
-                                <CardHeader className="border-b">
+                            <GlassCard className="border-none shadow-2xl shadow-on-surface/5 bg-white overflow-hidden min-h-[850px] flex flex-col rounded-[32px]">
+                                <GlassCardHeader className="bg-surface-container p-12 ">
                                     <div className="flex items-center justify-between">
-                                        <div>
-                                            <CardTitle>{selectedRole.name}</CardTitle>
-                                            <CardDescription>{selectedRole.description}</CardDescription>
+                                        <div className="space-y-5">
+                                            <div className="flex items-center gap-5">
+                                                <div className="p-3.5 bg-primary/10 rounded-2xl">
+                                                    <Shield className="w-8 h-8 text-primary" />
+                                                </div>
+                                                <h2 className="text-4xl font-bold tracking-tight text-on-surface">{selectedRole.name}</h2>
+                                            </div>
+                                            <p className="font-medium text-sm text-on-surface-variant/60 max-w-xl">{selectedRole.description || 'System-defined security object identified.'}</p>
                                         </div>
                                     </div>
-                                </CardHeader>
-                                <CardContent className="space-y-8 p-6">
-                                    {/* ASSIGNED */}
-                                    <div>
-                                        <h3 className="text-sm font-medium mb-3 flex items-center gap-2">
-                                            <Badge variant="default">{rolePermissions.length}</Badge> Assigned Permissions
-                                        </h3>
-                                        <div className="bg-muted/10 rounded-md border p-1 min-h-[100px] flex flex-wrap content-start gap-2">
+                                </GlassCardHeader>
+                                <GlassCardContent className="p-12 space-y-16 flex-1 overflow-y-auto bg-white">
+                                    {/* BOUND POLICIES */}
+                                    <div className="space-y-10">
+                                        <div className="flex items-center justify-between border-b border-on-surface/5 pb-6">
+                                             <h3 className="text-[12px] font-bold tracking-tight text-on-surface-variant/40 flex items-center gap-3">
+                                                 <ShieldCheck className="w-4.5 h-4.5 text-emerald-500" />
+                                                 Synchronized permissions
+                                             </h3>
+                                             <Badge className="bg-emerald-50 text-emerald-600 border-none rounded-xl h-8 px-4 text-xs font-bold tracking-tight">
+                                                 {rolePermissions.length} Active vectors
+                                             </Badge>
+                                        </div>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                             {rolePermissions.length === 0 ? (
-                                                <p className="w-full text-center text-sm text-muted-foreground py-8 italic">No permissions assigned yet.</p>
+                                                <div className="col-span-full py-20 border-2 border-dashed rounded-[32px] bg-surface-container/10 flex flex-col items-center justify-center">
+                                                    <Lock className="w-10 h-10 mb-4 text-on-surface-variant/10" />
+                                                    <span className="text-sm font-medium text-on-surface-variant/40">No permissions associated with this matrix.</span>
+                                                </div>
                                             ) : (
                                                 rolePermissions.map(p => (
-                                                    <Badge key={p.id} variant="secondary" className="px-3 py-1 bg-background border shadow-sm">
-                                                        <span className="font-mono text-xs">{p.resource}</span>
-                                                        <span className="mx-1 text-muted-foreground">:</span>
-                                                        <span className="font-semibold text-xs">{p.action}</span>
-                                                    </Badge>
+                                                    <div key={p.id} className="p-6 bg-white ring-1 ring-on-surface/5 rounded-2xl flex items-center justify-between group hover:ring-emerald-500/20 hover:bg-emerald-50/10 transition-all shadow-sm hover:shadow-lg hover:shadow-emerald-500/5">
+                                                         <div className="flex flex-col">
+                                                             <span className="text-[10px] font-bold tracking-tight text-on-surface-variant/40 mb-2 italic">Resource vector</span>
+                                                            <div className="flex items-center gap-3">
+                                                                <span className="font-mono text-xs font-bold text-on-surface">{p.resource}</span>
+                                                                <span className="text-on-surface-variant/10">/</span>
+                                                                <Badge className="bg-primary/5 text-primary border-none rounded-lg font-bold text-[10px] tracking-tight px-2.5 py-1">{p.action}</Badge>
+                                                            </div>
+                                                        </div>
+                                                        <div className="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center">
+                                                            <ShieldCheck className="w-4.5 h-4.5 text-emerald-600" />
+                                                        </div>
+                                                    </div>
                                                 ))
                                             )}
                                         </div>
                                     </div>
 
-                                    <Separator />
-
-                                    {/* AVAILABLE */}
-                                    <div>
-                                        <h3 className="text-sm font-medium mb-3">Available Permissions</h3>
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[400px] overflow-y-auto pr-2">
+                                    {/* AVAILABLE POLICIES */}
+                                    <div className="space-y-10">
+                                        <div className="flex items-center justify-between border-b border-on-surface/5 pb-6">
+                                             <h3 className="text-[12px] font-bold tracking-tight text-on-surface-variant/40 flex items-center gap-3">
+                                                 <Command className="w-4.5 h-4.5 text-primary/40" />
+                                                 Available system vectors
+                                             </h3>
+                                        </div>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[500px] overflow-y-auto pr-4 custom-scrollbar">
                                             {permissions
                                                 .filter(p => !rolePermissions.find(rp => rp.id === p.id))
                                                 .map(p => (
-                                                    <div key={p.id} className="flex items-center justify-between p-2 rounded-md border bg-card hover:bg-muted/50 transition-colors">
-                                                        <div className="flex flex-col min-w-0">
-                                                            <div className="text-sm font-medium font-mono">
-                                                                {p.resource}<span className="text-muted-foreground">:</span>{p.action}
+                                                    <div key={p.id} className="p-6 bg-white ring-1 ring-on-surface/5 rounded-2xl group hover:ring-primary/20 hover:bg-primary/5 transition-all cursor-pointer shadow-sm hover:shadow-lg hover:shadow-primary/5" onClick={() => handleAssignPermission(p.id)}>
+                                                        <div className="flex items-center justify-between">
+                                                            <div className="flex flex-col min-w-0 pr-4">
+                                                                <div className="flex items-center gap-3 mb-2">
+                                                                    <span className="font-mono text-[11px] font-bold text-on-surface">{p.resource}</span>
+                                                                    <span className="text-on-surface-variant/10">:</span>
+                                                                    <span className="font-bold text-[11px] text-primary">{p.action}</span>
+                                                                </div>
+                                                                <span className="text-[10px] font-medium text-on-surface-variant/40 tracking-tight truncate">{p.description || 'No verifiable description provided'}</span>
                                                             </div>
-                                                            <div className="text-[10px] text-muted-foreground truncate" title={p.description}>
-                                                                {p.description}
+                                                            <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-surface-container/50 group-hover:bg-primary group-hover:text-white flex items-center justify-center transition-all">
+                                                                <Plus className="h-4.5 w-4.5" />
                                                             </div>
                                                         </div>
-                                                        <Button size="sm" variant="outline" className="h-7 w-7 p-0 ml-2 shrink-0" onClick={() => handleAssignPermission(p.id)}>
-                                                            <Plus className="h-3 w-3" />
-                                                        </Button>
                                                     </div>
                                                 ))
                                             }
-                                            {permissions.length === 0 && <p className="text-sm text-muted-foreground">No permissions available to assign.</p>}
+                                            {permissions.length === 0 && <div className="col-span-full py-12 text-center text-sm font-medium text-on-surface-variant/20 italic">No available system vectors established.</div>}
                                         </div>
                                     </div>
-                                </CardContent>
-                            </Card>
+                                </GlassCardContent>
+                            </GlassCard>
                         ) : (
-                            <div className="h-full flex flex-col items-center justify-center border-2 border-dashed rounded-lg p-12 text-muted-foreground bg-muted/20">
-                                <Shield className="h-12 w-12 mb-4 opacity-20" />
-                                <p>Select a role to manage permissions</p>
+                            <div className="h-full flex flex-col items-center justify-center border-2 border-dashed rounded-[40px] border-on-surface/5 bg-surface-container/10 min-h-[850px] animate-in fade-in duration-1000">
+                                <div className="p-16 bg-white rounded-[32px] shadow-2xl shadow-on-surface/5 flex flex-col items-center text-center max-w-lg mx-auto">
+                                    <div className="w-24 h-24 bg-primary/5 rounded-[32px] flex items-center justify-center mb-10">
+                                        <Shield className="h-12 w-12 text-primary/20 animate-pulse" />
+                                    </div>
+                                    <h3 className="text-2xl font-bold tracking-tight text-on-surface mb-4">Core Shrouded</h3>
+                                    <p className="text-sm font-medium text-on-surface-variant/40 leading-relaxed max-w-xs">Select a cryptographic role from the primary index to orchestrate the underlying permission matrix.</p>
+                                </div>
                             </div>
                         )}
                     </div>
                 </div>
             ) : (
-                // PERMISSIONS TAB
-                <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
+                /* PERMISSIONS REGISTRY */
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-10 items-start">
                     <div className="md:col-span-4">
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>Define Permission</CardTitle>
-                                <CardDescription>Create a new system permission.</CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                                <form onSubmit={handleCreatePermission} className="space-y-4">
-                                    <div className="space-y-2">
-                                        <Label>Resource</Label>
+                        <GlassCard className="border-none shadow-xl shadow-on-surface/5 bg-white overflow-hidden rounded-[24px]">
+                            <GlassCardHeader className="bg-primary p-12 text-white">
+                                <div className="flex items-center gap-5">
+                                    <div className="p-3 bg-white/20 rounded-2xl backdrop-blur-md">
+                                        <Plus className="w-6 h-6 text-white" />
+                                    </div>
+                                     <GlassCardTitle className="text-2xl font-bold tracking-tight">Register vector</GlassCardTitle>
+                                </div>
+                            </GlassCardHeader>
+                            <GlassCardContent className="p-10">
+                                <form onSubmit={handleCreatePermission} className="space-y-8">
+                                     <div className="space-y-2.5">
+                                         <Label className="text-[12px] font-bold tracking-tight text-on-surface-variant/40 ml-1">Vector resource</Label>
                                         <Input
-                                            placeholder="e.g. users, reports"
+                                            placeholder="e.g. applications"
                                             value={newPermission.resource}
                                             onChange={(e) => setNewPermission({ ...newPermission, resource: e.target.value })}
+                                            className="h-12 border-none rounded-xl bg-surface-container/30 ring-1 ring-on-surface/5 focus-visible:ring-2 focus-visible:ring-primary/20 font-medium transition-all"
                                             required
                                         />
                                     </div>
-                                    <div className="space-y-2">
-                                        <Label>Action</Label>
+                                     <div className="space-y-2.5">
+                                         <Label className="text-[12px] font-bold tracking-tight text-on-surface-variant/40 ml-1">Vector action</Label>
                                         <Input
-                                            placeholder="e.g. read, write, delete"
+                                            placeholder="e.g. WRITE"
                                             value={newPermission.action}
                                             onChange={(e) => setNewPermission({ ...newPermission, action: e.target.value })}
+                                            className="h-12 border-none rounded-xl bg-surface-container/30 ring-1 ring-on-surface/5 focus-visible:ring-2 focus-visible:ring-primary/20 font-medium transition-all"
                                             required
                                         />
                                     </div>
-                                    <div className="space-y-2">
-                                        <Label>Description</Label>
+                                     <div className="space-y-2.5">
+                                         <Label className="text-[12px] font-bold tracking-tight text-on-surface-variant/40 ml-1">Vector description</Label>
                                         <Input
-                                            placeholder="What does this permission allow?"
+                                            placeholder="Detailed access logic description..."
                                             value={newPermission.description}
                                             onChange={(e) => setNewPermission({ ...newPermission, description: e.target.value })}
+                                            className="h-12 border-none rounded-xl bg-surface-container/30 ring-1 ring-on-surface/5 focus-visible:ring-2 focus-visible:ring-primary/20 font-medium transition-all"
                                         />
                                     </div>
-                                    <Button type="submit" className="w-full">
-                                        <Plus className="mr-2 h-4 w-4" /> Create Permission
-                                    </Button>
+                                     <Button type="submit" className="w-full h-12 rounded-xl font-bold text-sm shadow-md shadow-primary/10">
+                                         Commit permission
+                                     </Button>
                                 </form>
-                            </CardContent>
-                        </Card>
+                            </GlassCardContent>
+                        </GlassCard>
                     </div>
                     <div className="md:col-span-8">
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>All Permissions</CardTitle>
-                            </CardHeader>
-                            <CardContent className="p-0">
-                                <Table>
-                                    <TableHeader>
-                                        <TableRow>
-                                            <TableHead>Resource</TableHead>
-                                            <TableHead>Action</TableHead>
-                                            <TableHead>Description</TableHead>
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {permissions.map(p => (
-                                            <TableRow key={p.id}>
-                                                <TableCell className="font-mono">{p.resource}</TableCell>
-                                                <TableCell className="font-mono text-xs uppercase bg-muted/50 px-2 py-1 rounded inline-block m-2">{p.action}</TableCell>
-                                                <TableCell className="text-muted-foreground">{p.description}</TableCell>
-                                            </TableRow>
-                                        ))}
-                                    </TableBody>
-                                </Table>
-                            </CardContent>
-                        </Card>
+                        <GlassCard className="border-none shadow-xl shadow-on-surface/5 bg-white overflow-hidden rounded-[32px]">
+                            <GlassCardHeader className="py-10 px-10 border-b border-on-surface/5">
+                                <div className="flex items-center gap-6">
+                                    <div className="p-4 bg-primary/5 rounded-[20px]">
+                                        <Lock className="w-8 h-8 text-primary" />
+                                    </div>
+                                     <div>
+                                         <GlassCardTitle className="text-3xl font-bold tracking-tight text-on-surface">System vectors</GlassCardTitle>
+                                         <p className="text-on-surface-variant/40 font-bold text-[12px] mt-1 tracking-tight">{permissions.length} Granular protocols established</p>
+                                     </div>
+                                </div>
+                            </GlassCardHeader>
+                            <GlassCardContent className="p-0">
+                                <div className="overflow-x-auto">
+                                    <GlassTable>
+                                        <GlassTableHeader>
+                                            <GlassTableRow className="hover:bg-transparent border-b border-on-surface/5">
+                                                 <GlassTableHead className="py-6 pl-10 font-bold text-[12px] tracking-tight text-on-surface-variant/40">Resource context</GlassTableHead>
+                                                 <GlassTableHead className="font-bold text-[12px] tracking-tight text-on-surface-variant/40">Action protocol</GlassTableHead>
+                                                 <GlassTableHead className="font-bold text-[12px] tracking-tight text-on-surface-variant/40 pr-10">System description</GlassTableHead>
+                                            </GlassTableRow>
+                                        </GlassTableHeader>
+                                        <TableBody>
+                                            {permissions.map(p => (
+                                                <GlassTableRow key={p.id} className="hover:bg-surface-container/20 transition-all border-b border-on-surface/5 last:border-0 group">
+                                                    <TableCell className="py-8 pl-10 font-mono text-sm font-bold text-on-surface/60">{p.resource}</TableCell>
+                                                     <TableCell className="py-8">
+                                                         <Badge className="bg-primary/5 text-primary border-none rounded-lg font-bold text-[10px] tracking-tight px-4 py-1.5 group-hover:bg-primary group-hover:text-white transition-all shadow-none">
+                                                             {p.action}
+                                                         </Badge>
+                                                     </TableCell>
+                                                    <TableCell className="py-8 text-[11px] font-bold text-on-surface-variant/20 italic tracking-tight pr-10">{p.description || 'No system definition metadata'}</TableCell>
+                                                </GlassTableRow>
+                                            ))}
+                                        </TableBody>
+                                    </GlassTable>
+                                </div>
+                            </GlassCardContent>
+                        </GlassCard>
                     </div>
                 </div>
             )}
         </div>
+
     );
-}
+};
+
+export default Roles;

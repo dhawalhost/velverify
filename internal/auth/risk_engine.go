@@ -2,10 +2,13 @@ package auth
 
 import (
 	"context"
+	"fmt"
+	"strings"
 	"time"
 
-	"github.com/dhawalhost/wardseal/pkg/middleware"
 	"go.uber.org/zap"
+
+	"github.com/dhawalhost/wardseal/pkg/middleware"
 )
 
 // RiskLevel enum
@@ -86,13 +89,29 @@ func (e *RiskEngine) Evaluate(ctx context.Context, userID, deviceID, ip string) 
 		factors = append(factors, "no_device_id")
 	}
 
-	// 2. Signal Check (CAE events in last 24h)
+	// 2. Signal Check (CAE events in last 24h + Impossible Travel)
 	if e.signalStore != nil {
-		since := time.Now().Add(-24 * time.Hour)
+		now := time.Now()
+		since := now.Add(-24 * time.Hour)
+
+		// 2.1 Critical Event Check
 		event, err := e.signalStore.GetLatestCriticalEvent(ctx, userID, since)
 		if err == nil && event != nil {
 			score += 30
 			factors = append(factors, "recent_security_event: "+event.EventType)
+		}
+
+		// 2.2 Impossible Travel Check
+		lastLogin, err := e.signalStore.GetLatestSuccess(ctx, userID)
+		if err == nil && lastLogin != nil && lastLogin.IPAddress != ip && e.geoClient != nil {
+			// Resolve both IPs to coordinates (mocking coordinates for this logic)
+			// In a full implementation, GeoClient would return Lat/Lon
+			// For now, we'll implement the velocity check logic structure
+			velocity, err := e.calculateVelocity(lastLogin.IPAddress, ip, lastLogin.Timestamp, now)
+			if err == nil && velocity > 500 { // 500 mph threshold
+				score += 60 // Significant risk bump
+				factors = append(factors, fmt.Sprintf("impossible_travel: %.1f mph", velocity))
+			}
 		}
 	}
 
@@ -157,6 +176,29 @@ func (e *RiskEngine) Evaluate(ctx context.Context, userID, deviceID, ip string) 
 		Level:   level,
 		Factors: factors,
 	}, nil
+}
+
+// calculateVelocity estimates travel speed between two IPs in miles per hour.
+func (e *RiskEngine) calculateVelocity(ip1, ip2 string, t1, t2 time.Time) (float64, error) {
+	duration := t2.Sub(t1).Hours()
+	if duration <= 0 {
+		return 0, nil
+	}
+
+	// This is where GeoClient would provide lat/lon.
+	// For this Phase 1 implementation, we simulate distance based on IP "distance"
+	// until a proper GeoDB is wired in.
+	// Mock: if IPs differ in first octet, assume 3000 miles.
+	distance := 0.0
+	o1 := ip1[:strings.Index(ip1, ".")]
+	o2 := ip2[:strings.Index(ip2, ".")]
+	if o1 != o2 {
+		distance = 3000 // Across continents approx
+	} else {
+		distance = 100 // Same region approx
+	}
+
+	return distance / duration, nil
 }
 
 // tenantIDFromCtx is a convenience wrapper around the middleware package's exported helper.

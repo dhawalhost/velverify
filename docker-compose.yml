@@ -1,236 +1,83 @@
+# WardSeal Infrastructure Layer 
+# ===========================
+# This file contains only the core infrastructure components.
 
 services:
   traefik:
-    image: traefik:v3.1
+    image: traefik:v2.11
+    container_name: wardseal-traefik
+    user: root
     command:
       - --api.insecure=true
-      - --providers.file.filename=/etc/traefik/dynamic.yml
-      - --providers.file.watch=true
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
       - --entrypoints.web.address=:80
+      - --log.level=DEBUG
     ports:
       - "80:80"
       - "8088:8080"
     volumes:
-      - ./deploy/local/traefik/dynamic.yml:/etc/traefik/dynamic.yml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      - DOCKER_API_VERSION=1.41
+    labels:
+      - traefik.enable=true
+    networks:
+      - wardseal-net
 
   postgres:
-    image: postgres:14-alpine
-    container_name: identity_platform_postgres
+    image: postgres:17-alpine
+    container_name: wardseal-postgres
     ports:
       - "5432:5432"
     environment:
-      - POSTGRES_USER=user
-      - POSTGRES_PASSWORD=password
-      - POSTGRES_DB=identity_platform
+      - POSTGRES_USER=${APP_DATABASE_USER:-user}
+      - POSTGRES_PASSWORD=${APP_DATABASE_PASSWORD:-password}
+      - POSTGRES_DB=${APP_DATABASE_NAME:-identity_platform}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U user -d identity_platform"]
-      interval: 10s
+      test: ["CMD-SHELL", "pg_isready -U ${APP_DATABASE_USER:-user} -d ${APP_DATABASE_NAME:-identity_platform}"]
+      interval: 5s
       timeout: 5s
       retries: 5
+    networks:
+      - wardseal-net
 
   redis:
-    image: redis:7-alpine
-    container_name: identity_platform_redis
+    image: redis:7.4-alpine
+    container_name: wardseal-redis
     ports:
       - "6379:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
+      interval: 5s
+      timeout: 3s
       retries: 5
+    networks:
+      - wardseal-net
 
+  # Migration runner
   migrate:
-    image: postgres:14-alpine
-    container_name: identity_platform_migrate
+    image: migrate/migrate:v4.18.2
+    container_name: wardseal-migrate
     depends_on:
       postgres:
         condition: service_healthy
     volumes:
       - ./migrations:/migrations:ro
-    environment:
-      - PGPASSWORD=password
-    command: >
-      sh -c '
-      for f in /migrations/*.up.sql; do
-        psql -h postgres -U user -d identity_platform -f "$$f";
-      done
-      '
+    command: 
+      - -path=/migrations/
+      - -database=postgres://${APP_DATABASE_USER:-user}:${APP_DATABASE_PASSWORD:-password}@postgres:5432/${APP_DATABASE_NAME:-identity_platform}?sslmode=disable
+      - up
+    networks:
+      - wardseal-net
 
-  authsvc:
-    build:
-      context: .
-      dockerfile: cmd/authsvc/Dockerfile
-    ports:
-      - "8080:8080"
-    depends_on:
-      postgres:
-        condition: service_healthy
-      migrate:
-        condition: service_completed_successfully
-      dirsvc:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    environment:
-      - DB_HOST=postgres
-      - DB_USER=user
-      - DB_PASSWORD=password
-      - DB_NAME=identity_platform
-      - DB_SSLMODE=disable
-      - DIRECTORY_SERVICE_URL=http://dirsvc:8081
-      - CORS_ALLOWED_ORIGINS=http://manage.wardseal.local,http://wardseal.local
-      - AUTH_SERVICE_URL=http://auth.wardseal.local
-      - KMS_PROVIDER=local
-      - JWT_PRIVATE_KEY_PATH=/etc/wardseal/keys/private_key.pem
-      - JWT_PUBLIC_KEY_PATH=/etc/wardseal/keys/public_key.pem
-      - DEPLOYMENT_MODE=saas
-      - UI_URL=http://manage.wardseal.local
-      - REDIS_ADDR=redis:6379
-      - REDIS_DB=0
-      - WEBAUTHN_SESSION_TTL_SECONDS=600
-    volumes:
-      - ./deploy/dev-keys:/etc/wardseal/keys:ro
-    healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    labels:
-      - traefik.enable=true
-      - traefik.http.routers.authsvc.rule=Host(`auth.wardseal.local`)
-      - traefik.http.routers.authsvc.entrypoints=web
-      - traefik.http.services.authsvc.loadbalancer.server.port=8080
-
-  dirsvc:
-    build:
-      context: .
-      dockerfile: cmd/dirsvc/Dockerfile
-    ports:
-      - "8081:8081"
-    depends_on:
-      postgres:
-        condition: service_healthy
-      migrate:
-        condition: service_completed_successfully
-    environment:
-      - DB_HOST=postgres
-      - DB_USER=user
-      - DB_PASSWORD=password
-      - DB_NAME=identity_platform
-      - DB_SSLMODE=disable
-      - CORS_ALLOWED_ORIGINS=http://manage.wardseal.local,http://wardseal.local
-    healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8081/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    labels:
-      - traefik.enable=true
-      - traefik.http.routers.dirsvc.rule=Host(`api.wardseal.local`) && (PathPrefix(`/scim`) || PathPrefix(`/api/v1/users`) || PathPrefix(`/api/v1/groups`) || PathPrefix(`/api/v1/scim`))
-      - traefik.http.routers.dirsvc.entrypoints=web
-      - traefik.http.services.dirsvc.loadbalancer.server.port=8081
-
-  govsvc:
-    build:
-      context: .
-      dockerfile: cmd/govsvc/Dockerfile
-    ports:
-      - "8082:8082"
-    depends_on:
-      postgres:
-        condition: service_healthy
-      migrate:
-        condition: service_completed_successfully
-      dirsvc:
-        condition: service_healthy
-    environment:
-      - DB_HOST=postgres
-      - DB_USER=user
-      - DB_PASSWORD=password
-      - DB_NAME=identity_platform
-      - DB_SSLMODE=disable
-      - DIRECTORY_SERVICE_URL=http://dirsvc:8081
-      - CORS_ALLOWED_ORIGINS=http://manage.wardseal.local,http://wardseal.local,http://help.wardseal.local
-    healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8082/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    labels:
-      - traefik.enable=true
-      - traefik.http.routers.govsvc.rule=Host(`api.wardseal.local`) && (PathPrefix(`/api/v1/oauth`) || PathPrefix(`/api/v1/governance`))
-      - traefik.http.routers.govsvc.entrypoints=web
-      - traefik.http.services.govsvc.loadbalancer.server.port=8082
-
-  policysvc:
-    build:
-      context: .
-      dockerfile: cmd/policysvc/Dockerfile
-    ports:
-      - "8083:8083"
-    depends_on:
-      postgres:
-        condition: service_healthy
-      migrate:
-        condition: service_completed_successfully
-    labels:
-      - traefik.enable=true
-      - traefik.http.routers.policysvc.rule=Host(`api.wardseal.local`) && PathPrefix(`/api/v1/policy`)
-      - traefik.http.routers.policysvc.entrypoints=web
-      - traefik.http.services.policysvc.loadbalancer.server.port=8083
-
-  provsvc:
-    build:
-      context: .
-      dockerfile: cmd/provsvc/Dockerfile
-    ports:
-      - "8084:8084"
-    depends_on:
-      postgres:
-        condition: service_healthy
-      migrate:
-        condition: service_completed_successfully
-    labels:
-      - traefik.enable=true
-      - traefik.http.routers.provsvc.rule=Host(`api.wardseal.local`) && PathPrefix(`/api/v1/provisioning`)
-      - traefik.http.routers.provsvc.entrypoints=web
-      - traefik.http.services.provsvc.loadbalancer.server.port=8084
-
-  adminui:
-    build:
-      context: ./web/admin
-      dockerfile: Dockerfile
-      args:
-        VITE_GOVSVC_URL: http://api.wardseal.local
-        VITE_AUTHSVC_URL: http://auth.wardseal.local
-        VITE_DIRSVC_URL: http://api.wardseal.local
-        VITE_APP_MODE: saas
-    depends_on:
-      govsvc:
-        condition: service_healthy
-    labels:
-      - traefik.enable=true
-      - traefik.http.routers.adminui.rule=Host(`manage.wardseal.local`)
-      - traefik.http.routers.adminui.entrypoints=web
-      - traefik.http.services.adminui.loadbalancer.server.port=80
-
-  landingui:
-    build:
-      context: ./web/landing
-      dockerfile: Dockerfile
-      args:
-        VITE_ENVIRONMENT: local
-        VITE_SITE_BASE_URL: http://wardseal.local
-        VITE_CONSOLE_BASE_URL: http://manage.wardseal.local
-        VITE_SUPPORT_EMAIL: support@wardseal.com
-    labels:
-      - traefik.enable=true
-      - traefik.http.routers.landingui-site.rule=Host(`wardseal.local`)
-      - traefik.http.routers.landingui-site.entrypoints=web
-      - traefik.http.services.landingui.loadbalancer.server.port=80
+networks:
+  wardseal-net:
+    name: wardseal-net
+    driver: bridge
 
 volumes:
   postgres_data:
-    driver: local
+    name: wardseal-postgres-data

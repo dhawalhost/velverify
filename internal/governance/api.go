@@ -4,12 +4,16 @@ import (
 	"errors"
 	"net/http"
 	"strings"
+	"time"
 
+	"github.com/gin-gonic/gin"
+	"go.uber.org/zap"
+
+	"github.com/dhawalhost/wardseal/internal/auth"
+	"github.com/dhawalhost/wardseal/internal/authz"
 	"github.com/dhawalhost/wardseal/internal/oauthclient"
 	"github.com/dhawalhost/wardseal/internal/webhook"
 	"github.com/dhawalhost/wardseal/pkg/middleware"
-	"github.com/gin-gonic/gin"
-	"go.uber.org/zap"
 )
 
 // HTTPHandler represents the HTTP API handlers for the governance service.
@@ -56,6 +60,7 @@ func (h *HTTPHandler) RegisterRoutes(router *gin.Engine) {
 		clients.PUT("/:clientID", h.updateOAuthClient)
 		clients.DELETE("/:clientID", h.deleteOAuthClient)
 	}
+	tenantGroup.GET("/governance/stats", h.getDashboardStats)
 
 	requests := tenantGroup.Group("/governance/requests")
 	{
@@ -70,6 +75,22 @@ func (h *HTTPHandler) RegisterRoutes(router *gin.Engine) {
 		ipPolicies.GET("", h.listIPPolicies)
 		ipPolicies.POST("", h.createIPPolicy)
 		ipPolicies.DELETE("/:ipPolicyID", h.deleteIPPolicy)
+	}
+
+	workloads := tenantGroup.Group("/governance/workloads")
+	{
+		workloads.GET("", h.listWorkloads)
+		workloads.POST("", h.createWorkload)
+	}
+
+	relationships := tenantGroup.Group("/governance/relationships")
+	{
+		relationships.GET("", h.listRelationships)
+	}
+
+	graph := tenantGroup.Group("/governance/graph")
+	{
+		graph.GET("/traverse", h.traverseGraph)
 	}
 
 	// Registered combined routes
@@ -300,6 +321,19 @@ func (h *HTTPHandler) deleteIPPolicy(c *gin.Context) {
 	c.Status(http.StatusNoContent)
 }
 
+func (h *HTTPHandler) getDashboardStats(c *gin.Context) {
+	tenantID, ok := h.tenantID(c)
+	if !ok {
+		return
+	}
+	stats, err := h.svc.GetDashboardStats(c.Request.Context(), tenantID)
+	if err != nil {
+		h.handleServiceError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, stats)
+}
+
 func (h *HTTPHandler) tenantID(c *gin.Context) (string, bool) {
 	tenantID, err := middleware.TenantIDFromGinContext(c)
 	if err != nil {
@@ -331,4 +365,92 @@ func actorIDFromRequest(c *gin.Context) string {
 		return userID
 	}
 	return ""
+}
+
+func (h *HTTPHandler) listWorkloads(c *gin.Context) {
+	tenantID, ok := h.tenantID(c)
+	if !ok {
+		return
+	}
+	workloads, err := h.svc.ListWorkloads(c.Request.Context(), tenantID)
+	if err != nil {
+		h.handleServiceError(c, err)
+		return
+	}
+	responses := make([]WorkloadResponse, 0, len(workloads))
+	for _, w := range workloads {
+		resp := WorkloadResponse{
+			ID:            w.ID,
+			Name:          w.Name,
+			ServiceHandle: w.ServiceHandle,
+			Status:        w.Status,
+		}
+		if w.LastUsedAt != nil {
+			resp.LastUsedAt = w.LastUsedAt.Format(time.RFC3339)
+		}
+		responses = append(responses, resp)
+	}
+	c.JSON(http.StatusOK, gin.H{"workloads": responses})
+}
+
+func (h *HTTPHandler) createWorkload(c *gin.Context) {
+	tenantID, ok := h.tenantID(c)
+	if !ok {
+		return
+	}
+	// Note: In a real scenario, we would use a specific request DTO
+	var w auth.Workload
+	if err := c.ShouldBindJSON(&w); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	id, err := h.svc.CreateWorkload(c.Request.Context(), tenantID, w)
+	if err != nil {
+		h.handleServiceError(c, err)
+		return
+	}
+	c.JSON(http.StatusCreated, gin.H{"id": id})
+}
+
+func (h *HTTPHandler) listRelationships(c *gin.Context) {
+	tenantID, ok := h.tenantID(c)
+	if !ok {
+		return
+	}
+
+	query := authz.Query{
+		Namespace:   c.Query("namespace"),
+		ObjectID:    c.Query("object_id"),
+		Relation:    c.Query("relation"),
+		SubjectType: c.Query("subject_type"),
+		SubjectID:   c.Query("subject_id"),
+	}
+
+	tuples, err := h.svc.ListRelationships(c.Request.Context(), tenantID, query)
+	if err != nil {
+		h.handleServiceError(c, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"relationships": tuples})
+}
+
+func (h *HTTPHandler) traverseGraph(c *gin.Context) {
+	tenantID, ok := h.tenantID(c)
+	if !ok {
+		return
+	}
+	subjectID := c.Query("subject_id")
+	if subjectID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "subject_id required"})
+		return
+	}
+
+	results, err := h.svc.TraverseGraph(c.Request.Context(), tenantID, subjectID)
+	if err != nil {
+		h.handleServiceError(c, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, results)
 }

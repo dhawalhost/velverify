@@ -5,10 +5,11 @@ import (
 	"crypto/rsa"
 	"testing"
 
-	"github.com/dhawalhost/wardseal/internal/rbac"
-	"github.com/dhawalhost/wardseal/pkg/middleware"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
+
+	"github.com/dhawalhost/wardseal/internal/rbac"
+	"github.com/dhawalhost/wardseal/pkg/middleware"
 )
 
 // Mock RBAC Store

@@ -12,10 +12,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dhawalhost/wardseal/pkg/middleware"
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
 	"go.uber.org/zap"
+
+	"github.com/dhawalhost/wardseal/pkg/middleware"
 )
 
 // Cookie configuration

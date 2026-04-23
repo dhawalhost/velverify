@@ -10,9 +10,10 @@ import (
 	"net/url"
 	"testing"
 
+	"github.com/gin-gonic/gin"
+
 	"github.com/dhawalhost/wardseal/internal/saml"
 	"github.com/dhawalhost/wardseal/pkg/middleware"
-	"github.com/gin-gonic/gin"
 )
 
 func TestAuthorizationCodePkceFlow(t *testing.T) {
@@ -175,7 +176,7 @@ func newTestService(t *testing.T) *authService {
 	svc, err := NewService(Config{
 		BaseURL:             "http://wardseal.com",
 		DirectoryServiceURL: "http://dirsvc",
-		SAMLStore:           saml.NewStore(nil),
+		SAMLStore:           saml.NewStore(nil, "", "", ""),
 		Clients: []ClientConfig{
 			{
 				ID:            "test-client",

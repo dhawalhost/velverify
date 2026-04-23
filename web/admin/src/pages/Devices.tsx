@@ -1,20 +1,36 @@
 import React, { useEffect, useState } from 'react';
 import { getEndpoints, updateEndpointStatus, Device } from '../api';
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
-import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { 
-    Loader2, 
-    MonitorSmartphone, 
-    ShieldCheck, 
-    ShieldAlert, 
-    ShieldIcon, 
-    User, 
+import {
+    Loader2,
+    MonitorSmartphone,
+    ShieldCheck,
+    ShieldAlert,
+    ShieldIcon,
+    User,
     Info,
     CheckCircle2,
-    XCircle
+    XCircle,
+    Activity,
+    Lock,
+    Smartphone,
+    Cpu,
+    Zap,
+    ExternalLink,
+    MoreHorizontal,
+    Terminal,
+    Binary
 } from 'lucide-react';
+import { PageHeader, GlassCard, GlassCardHeader, GlassCardTitle, GlassCardContent, GlassTable, GlassTableHeader, GlassTableHead, GlassTableRow, GlassCardDescription } from '@/components/layout';
+import { TableBody, TableCell } from '@/components/ui/table';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 const Devices: React.FC = () => {
     const [devices, setDevices] = useState<Device[]>([]);
@@ -28,7 +44,7 @@ const Devices: React.FC = () => {
             setDevices(data || []);
         } catch (err) {
             console.error(err);
-            setError('Failed to load organizational endpoints');
+            setError('Failed to load organizational endpoints.');
         } finally {
             setLoading(false);
         }
@@ -44,138 +60,184 @@ const Devices: React.FC = () => {
             fetchDevices();
         } catch (err) {
             console.error(err);
-            alert("Failed to update trust status");
+            setError('Failed to synchronize trust state.');
         }
     };
 
     const getStatusBadge = (status: string) => {
         switch (status) {
-            case 'trusted':
-                return <Badge className="bg-green-600 hover:bg-green-700 gap-1"><ShieldCheck className="w-3 h-3" /> Trusted</Badge>;
+             case 'trusted':
+                return <Badge className="bg-emerald-500/10 text-emerald-600 border-none gap-2 rounded-xl font-bold text-[10px] tracking-tight px-4 py-1.5"><ShieldCheck className="w-3.5 h-3.5" /> Verified</Badge>;
             case 'untrusted':
-                return <Badge variant="destructive" className="gap-1"><ShieldAlert className="w-3 h-3" /> Untrusted</Badge>;
+                return <Badge className="bg-red-500/10 text-red-600 border-none gap-2 rounded-xl font-bold text-[10px] tracking-tight px-4 py-1.5"><ShieldAlert className="w-3.5 h-3.5" /> Blocked</Badge>;
             default:
-                return <Badge variant="outline" className="gap-1 text-amber-600 border-amber-600"><ShieldIcon className="w-3 h-3" /> Pending</Badge>;
+                return <Badge className="bg-amber-500/10 text-amber-600 border-none gap-2 rounded-xl font-bold text-[10px] tracking-tight px-4 py-1.5"><Activity className="w-3.5 h-3.5" /> Pending</Badge>;
         }
     };
 
-    if (loading && devices.length === 0) {
-        return (
-            <div className="h-[400px] flex items-center justify-center">
-                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-            </div>
-        );
-    }
+    if (loading && devices.length === 0) return <div className="h-[400px] flex items-center justify-center"><Loader2 className="h-10 w-10 animate-spin text-primary opacity-20" /></div>;
 
     return (
-        <div className="space-y-6">
-            <div className="flex justify-between items-end">
-                <div>
-                    <h1 className="text-3xl font-bold tracking-tight">Endpoint Identity Registry</h1>
-                    <p className="text-muted-foreground mt-1">Manage and verify the trust status of all corporate devices.</p>
+        <div className="space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-700">
+            <PageHeader
+                icon={<MonitorSmartphone className="w-10 h-10 text-primary" />}
+                title="Endpoint Inventory"
+                description="Manage and verify the trust status of all organizational nodes. Conduct remote attestation and hardware identification across the cluster."
+                actions={
+                    <div className="flex gap-6">
+                        {[
+                            { label: 'Attested Nodes', value: devices.filter(d => d.trust_status === 'trusted').length, color: 'text-emerald-500', bg: 'bg-emerald-50' },
+                            { label: 'Pending Sync', value: devices.filter(d => d.trust_status === 'pending').length, color: 'text-amber-500', bg: 'bg-amber-50' },
+                        ].map((stat, i) => (
+                             <GlassCard key={i} className="min-w-[160px] border-none shadow-xl shadow-on-surface/5 bg-white rounded-2xl p-6">
+                                <div className="flex flex-col items-center gap-3">
+                                    <span className={`text-3xl font-black tracking-tighter ${stat.color}`}>{stat.value}</span>
+                                    <span className="text-[11px] font-bold tracking-tight text-on-surface-variant/40 italic mt-1">{stat.label}</span>
+                                </div>
+                            </GlassCard>
+                        ))}
+                    </div>
+                }
+            />
+
+             {error && (
+                <Alert variant="destructive" className="rounded-2xl border-none bg-red-50 text-red-600 animate-in slide-in-from-top-2">
+                    <AlertDescription className="font-bold text-xs tracking-tight flex items-center gap-3">
+                        <ShieldAlert className="w-4 h-4" />
+                        Registry error: {error}
+                    </AlertDescription>
+                </Alert>
+            )}
+
+            <GlassCard className="border-none shadow-2xl shadow-on-surface/5 bg-white overflow-hidden rounded-[40px]">
+                <GlassCardHeader className="py-10 px-10 border-b border-on-surface/5 bg-surface-container/5">
+                    <div className="flex items-center gap-6">
+                        <div className="p-4 bg-primary/5 rounded-2xl text-primary">
+                            <Lock className="w-7 h-7" />
+                        </div>
+                         <div>
+                            <GlassCardTitle className="text-3xl font-bold tracking-tight text-on-surface">Hardware identity registry</GlassCardTitle>
+                            <p className="text-on-surface-variant/60 font-medium text-[11px] mt-2">Verified endpoints authenticated for secure role assumption.</p>
+                        </div>
+                    </div>
+                </GlassCardHeader>
+                <GlassCardContent className="p-0">
+                    <div className="overflow-x-auto min-h-[500px]">
+                        <GlassTable>
+                            <GlassTableHeader>
+                                 <GlassTableRow className="hover:bg-transparent border-b border-on-surface/5">
+                                    <GlassTableHead className="py-6 pl-10">Hardware serial</GlassTableHead>
+                                    <GlassTableHead>Subject context</GlassTableHead>
+                                    <GlassTableHead>Architecture</GlassTableHead>
+                                    <GlassTableHead>Trust logic</GlassTableHead>
+                                    <GlassTableHead>Last validation</GlassTableHead>
+                                    <GlassTableHead className="text-right pr-10">Directives</GlassTableHead>
+                                </GlassTableRow>
+                            </GlassTableHeader>
+                            <TableBody>
+                                {devices.length === 0 ? (
+                                    <GlassTableRow>
+                                         <TableCell colSpan={6} className="py-40 text-center">
+                                            <div className="flex flex-col items-center gap-6 opacity-20">
+                                                <Smartphone className="h-16 w-16" />
+                                                <span className="text-[13px] font-bold tracking-tight italic">Null endpoint state // Awaiting initialization</span>
+                                            </div>
+                                        </TableCell>
+                                    </GlassTableRow>
+                                ) : (
+                                    devices.map(device => (
+                                        <GlassTableRow key={device.id} className="hover:bg-surface-container/10 transition-all border-b border-on-surface/5 last:border-0 group">
+                                            <TableCell className="py-8 pl-10">
+                                                <div className="flex items-center gap-4">
+                                                     <div className="w-10 h-10 rounded-2xl bg-surface-container flex items-center justify-center group-hover:bg-primary/10 group-hover:text-primary transition-all">
+                                                        <Binary className="h-5 w-5 opacity-40 group-hover:opacity-100" />
+                                                    </div>
+                                                    <code className="text-[11px] font-bold text-primary tracking-tight font-mono group-hover:underline cursor-pointer">
+                                                        {device.serial}
+                                                    </code>
+                                                </div>
+                                            </TableCell>
+                                            <TableCell className="py-8">
+                                                <div className="flex items-center gap-4">
+                                                     <div className="w-9 h-9 rounded-xl bg-surface-container flex items-center justify-center group-hover:bg-primary/10 group-hover:text-primary transition-all">
+                                                        <User className="w-4 h-4 opacity-40 group-hover:opacity-100" />
+                                                    </div>
+                                                    <span className="text-[11px] font-bold text-on-surface-variant/60 tracking-tight">{device.user_id.substring(0, 16)}...</span>
+                                                </div>
+                                            </TableCell>
+                                            <TableCell className="py-8">
+                                                 <div className="flex flex-col">
+                                                    <span className="text-sm font-bold tracking-tight text-on-surface group-hover:text-primary transition-colors">{device.platform}</span>
+                                                    <span className="text-[10px] font-bold text-on-surface-variant/30 tracking-tight mt-1 italic">{device.os_version}</span>
+                                                </div>
+                                            </TableCell>
+                                            <TableCell className="py-8">
+                                                {getStatusBadge(device.trust_status)}
+                                            </TableCell>
+                                             <TableCell className="py-8 text-[11px] font-medium text-on-surface-variant/40 italic tracking-tight">
+                                                {new Date(device.last_scan_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                                            </TableCell>
+                                            <TableCell className="py-8 text-right pr-10">
+                                                <div className="flex justify-end gap-3">
+                                                    <DropdownMenu>
+                                                        <DropdownMenuTrigger asChild>
+                                                            <Button variant="ghost" size="icon" className="h-10 w-10 rounded-xl hover:bg-surface-container transition-all">
+                                                                <MoreHorizontal className="h-5 w-5 text-on-surface-variant/60" />
+                                                            </Button>
+                                                        </DropdownMenuTrigger>
+                                                        <DropdownMenuContent align="end" className="w-[200px] rounded-[24px] border-none shadow-2xl shadow-on-surface/10 p-2 bg-white">
+                                                            <DropdownMenuItem 
+                                                                className="font-bold text-xs gap-3 py-3.5 px-4 cursor-pointer rounded-2xl focus:bg-emerald-50 focus:text-emerald-600 transition-colors"
+                                                                onClick={() => handleUpdateStatus(device.id, 'trusted')}
+                                                                disabled={device.trust_status === 'trusted'}
+                                                            >
+                                                                <ShieldCheck className="w-4 h-4 opacity-50" />
+                                                                Attest Endpoint
+                                                            </DropdownMenuItem>
+                                                            <DropdownMenuItem 
+                                                                className="font-bold text-xs gap-3 py-3.5 px-4 cursor-pointer rounded-2xl focus:bg-red-50 focus:text-red-600 transition-colors"
+                                                                onClick={() => handleUpdateStatus(device.id, 'untrusted')}
+                                                                disabled={device.trust_status === 'untrusted'}
+                                                            >
+                                                                <ShieldAlert className="w-4 h-4" />
+                                                                Revoke Trust
+                                                            </DropdownMenuItem>
+                                                            <DropdownMenuItem className="font-bold text-xs gap-3 py-3.5 px-4 cursor-pointer rounded-2xl focus:bg-primary/5 focus:text-primary transition-colors">
+                                                                <Terminal className="w-4 h-4 opacity-50" />
+                                                                Remote Shell
+                                                            </DropdownMenuItem>
+                                                        </DropdownMenuContent>
+                                                    </DropdownMenu>
+                                                </div>
+                                            </TableCell>
+                                        </GlassTableRow>
+                                    ))
+                                )}
+                            </TableBody>
+                        </GlassTable>
+                    </div>
+                </GlassCardContent>
+            </GlassCard>
+
+            <div className="bg-on-surface text-white p-12 rounded-[48px] shadow-2xl shadow-on-surface/10 relative overflow-hidden group">
+                <div className="absolute top-0 right-0 p-8 opacity-5 pointer-events-none group-hover:scale-110 transition-transform">
+                    <Cpu className="w-32 h-32 -mr-8 -mt-8 text-primary" />
                 </div>
-                <div className="flex gap-4">
-                    <Card className="min-w-[120px] shadow-sm">
-                        <CardContent className="p-4 py-2 flex flex-col items-center">
-                            <span className="text-2xl font-bold text-green-600">{devices.filter(d => d.trust_status === 'trusted').length}</span>
-                            <span className="text-[10px] uppercase text-muted-foreground font-semibold">Verified</span>
-                        </CardContent>
-                    </Card>
-                    <Card className="min-w-[120px] shadow-sm">
-                        <CardContent className="p-4 py-2 flex flex-col items-center">
-                            <span className="text-2xl font-bold text-amber-500">{devices.filter(d => d.trust_status === 'pending').length}</span>
-                            <span className="text-[10px] uppercase text-muted-foreground font-semibold">Pending</span>
-                        </CardContent>
-                    </Card>
+                <div className="flex flex-col md:flex-row items-center gap-12 relative z-10">
+                    <div className="p-6 bg-white/5 rounded-3xl backdrop-blur-xl border border-white/5">
+                        <Activity className="w-12 h-12 text-primary animate-pulse" />
+                    </div>
+                     <div className="space-y-6 flex-1 text-center md:text-left">
+                        <h3 className="text-3xl font-bold tracking-tight">Post-login device trust</h3>
+                        <p className="text-sm font-medium opacity-60 max-w-2xl leading-relaxed italic">
+                            All architectural endpoints must maintain a verified attestation status to bypass secondary entropy gatekeepers. Security policy PX_14 strictly prohibits unauthenticated hardware origins.
+                        </p>
+                    </div>
+                    <Button variant="outline" className="h-14 px-10 rounded-2xl border-white/10 bg-white/5 hover:bg-white/10 text-white font-bold tracking-tight text-[11px] hidden lg:flex">
+                        Audit logic manifest
+                    </Button>
                 </div>
             </div>
-
-            <Card className="border-none shadow-md overflow-hidden">
-                <CardHeader className="bg-muted/50 border-b">
-                    <CardTitle className="text-lg flex items-center gap-2">
-                        <MonitorSmartphone className="w-5 h-5" /> Registered Corporate Endpoints
-                    </CardTitle>
-                    <CardDescription>Review device health and authenticate hardware for sensitive role assumption.</CardDescription>
-                </CardHeader>
-                <CardContent className="p-0">
-                    {error && <div className="p-4 bg-destructive/10 text-destructive flex items-center gap-2"><Info className="w-4 h-4" /> {error}</div>}
-
-                    {devices.length === 0 ? (
-                        <div className="p-20 text-center text-muted-foreground flex flex-col items-center gap-4">
-                            <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center">
-                                <ShieldIcon className="h-8 w-8 opacity-40" />
-                            </div>
-                            <div className="max-w-[200px]">No endpoints have been registered for this tenant yet.</div>
-                        </div>
-                    ) : (
-                        <Table>
-                            <TableHeader className="bg-muted/30">
-                                <TableRow>
-                                    <TableHead>Serial Number</TableHead>
-                                    <TableHead>Primary User</TableHead>
-                                    <TableHead>Platform / OS</TableHead>
-                                    <TableHead>Trust Level</TableHead>
-                                    <TableHead>Last Validation</TableHead>
-                                    <TableHead className="text-right">Access Control</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {devices.map(device => (
-                                    <TableRow key={device.id} className="hover:bg-muted/10 transition-colors">
-                                        <TableCell className="font-mono text-xs font-semibold uppercase">
-                                            {device.serial}
-                                        </TableCell>
-                                        <TableCell>
-                                            <div className="flex items-center gap-2">
-                                                <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center">
-                                                    <User className="w-3 h-3 text-primary" />
-                                                </div>
-                                                <span className="text-sm font-medium">{device.user_id.substring(0, 8)}...</span>
-                                            </div>
-                                        </TableCell>
-                                        <TableCell>
-                                            <div className="flex flex-col">
-                                                <span className="text-sm font-medium">{device.platform}</span>
-                                                <span className="text-[10px] text-muted-foreground font-mono">{device.os_version}</span>
-                                            </div>
-                                        </TableCell>
-                                        <TableCell>
-                                            {getStatusBadge(device.trust_status)}
-                                        </TableCell>
-                                        <TableCell className="text-muted-foreground text-sm">
-                                            {new Date(device.last_scan_at).toLocaleDateString()}
-                                        </TableCell>
-                                        <TableCell className="text-right">
-                                            <div className="flex justify-end gap-1">
-                                                {device.trust_status !== 'trusted' && (
-                                                    <Button 
-                                                        size="sm" 
-                                                        variant="outline" 
-                                                        className="h-8 border-green-600 text-green-600 hover:bg-green-600 hover:text-white"
-                                                        onClick={() => handleUpdateStatus(device.id, 'trusted')}
-                                                    >
-                                                        <CheckCircle2 className="w-3 h-3 mr-1" /> Trust
-                                                    </Button>
-                                                )}
-                                                {device.trust_status !== 'untrusted' && (
-                                                    <Button 
-                                                        size="sm" 
-                                                        variant="ghost" 
-                                                        className="h-8 text-destructive hover:bg-destructive/10"
-                                                        onClick={() => handleUpdateStatus(device.id, 'untrusted')}
-                                                    >
-                                                        <XCircle className="w-3 h-3 mr-1" /> Block
-                                                    </Button>
-                                                )}
-                                            </div>
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                    )}
-                </CardContent>
-            </Card>
         </div>
     );
 };

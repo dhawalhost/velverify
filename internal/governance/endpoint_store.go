@@ -45,7 +45,7 @@ func (r *sqlEndpointRepository) RegisterDevice(ctx context.Context, d Device) (s
 		 VALUES ($1, $2, $3, $4, $5, $6) 
 		 ON CONFLICT (tenant_id, serial) DO UPDATE SET os_version = $5, updated_at = NOW()
 		 RETURNING id`
-	err := r.db.QueryRowContext(ctx, query, 
+	err := r.db.QueryRowContext(ctx, query,
 		d.TenantID, d.UserID, d.Serial, d.Platform, d.OSVersion, "pending").Scan(&id)
 	if err != nil {
 		return "", fmt.Errorf("failed to register device: %w", err)

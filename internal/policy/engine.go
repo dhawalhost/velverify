@@ -37,7 +37,7 @@ func (e *simpleEngine) Register(ruleType RuleType, eval RuleEvaluator) {
 
 func (e *simpleEngine) Evaluate(ctx context.Context, input Input) (bool, string, error) {
 	// 1. CORE SYSTEM RULES (Hardcoded for maximum safety)
-	
+
 	// Separation of Duties (SOD) check
 	// This remains hardcoded as a "Guardrail" rule that cannot be overridden by tenant policy
 	if requesterID, ok := input.Context["requester_id"].(string); ok {

@@ -3,10 +3,11 @@ package governance
 import (
 	"net/http"
 
-	"github.com/dhawalhost/wardseal/internal/webhook"
-	"github.com/dhawalhost/wardseal/pkg/middleware"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
+
+	"github.com/dhawalhost/wardseal/internal/webhook"
+	"github.com/dhawalhost/wardseal/pkg/middleware"
 )
 
 // WebhookHTTPHandler handles webhook management requests.
@@ -20,7 +21,7 @@ func NewWebhookHTTPHandler(svc webhook.Service, logger *zap.Logger) *WebhookHTTP
 }
 
 func (h *WebhookHTTPHandler) RegisterRoutes(rg *gin.RouterGroup) {
-	hooks := rg.Group("/webhooks")
+	hooks := rg.Group("/governance/webhooks")
 	{
 		hooks.POST("", h.createWebhook)
 		hooks.GET("", h.listWebhooks)

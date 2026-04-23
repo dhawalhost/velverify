@@ -3,9 +3,10 @@ package sso
 import (
 	"net/http"
 
-	"github.com/dhawalhost/wardseal/pkg/middleware"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
+
+	"github.com/dhawalhost/wardseal/pkg/middleware"
 )
 
 // HTTPHandler handles SSO provider HTTP requests.
@@ -21,7 +22,7 @@ func NewHTTPHandler(svc Service, logger *zap.Logger) *HTTPHandler {
 
 // RegisterRoutes registers SSO routes.
 func (h *HTTPHandler) RegisterRoutes(rg *gin.RouterGroup) {
-	sso := rg.Group("/sso/providers")
+	sso := rg.Group("/saml/providers")
 	{
 		sso.GET("", h.listProviders)
 		sso.POST("", h.createProvider)

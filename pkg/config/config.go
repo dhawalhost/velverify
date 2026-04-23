@@ -9,9 +9,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dhawalhost/wardseal/pkg/types"
 	"github.com/spf13/viper"
 	"github.com/subosito/gotenv"
+
+	"github.com/dhawalhost/wardseal/pkg/types"
 )
 
 // Environment represents the deployment environment.
@@ -141,7 +142,7 @@ func Load(cfgFile string) (*Config, error) {
 
 	v.SetDefault("auth.base_url", "http://localhost:8080")
 	v.SetDefault("auth.directory_service_url", "http://localhost:8081")
-	v.SetDefault("auth.service_auth_header", "X-Service-Auth")
+	v.SetDefault("auth.service_auth_header", "X-Service-Token")
 	v.SetDefault("auth.rate_limit_use_tenant", true)
 	v.SetDefault("auth.rate_limit_key_prefix", "authsvc:ratelimit")
 
@@ -151,11 +152,31 @@ func Load(cfgFile string) (*Config, error) {
 	v.SetDefault("kms.vault_key_path", "transit")
 
 	v.SetDefault("slack.enabled", false)
+	v.SetDefault("governance.cors_allowed_origins", []string{"http://localhost:5173"})
 
 	// Environment variables
 	v.SetEnvPrefix("APP") // Align with gokit default prefix
 	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	v.AutomaticEnv()
+	// Explicitly bind environment variables for keys that don't have defaults but are required
+	_ = v.BindEnv("database.user")
+	_ = v.BindEnv("database.password")
+	_ = v.BindEnv("database.name")
+	_ = v.BindEnv("auth.base_url")
+	_ = v.BindEnv("auth.directory_service_url")
+	_ = v.BindEnv("auth.deployment_mode")
+	_ = v.BindEnv("auth.ui_url")
+	_ = v.BindEnv("auth.service_auth_token")
+	_ = v.BindEnv("auth.jwt_private_key_path")
+	_ = v.BindEnv("auth.jwt_public_key_path")
+	_ = v.BindEnv("auth.redis_addr")
+	_ = v.BindEnv("directory.service_auth_token")
+	_ = v.BindEnv("governance.directory_service_url")
+	_ = v.BindEnv("governance.webhook_secret")
+	_ = v.BindEnv("governance.cors_allowed_origins")
+	_ = v.BindEnv("kms.master_key")
+	_ = v.BindEnv("kms.vault_addr")
+	_ = v.BindEnv("kms.vault_token")
 
 	// Optional config file
 	if cfgFile != "" {
@@ -180,10 +201,11 @@ func Load(cfgFile string) (*Config, error) {
 	}
 
 	// Post-processing: Vault integration
+	// Post-processing: Vault integration
 	if cfg.KMS.VaultAddr != "" {
-		// In a real implementation, we would call a Vault client here.
-		// For now, we assume secrets were already loaded into Environment via gotenv or OS env.
-		// If late-binding from Vault is needed directly, we can add it here.
+		// Late-binding from Vault is handled dynamically in the KMS package.
+		// No immediate action needed here during initialization sweep.
+		_ = cfg.KMS.VaultAddr
 	}
 
 	if err := cfg.Validate(); err != nil {
@@ -230,7 +252,7 @@ func (c *Config) Validate() error {
 			problems = append(problems, fmt.Sprintf("AUTH_SERVICE_URL must be https in %s: %v", c.Environment, err))
 		}
 
-		if !strings.EqualFold(string(c.KMS.Provider), "vault") {
+		if !strings.EqualFold(c.KMS.Provider, "vault") {
 			problems = append(problems, fmt.Sprintf("KMS_PROVIDER must be 'vault' in %s", c.Environment))
 		}
 

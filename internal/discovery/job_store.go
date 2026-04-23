@@ -3,6 +3,7 @@ package discovery
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -21,12 +22,12 @@ const (
 
 // JobState contains the metadata for a discovery scan job.
 type JobState struct {
-	ID         string    `json:"id"`
-	TenantID   string    `json:"tenant_id"`
-	Status     JobStatus `json:"status"`
-	Progress   int       `json:"progress"` // 0-100
-	Message    string    `json:"message,omitempty"`
-	StartedAt  time.Time `json:"started_at"`
+	ID         string     `json:"id"`
+	TenantID   string     `json:"tenant_id"`
+	Status     JobStatus  `json:"status"`
+	Progress   int        `json:"progress"` // 0-100
+	Message    string     `json:"message,omitempty"`
+	StartedAt  time.Time  `json:"started_at"`
 	FinishedAt *time.Time `json:"finished_at,omitempty"`
 }
 
@@ -122,7 +123,7 @@ func (s *redisJobStore) Update(ctx context.Context, jobID string, updateFn func(
 func (s *redisJobStore) Get(ctx context.Context, jobID string) (*JobState, error) {
 	data, err := s.client.Get(ctx, s.key(jobID)).Bytes()
 	if err != nil {
-		if err == redis.Nil {
+		if errors.Is(err, redis.Nil) {
 			return nil, fmt.Errorf("job not found")
 		}
 		return nil, fmt.Errorf("failed to get job state: %w", err)

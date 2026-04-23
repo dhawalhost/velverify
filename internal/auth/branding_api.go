@@ -3,9 +3,10 @@ package auth
 import (
 	"net/http"
 
-	"github.com/dhawalhost/wardseal/pkg/middleware"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
+
+	"github.com/dhawalhost/wardseal/pkg/middleware"
 )
 
 // RegisterBrandingRoutes registers branding routes on the router.
@@ -16,7 +17,9 @@ func (h *HTTPHandler) RegisterBrandingRoutes(router *gin.RouterGroup) {
 
 	// Protected management endpoints
 	mgmt := router.Group("/api/v1/branding")
-	mgmt.Use(middleware.TenantExtractor(middleware.TenantConfig{}))
+	mgmt.Use(middleware.TenantExtractor(middleware.TenantConfig{
+		SlugResolver: h.svc.ResolveTenantSlug,
+	}))
 	mgmt.GET("", h.getBranding)
 	mgmt.PUT("", h.updateBranding)
 }

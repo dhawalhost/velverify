@@ -5,9 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"go.uber.org/zap"
+
 	"github.com/dhawalhost/wardseal/internal/governance"
 	"github.com/dhawalhost/wardseal/pkg/eventbus"
-	"go.uber.org/zap"
 )
 
 // ChatOpsSubscriber listens for events that require human intervention.
@@ -43,7 +44,7 @@ func (s *ChatOpsSubscriber) handleProposedRevocation(ctx context.Context, payloa
 		return err
 	}
 
-	s.log.Info("safety check: notifying slack about internal proposal", 
+	s.log.Info("safety check: notifying slack about internal proposal",
 		zap.String("action_id", action.ID),
 		zap.String("target_id", action.TargetID),
 	)

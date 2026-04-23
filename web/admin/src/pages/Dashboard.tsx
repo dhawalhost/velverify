@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { getSCIMUsers } from '../api';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
-import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@/components/ui/table';
+import { TableBody, TableCell } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
@@ -10,192 +10,273 @@ import {
     ShieldCheck,
     Activity,
     UserPlus,
-    MoreHorizontal
+    MoreHorizontal,
+    Database,
+    Clock,
+    Globe,
+    AlertTriangle
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { getGovernanceStats, DashboardStats } from '../api';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend, BarChart, Bar, XAxis, YAxis } from 'recharts';
+import { PageHeader, GlassCard, GlassCardHeader, GlassCardTitle, GlassCardContent, GlassTable, GlassTableHeader, GlassTableHead, GlassTableRow } from '@/components/layout';
+import { cn } from '@/lib/utils';
 // import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
 const Dashboard: React.FC = () => {
     const [users, setUsers] = useState<any[]>([]);
+    const [stats, setStats] = useState<DashboardStats | null>(null);
     const [error, setError] = useState('');
+    const [loading, setLoading] = useState(true);
     const navigate = useNavigate();
 
-    useEffect(() => {
-        const fetchUsers = async () => {
-            try {
-                const data = await getSCIMUsers();
-                // SCIM returns { Resources: [...] }
-                setUsers(data.Resources || []);
-            } catch (err: any) {
-                console.error(err);
-                setError('Failed to fetch users');
-                // Basic auth check
-                if (err.response?.status === 401) {
-                    navigate('/login');
-                }
+    const fetchData = async () => {
+        try {
+            const [usersData, statsData] = await Promise.all([
+                getSCIMUsers(),
+                getGovernanceStats()
+            ]);
+            setUsers(usersData.Resources || []);
+            setStats(statsData);
+            setError('');
+        } catch (err: any) {
+            console.error(err);
+            setError('Failed to refresh dashboard data');
+            if (err.response?.status === 401) {
+                navigate('/login');
             }
-        };
-        fetchUsers();
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchData();
+        const interval = setInterval(fetchData, 30000); // 30s Polling
+        return () => clearInterval(interval);
     }, [navigate]);
 
-    // Derived Stats
-    const totalUsers = users.length;
-    const activeUsers = users.filter(u => u.active).length;
-    const inactiveUsers = totalUsers - activeUsers;
+    // Risk levels for chart
+    const riskData = stats?.risk_profile ? Object.entries(stats.risk_profile).map(([name, value]) => ({
+        name: name.toUpperCase(),
+        value
+    })) : [];
+
+    const COLORS = ['#10b981', '#f59e0b', '#ef4444'];
 
     return (
-        <div className="space-y-8">
-            <div className="flex items-center justify-between">
-                <div>
-                    <h2 className="text-3xl font-bold tracking-tight">Overview</h2>
-                    <p className="text-muted-foreground mt-1">
-                        Manage your directory and monitor system health.
-                    </p>
-                </div>
-                <div className="flex items-center gap-2">
-                    <Button onClick={() => navigate('/users/new')}>
-                        <UserPlus className="mr-2 h-4 w-4" />
-                        Add User
+        <div className="space-y-12 animate-in fade-in duration-700">
+            <PageHeader
+                icon={
+                    <div className="p-3 bg-primary rounded-2xl shadow-lg shadow-primary/20">
+                        <ShieldCheck className="w-8 h-8 text-white" />
+                    </div>
+                }
+                title="Dashboard"
+                description="Overview of your identity infrastructure — users, access requests, policies, and security posture."
+                actions={
+                    <Button
+                        onClick={() => navigate('/users/new')}
+                        className="h-11 rounded-xl bg-primary text-white font-bold text-[12px] tracking-tight px-8 shadow-xl shadow-primary/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                    >
+                        <UserPlus className="mr-3 h-4 w-4" /> Add user
                     </Button>
-                </div>
-            </div>
+                }
+            />
 
             {error && (
-                <div className="bg-destructive/15 text-destructive px-4 py-3 rounded-md border border-destructive/20 text-sm font-medium">
+                <div className="bg-destructive/5 text-destructive px-6 py-4 rounded-xl border border-destructive/10 text-sm font-semibold">
                     {error}
                 </div>
             )}
 
             {/* Stats Cards */}
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                <Card className="shadow-sm">
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">
-                            Total Users
-                        </CardTitle>
-                        <Users className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{totalUsers}</div>
-                        <p className="text-xs text-muted-foreground">
-                            +2.5% from last month
-                        </p>
-                    </CardContent>
-                </Card>
-                <Card className="shadow-sm">
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">
-                            Active Identities
-                        </CardTitle>
-                        <Activity className="h-4 w-4 text-green-500" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{activeUsers}</div>
-                        <p className="text-xs text-muted-foreground">
-                            {((activeUsers / (totalUsers || 1)) * 100).toFixed(0)}% are active
-                        </p>
-                    </CardContent>
-                </Card>
-                <Card className="shadow-sm">
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">
-                            MFA Enrolled
-                        </CardTitle>
-                        <ShieldCheck className="h-4 w-4 text-primary" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">--</div>
-                        <p className="text-xs text-muted-foreground">
-                            MFA enrollment status
-                        </p>
-                    </CardContent>
-                </Card>
-                <Card className="shadow-sm">
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">
-                            Security Score
-                        </CardTitle>
-                        <Activity className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">98%</div>
-                        <p className="text-xs text-muted-foreground">
-                            Based on current policies
-                        </p>
-                    </CardContent>
-                </Card>
+            <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-4">
+                 <GlassCard className="border-none shadow-2xl shadow-on-surface/5 bg-white overflow-hidden rounded-[32px]">
+                    <GlassCardHeader className="flex flex-row items-center justify-between pb-4">
+                        <GlassCardTitle className="text-sm font-bold tracking-tight text-on-surface-variant/40">Total identities</GlassCardTitle>
+                        <div className="p-2 bg-primary/5 rounded-lg">
+                            <Users className="h-4 w-4 text-primary" />
+                        </div>
+                    </GlassCardHeader>
+                    <GlassCardContent>
+                        <div className="text-5xl font-bold tracking-tighter text-on-surface tabular-nums">{stats?.active_users ?? users.length}</div>
+                        <p className="text-[11px] font-bold text-emerald-500 mt-4 tracking-tight italic">Operational units</p>
+                    </GlassCardContent>
+                </GlassCard>
+
+                <GlassCard className="bg-primary text-white border-none shadow-2xl shadow-primary/20 overflow-hidden rounded-[32px]">
+                    <GlassCardHeader className="flex flex-row items-center justify-between pb-4">
+                        <GlassCardTitle className="text-sm font-bold tracking-tight text-white/40">Pending governance</GlassCardTitle>
+                        <div className="p-2 bg-white/10 rounded-lg">
+                            <Clock className="h-4 w-4 text-white" />
+                        </div>
+                    </GlassCardHeader>
+                    <GlassCardContent>
+                        <div className="text-5xl font-bold tracking-tighter tabular-nums">{stats?.pending_requests ?? '--'}</div>
+                        <p className="text-[11px] font-bold text-white/40 mt-4 tracking-tight italic">Awaiting review</p>
+                    </GlassCardContent>
+                </GlassCard>
+
+                <GlassCard className="border-none shadow-2xl shadow-on-surface/5 bg-white overflow-hidden rounded-[32px]">
+                    <GlassCardHeader className="flex flex-row items-center justify-between pb-4">
+                        <GlassCardTitle className="text-sm font-bold tracking-tight text-on-surface-variant/40">Network rules</GlassCardTitle>
+                        <div className="p-2 bg-primary/5 rounded-lg">
+                            <Globe className="h-4 w-4 text-primary" />
+                        </div>
+                    </GlassCardHeader>
+                    <GlassCardContent>
+                        <div className="text-5xl font-bold tracking-tighter text-on-surface tabular-nums">{stats?.active_ip_policies ?? '--'}</div>
+                        <p className="text-[11px] font-bold text-primary mt-4 tracking-tight italic">Active guardrails</p>
+                    </GlassCardContent>
+                </GlassCard>
+
+                <GlassCard className="border-none shadow-2xl shadow-on-surface/5 bg-white overflow-hidden rounded-[32px]">
+                    <GlassCardHeader className="flex flex-row items-center justify-between pb-4">
+                        <GlassCardTitle className="text-sm font-bold tracking-tight text-on-surface-variant/40">Hygiene rating</GlassCardTitle>
+                        <div className="p-2 bg-primary/5 rounded-lg">
+                            <ShieldCheck className="h-4 w-4 text-primary" />
+                        </div>
+                    </GlassCardHeader>
+                    <GlassCardContent>
+                        <div className="text-5xl font-bold tracking-tighter text-on-surface tabular-nums">{stats?.hygiene_score ?? '--'}<span className="text-2xl ml-1 opacity-20">%</span></div>
+                        <p className="text-[11px] font-bold text-emerald-500 mt-4 tracking-tight italic">System posture</p>
+                    </GlassCardContent>
+                </GlassCard>
+            </div>
+
+            <div className="grid gap-6 md:grid-cols-7">
+                <GlassCard className="col-span-4">
+                    <GlassCardHeader>
+                        <GlassCardTitle className="flex items-center gap-2">
+                            <Database className="w-4 h-4 opacity-20" />
+                            Provisioning load telemetry
+                        </GlassCardTitle>
+                    </GlassCardHeader>
+                    <GlassCardContent className="p-8">
+                        <div className="h-[260px] w-full">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={[
+                                    { name: 'Identities', value: stats?.active_users ?? 0 },
+                                    { name: 'Groups', value: stats?.total_groups ?? 0 },
+                                    { name: 'Workloads', value: stats?.active_workloads ?? 0 },
+                                    { name: 'Policies', value: stats?.active_ip_policies ?? 0 },
+                                ]}>
+                                    <XAxis dataKey="name" fontSize={10} fontWeight="600" tickLine={false} axisLine={false} dy={10} />
+                                    <YAxis fontSize={10} fontWeight="600" tickLine={false} axisLine={false} />
+                                    <Bar dataKey="value" fill="currentColor" className="text-primary" radius={[4, 4, 0, 0]} barSize={40} />
+                                </BarChart>
+                            </ResponsiveContainer>
+                        </div>
+                    </GlassCardContent>
+                </GlassCard>
+
+                <GlassCard className="col-span-3">
+                    <GlassCardHeader>
+                        <GlassCardTitle className="flex items-center gap-2">
+                            <AlertTriangle className="w-4 h-4 opacity-20" />
+                            Risk distribution matrix
+                        </GlassCardTitle>
+                    </GlassCardHeader>
+                    <GlassCardContent className="p-8">
+                        <div className="h-[260px] w-full">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <PieChart>
+                                    <Pie
+                                        data={riskData}
+                                        cx="50%"
+                                        cy="50%"
+                                        innerRadius={70}
+                                        outerRadius={90}
+                                        paddingAngle={4}
+                                        dataKey="value"
+                                        stroke="none"
+                                    >
+                                        {riskData.map((entry, index) => (
+                                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                        ))}
+                                    </Pie>
+                                    <Tooltip contentStyle={{ fontSize: '11px', fontWeight: 'bold', border: '1px solid #E2E8F0', borderRadius: '12px', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', padding: '12px' }} />
+                                    <Legend iconType="circle" iconSize={8} verticalAlign="bottom" height={36} formatter={(value) => <span className="text-[11px] font-semibold text-on-surface-variant pl-2">{value}</span>} />
+                                </PieChart>
+                            </ResponsiveContainer>
+                        </div>
+                    </GlassCardContent>
+                </GlassCard>
             </div>
 
             {/* Content Table */}
-            <Card className="shadow-sm border-muted/60">
-                <CardHeader>
-                    <CardTitle>Recent Users</CardTitle>
-                    <CardDescription>
-                        A list of users recently added to your directory.
-                    </CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <div className="rounded-md border">
-                        <Table>
-                            <TableHeader className="bg-muted/50">
-                                <TableRow>
-                                    <TableHead className="w-[80px]">Avatar</TableHead>
-                                    <TableHead>User</TableHead>
-                                    <TableHead>Status</TableHead>
-                                    <TableHead>Created</TableHead>
-                                    <TableHead className="text-right">Actions</TableHead>
-                                </TableRow>
-                            </TableHeader>
+            <GlassCard className="overflow-hidden border-none shadow-xl shadow-on-surface/5 bg-white rounded-[32px]">
+                <GlassCardHeader className="py-8 px-10">
+                    <div className="flex items-center gap-5">
+                        <div className="p-3.5 bg-primary/5 rounded-2xl">
+                            <Users className="w-6 h-6 text-primary" />
+                        </div>
+                        <div>
+                            <GlassCardTitle className="text-2xl font-bold tracking-tight text-on-surface">Synchronized identity stream</GlassCardTitle>
+                            <p className="text-on-surface-variant/60 font-medium text-[11px] mt-1.5 italic">Real-time directory feed</p>
+                        </div>
+                    </div>
+                </GlassCardHeader>
+                <GlassCardContent className="p-0">
+                    <div className="overflow-x-auto">
+                        <GlassTable>
+                            <GlassTableHeader>
+                                <GlassTableRow className="hover:bg-transparent border-b border-on-surface/5">
+                                    <GlassTableHead className="py-6 pl-10">Identity profile</GlassTableHead>
+                                    <GlassTableHead>Access status</GlassTableHead>
+                                    <GlassTableHead>Synchronization</GlassTableHead>
+                                    <GlassTableHead className="text-right pr-10">Directives</GlassTableHead>
+                                </GlassTableRow>
+                            </GlassTableHeader>
                             <TableBody>
                                 {users.length === 0 ? (
-                                    <TableRow>
-                                        <TableCell colSpan={5} className="text-center text-muted-foreground h-32">
-                                            No users found.
+                                    <GlassTableRow>
+                                        <TableCell colSpan={4} className="py-32 text-center text-sm font-medium text-on-surface-variant/40">
+                                            No active identities detected in the current telemetry span.
                                         </TableCell>
-                                    </TableRow>
+                                    </GlassTableRow>
                                 ) : (
                                     users.map((user) => (
-                                        <TableRow key={user.id}>
-                                            <TableCell>
-                                                <Avatar className="h-9 w-9">
-                                                    <AvatarImage src={`https://avatar.vercel.sh/${user.userName}`} />
-                                                    <AvatarFallback>{user.userName.substring(0, 2).toUpperCase()}</AvatarFallback>
-                                                </Avatar>
-                                            </TableCell>
-                                            <TableCell>
-                                                <div className="flex flex-col">
-                                                    <span className="font-medium">{user.userName}</span>
-                                                    <span className="text-xs text-muted-foreground font-mono">{user.id}</span>
+                                        <GlassTableRow key={user.id} className="hover:bg-surface-container/20 transition-all border-b border-on-surface/5 last:border-0 group">
+                                            <TableCell className="py-6 pl-10">
+                                                <div className="flex items-center gap-5">
+                                                    <Avatar className="h-10 w-10 border-none ring-1 ring-on-surface/5 rounded-2xl overflow-hidden group-hover:scale-105 transition-transform">
+                                                        <AvatarImage src={`https://avatar.vercel.sh/${user.userName}`} />
+                                                        <AvatarFallback className="bg-primary/5 text-xs font-bold text-primary">{user.userName?.substring(0, 2).toUpperCase() || '??'}</AvatarFallback>
+                                                    </Avatar>
+                                                    <div className="flex flex-col">
+                                                        <span className="font-bold text-sm tracking-tight text-on-surface group-hover:text-primary transition-colors">{user.userName}</span>
+                                                        <span className="text-[10px] text-on-surface-variant/40 font-mono tracking-tight">{user.id}</span>
+                                                    </div>
                                                 </div>
                                             </TableCell>
-                                            <TableCell>
-                                                <Badge variant={user.active ? "outline" : "secondary"} className={user.active ? "border-green-500 text-green-600 bg-green-50" : ""}>
-                                                    <span className={`w-1.5 h-1.5 rounded-full mr-2 ${user.active ? "bg-green-500" : "bg-gray-400"}`}></span>
-                                                    {user.active ? 'Active' : 'Inactive'}
+                                            <TableCell className="py-6">
+                                                <Badge className={cn("rounded-lg font-bold text-[10px] tracking-tight px-3 py-1 shadow-none border-none", user.active ? "bg-emerald-50 text-emerald-600" : "bg-red-50 text-red-600")}>
+                                                    {user.active ? 'Operational' : 'Inert'}
                                                 </Badge>
                                             </TableCell>
-                                            <TableCell className="text-muted-foreground text-sm">
-                                                {/* Mock date if not present, usually SCIM has meta.created */}
-                                                {user.meta?.created ? new Date(user.meta.created).toLocaleDateString() : 'Just now'}
+                                            <TableCell className="py-6 text-on-surface-variant text-xs font-medium">
+                                                {user.meta?.created ? new Date(user.meta.created).toLocaleDateString() : 'Initial Link'}
                                             </TableCell>
-                                            <TableCell className="text-right">
+                                            <TableCell className="py-6 text-right pr-10">
                                                 <Button
                                                     variant="ghost"
                                                     size="sm"
                                                     onClick={() => navigator.clipboard.writeText(user.id)}
-                                                    title="Copy ID"
+                                                    className="h-9 w-9 rounded-xl hover:bg-surface-container transition-all"
                                                 >
-                                                    Copy ID
+                                                    <MoreHorizontal className="h-4 w-4 opacity-40" />
                                                 </Button>
                                             </TableCell>
-                                        </TableRow>
+                                        </GlassTableRow>
                                     ))
                                 )}
                             </TableBody>
-                        </Table>
+                        </GlassTable>
                     </div>
-                </CardContent>
-            </Card>
+                </GlassCardContent>
+            </GlassCard>
         </div>
     );
 };

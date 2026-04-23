@@ -1,7 +1,7 @@
 -- Migration for multi-tenant Slack integration
 CREATE TABLE IF NOT EXISTS chatops_slack_integrations (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id UUID NOT NULL UNIQUE,
+    tenant_id VARCHAR(255) NOT NULL UNIQUE,
     team_id TEXT NOT NULL,
     app_id TEXT NOT NULL,
     bot_token_enc BYTEA,

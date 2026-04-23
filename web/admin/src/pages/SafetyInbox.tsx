@@ -4,7 +4,8 @@ import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/com
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Check, X, ShieldAlert, History } from 'lucide-react';
+import { Check, X, ShieldAlert, History, Activity } from 'lucide-react';
+import { PageHeader, GlassCard, GlassCardHeader, GlassCardTitle, GlassCardContent, GlassTable, GlassTableHeader, GlassTableHead, GlassTableRow } from '@/components/layout';
 
 const SafetyInbox: React.FC = () => {
     const [actions, setActions] = useState<any[]>([]);
@@ -49,101 +50,118 @@ const SafetyInbox: React.FC = () => {
     if (loading) return <div className="p-8 text-center text-muted-foreground">Monitoring directory safe state...</div>;
 
     return (
-        <div className="space-y-6">
-            <div className="flex justify-between items-center">
-                <div>
-                    <h1 className="text-3xl font-bold tracking-tight">Safety Inbox</h1>
-                    <p className="text-muted-foreground">Confirm or intercept automated security revocations.</p>
-                </div>
-                <Button variant="outline" size="sm" onClick={() => fetchActions()}>
-                    <History className="mr-2 h-4 w-4" /> Refresh
-                </Button>
-            </div>
+        <div className="space-y-12 animate-in fade-in duration-700">
+            <PageHeader
+                icon={<ShieldAlert className="w-10 h-10 text-red-600" />}
+                title="Safety Interceptor"
+                description="Monitor and intercept automated security revocations. Orchestrate emergency circuit breakers and identity isolation protocols."
+                actions={
+                    <Button
+                        variant="outline"
+                        onClick={() => fetchActions()}
+                        className="h-11 rounded-xl bg-white ring-1 ring-on-surface/5 font-bold tracking-tight text-[11px] px-8 shadow-sm transition-all hover:bg-surface-container"
+                    >
+                        <History className="mr-2 h-4 w-4" /> Refresh Registry
+                    </Button>
+                }
+            />
 
             {error && (
-                <div className="bg-destructive/15 text-destructive px-4 py-2 rounded-md flex items-center gap-2 text-sm">
+                <div className="bg-red-50 text-red-600 px-6 py-4 rounded-2xl flex items-center gap-4 text-[12px] font-bold tracking-tight border border-red-100 animate-in slide-in-from-top-2">
                     <ShieldAlert className="h-4 w-4" />
-                    {error}
+                    Neural Sync Error: {error}
                 </div>
             )}
 
-            <Card className="border-red-500/20 shadow-lg shadow-red-500/5">
-                <CardHeader className="bg-red-500/5 border-b border-red-500/10 rounded-t-lg">
-                    <CardTitle className="text-lg flex items-center gap-2 text-red-600">
-                        <ShieldAlert className="h-5 w-5" />
-                        Pending Critical Actions
-                    </CardTitle>
-                    <CardDescription>
-                        These actions require human confirmation to proceed. Unconfirmed actions will remain in the safety store.
-                    </CardDescription>
-                </CardHeader>
-                <CardContent className="pt-6">
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Action Type</TableHead>
-                                <TableHead>Target User</TableHead>
-                                <TableHead>Reason</TableHead>
-                                <TableHead>Metadata</TableHead>
-                                <TableHead>Proposed At</TableHead>
-                                <TableHead className="text-right">Safety Control</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {actions.length === 0 ? (
-                                <TableRow>
-                                    <TableCell colSpan={6} className="text-center text-muted-foreground h-32">
-                                        No pending safety actions. System is in safe state.
-                                    </TableCell>
-                                </TableRow>
-                            ) : (
-                                actions.map((action) => (
-                                    <TableRow key={action.id}>
-                                        <TableCell>
-                                            <Badge variant="destructive" className="font-mono bg-red-600">
-                                                {action.action_type.replaceAll('_', ' ')}
-                                            </Badge>
-                                        </TableCell>
-                                        <TableCell className="font-medium">{action.target_id}</TableCell>
-                                        <TableCell className="max-w-xs">{action.reason}</TableCell>
-                                        <TableCell>
-                                            <div className="flex gap-1 flex-wrap">
-                                                {action.metadata && action.metadata.org_ids && action.metadata.org_ids.map((org: string) => (
-                                                    <Badge key={org} variant="secondary" className="text-[10px] px-1 h-4">
-                                                        {org}
-                                                    </Badge>
-                                                ))}
+            <div className="grid grid-cols-1 gap-8">
+                <GlassCard className="border-none shadow-2xl shadow-red-500/5 bg-white overflow-hidden rounded-[32px]">
+                    <GlassCardHeader className="bg-red-50/30 border-b border-red-100 py-8 px-10">
+                        <div className="flex items-center gap-5">
+                            <div className="p-3 bg-red-600 rounded-2xl text-white shadow-lg shadow-red-600/20">
+                                <Activity className="h-6 w-6" />
+                            </div>
+                            <div>
+                                <GlassCardTitle className="text-2xl font-bold tracking-tight text-on-surface">Red Alert Queue</GlassCardTitle>
+                                <p className="text-red-600/60 font-bold text-[12px] mt-1 tracking-tight">Pending critical identity revocations ({actions.length})</p>
+                            </div>
+                        </div>
+                    </GlassCardHeader>
+                    <GlassCardContent className="p-0">
+                        <GlassTable>
+                            <GlassTableHeader>
+                                <GlassTableRow className="hover:bg-transparent border-b border-on-surface/5">
+                                    <GlassTableHead className="py-6 pl-10 font-bold text-[12px] tracking-tight text-on-surface-variant/40">Action Vector</GlassTableHead>
+                                    <GlassTableHead className="font-bold text-[12px] tracking-tight text-on-surface-variant/40">Identity Target</GlassTableHead>
+                                    <GlassTableHead className="font-bold text-[12px] tracking-tight text-on-surface-variant/40">Risk Intelligence</GlassTableHead>
+                                    <GlassTableHead className="font-bold text-[12px] tracking-tight text-on-surface-variant/40">Metadata</GlassTableHead>
+                                    <GlassTableHead className="font-bold text-[12px] tracking-tight text-on-surface-variant/40">Observation Chronology</GlassTableHead>
+                                    <GlassTableHead className="text-right font-bold text-[12px] tracking-tight text-on-surface-variant/40 pr-10">Intervention</GlassTableHead>
+                                </GlassTableRow>
+                            </GlassTableHeader>
+                            <TableBody>
+                                {actions.length === 0 ? (
+                                    <GlassTableRow>
+                                        <TableCell colSpan={6} className="text-center py-32 text-on-surface-variant/30 italic">
+                                            <div className="flex flex-col items-center gap-6">
+                                                <div className="w-20 h-20 rounded-3xl bg-emerald-50 flex items-center justify-center">
+                                                    <Check className="h-10 w-10 text-emerald-500 opacity-40" />
+                                                </div>
+                                                <span className="max-w-xs font-bold text-[12px] tracking-tight text-on-surface-variant/40 italic">System equilibrium established. Zero pending safety actions.</span>
                                             </div>
                                         </TableCell>
-                                        <TableCell className="text-muted-foreground text-sm">
-                                            {new Date(action.created_at).toLocaleString()}
-                                        </TableCell>
-                                        <TableCell className="text-right">
-                                            <div className="flex justify-end gap-2">
-                                                <Button 
-                                                    size="sm" 
-                                                    className="bg-red-600 hover:bg-red-700 text-white"
-                                                    onClick={() => handleConfirm(action.id)}
-                                                >
-                                                    <Check className="h-4 w-4 mr-1" /> Execute
-                                                </Button>
-                                                <Button 
-                                                    size="sm" 
-                                                    variant="outline" 
-                                                    className="text-muted-foreground hover:bg-secondary"
-                                                    onClick={() => handleReject(action.id)}
-                                                >
-                                                    <X className="h-4 w-4 mr-1" /> Intercept
-                                                </Button>
-                                            </div>
-                                        </TableCell>
-                                    </TableRow>
-                                ))
-                            )}
-                        </TableBody>
-                    </Table>
-                </CardContent>
-            </Card>
+                                    </GlassTableRow>
+                                ) : (
+                                    actions.map((action) => (
+                                        <GlassTableRow key={action.id} className="hover:bg-red-50/10 transition-all border-b border-on-surface/5 last:border-0 group">
+                                            <TableCell className="py-8 pl-10">
+                                                <Badge className="bg-red-500/10 text-red-600 border-none rounded-lg font-bold text-[11px] tracking-tight px-3 py-1 group-hover:bg-red-500 group-hover:text-white transition-all">
+                                                    {action.action_type ? (action.action_type.charAt(0).toUpperCase() + action.action_type.slice(1).toLowerCase()).replaceAll('_', ' ') : 'Unknown Action'}
+                                                </Badge>
+                                            </TableCell>
+                                            <TableCell className="py-8 font-mono text-xs font-bold text-on-surface">{action.target_id}</TableCell>
+                                            <TableCell className="py-8 max-w-xs text-xs font-medium italic text-on-surface-variant/60">{action.reason}</TableCell>
+                                            <TableCell className="py-8">
+                                                <div className="flex gap-1.5 flex-wrap">
+                                                    {Array.isArray(action.metadata?.org_ids) && action.metadata.org_ids.map((org: string) => (
+                                                        <Badge key={org} className="bg-surface-container text-on-surface-variant/40 border-none rounded-lg font-bold text-[10px] tracking-tight px-2 py-0.5 h-5">
+                                                            {org}
+                                                        </Badge>
+                                                    ))}
+                                                </div>
+                                            </TableCell>
+                                            <TableCell className="py-8">
+                                                <div className="flex flex-col gap-1">
+                                                    <span className="text-[11px] font-bold text-on-surface">{new Date(action.created_at).toLocaleDateString()}</span>
+                                                    <span className="text-[10px] font-mono font-bold text-on-surface-variant/20 tracking-tight">{new Date(action.created_at).toLocaleTimeString()}</span>
+                                                </div>
+                                            </TableCell>
+                                            <TableCell className="py-8 text-right pr-10">
+                                                <div className="flex justify-end gap-3">
+                                                    <Button
+                                                        size="sm"
+                                                        className="h-10 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold tracking-tight text-[11px] px-5 shadow-lg shadow-red-600/20 transition-all active:scale-95"
+                                                        onClick={() => handleConfirm(action.id)}
+                                                    >
+                                                        <Check className="h-3.5 w-3.5 mr-2" /> Execute
+                                                    </Button>
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        className="h-10 rounded-xl bg-white ring-1 ring-on-surface/5 font-bold tracking-tight text-[11px] px-5 shadow-sm transition-all hover:bg-surface-container active:scale-95 text-on-surface-variant/40"
+                                                        onClick={() => handleReject(action.id)}
+                                                    >
+                                                        <X className="h-3.5 w-3.5 mr-2" /> Intercept
+                                                    </Button>
+                                                </div>
+                                            </TableCell>
+                                        </GlassTableRow>
+                                    ))
+                                )}
+                            </TableBody>
+                        </GlassTable>
+                    </GlassCardContent>
+                </GlassCard>
+            </div>
         </div>
     );
 };

@@ -31,12 +31,13 @@ type Provider struct {
 	OIDCScopes       *string `json:"oidc_scopes,omitempty" db:"oidc_scopes"`
 
 	// SAML Configuration
-	SAMLEntityID       *string `json:"saml_entity_id,omitempty" db:"saml_entity_id"`
-	SAMLSSOURL         *string `json:"saml_sso_url,omitempty" db:"saml_sso_url"`
-	SAMLSLOURL         *string `json:"saml_slo_url,omitempty" db:"saml_slo_url"`
-	SAMLCertificate    *string `json:"saml_certificate,omitempty" db:"saml_certificate"`
-	SAMLSignRequests   bool    `json:"saml_sign_requests" db:"saml_sign_requests"`
-	SAMLSignAssertions bool    `json:"saml_sign_assertions" db:"saml_sign_assertions"`
+	SAMLEntityID          *string `json:"saml_entity_id,omitempty" db:"saml_entity_id"`
+	SAMLSSOURL            *string `json:"saml_sso_url,omitempty" db:"saml_sso_url"`
+	SAMLSLOURL            *string `json:"saml_slo_url,omitempty" db:"saml_slo_url"`
+	SAMLCertificate       *string `json:"saml_certificate,omitempty" db:"saml_certificate"`
+	SAMLSignRequests      bool    `json:"saml_sign_requests" db:"saml_sign_requests"`
+	SAMLSignAssertions    bool    `json:"saml_sign_assertions" db:"saml_sign_assertions"`
+	SAMLEncryptAssertions bool    `json:"saml_encrypt_assertions" db:"saml_encrypt_assertions"`
 
 	// Common settings
 	AutoCreateUsers   bool            `json:"auto_create_users" db:"auto_create_users"`
@@ -69,14 +70,14 @@ func NewRepository(db *sqlx.DB) Repository {
 func (s *sqlRepository) Create(ctx context.Context, p Provider) (string, error) {
 	var id string
 	err := s.db.QueryRowxContext(ctx,
-		`INSERT INTO sso_providers (tenant_id, name, type, enabled, 
+		`INSERT INTO sso_providers (tenant_id, name, type, enabled,
 			oidc_issuer_url, oidc_client_id, oidc_client_secret, oidc_scopes,
-			saml_entity_id, saml_sso_url, saml_slo_url, saml_certificate, saml_sign_requests, saml_sign_assertions,
+			saml_entity_id, saml_sso_url, saml_slo_url, saml_certificate, saml_sign_requests, saml_sign_assertions, saml_encrypt_assertions,
 			auto_create_users, default_role_id, attribute_mappings)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17) RETURNING id`,
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18) RETURNING id`,
 		p.TenantID, p.Name, p.Type, p.Enabled,
 		p.OIDCIssuerURL, p.OIDCClientID, p.OIDCClientSecret, p.OIDCScopes,
-		p.SAMLEntityID, p.SAMLSSOURL, p.SAMLSLOURL, p.SAMLCertificate, p.SAMLSignRequests, p.SAMLSignAssertions,
+		p.SAMLEntityID, p.SAMLSSOURL, p.SAMLSLOURL, p.SAMLCertificate, p.SAMLSignRequests, p.SAMLSignAssertions, p.SAMLEncryptAssertions,
 		p.AutoCreateUsers, p.DefaultRoleID, p.AttributeMappings,
 	).Scan(&id)
 	return id, err
@@ -117,13 +118,13 @@ func (s *sqlRepository) Update(ctx context.Context, p Provider) error {
 			name = $1, enabled = $2,
 			oidc_issuer_url = $3, oidc_client_id = $4, oidc_client_secret = $5, oidc_scopes = $6,
 			saml_entity_id = $7, saml_sso_url = $8, saml_slo_url = $9, saml_certificate = $10, 
-			saml_sign_requests = $11, saml_sign_assertions = $12,
-			auto_create_users = $13, default_role_id = $14, attribute_mappings = $15,
+			saml_sign_requests = $11, saml_sign_assertions = $12, saml_encrypt_assertions = $13,
+			auto_create_users = $14, default_role_id = $15, attribute_mappings = $16,
 			updated_at = NOW()
-		WHERE id = $16 AND tenant_id = $17`,
+		WHERE id = $17 AND tenant_id = $18`,
 		p.Name, p.Enabled,
 		p.OIDCIssuerURL, p.OIDCClientID, p.OIDCClientSecret, p.OIDCScopes,
-		p.SAMLEntityID, p.SAMLSSOURL, p.SAMLSLOURL, p.SAMLCertificate, p.SAMLSignRequests, p.SAMLSignAssertions,
+		p.SAMLEntityID, p.SAMLSSOURL, p.SAMLSLOURL, p.SAMLCertificate, p.SAMLSignRequests, p.SAMLSignAssertions, p.SAMLEncryptAssertions,
 		p.AutoCreateUsers, p.DefaultRoleID, p.AttributeMappings,
 		p.ID, p.TenantID)
 	return err

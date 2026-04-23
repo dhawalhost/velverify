@@ -113,10 +113,12 @@ func (f *fakeDirectoryService) RemoveUserFromOrganization(ctx context.Context, t
 func (f *fakeDirectoryService) ListUserOrganizations(ctx context.Context, tenantID, userID string) ([]string, error) {
 	return nil, nil
 }
-
+func (f *fakeDirectoryService) ListGroupMembers(ctx context.Context, tenantID, groupID string) ([]directory.User, error) {
+	return nil, nil
+}
 func TestCreateUserPrefersPrimaryEmail(t *testing.T) {
 	fake := &fakeDirectoryService{createUserID: "user-123"}
-	svc := NewService(fake)
+	svc := NewService(fake, nil)
 
 	req := User{
 		Schemas:  []string{UserSchema},
@@ -143,7 +145,7 @@ func TestCreateUserPrefersPrimaryEmail(t *testing.T) {
 
 func TestCreateUserUsesProvidedPassword(t *testing.T) {
 	fake := &fakeDirectoryService{createUserID: "user-123"}
-	svc := NewService(fake)
+	svc := NewService(fake, nil)
 
 	req := User{
 		Schemas:  []string{UserSchema},
@@ -164,7 +166,7 @@ func TestCreateUserUsesProvidedPassword(t *testing.T) {
 
 func TestCreateUserRejectsShortPassword(t *testing.T) {
 	fake := &fakeDirectoryService{createUserID: "user-123"}
-	svc := NewService(fake)
+	svc := NewService(fake, nil)
 
 	req := User{
 		Schemas:  []string{UserSchema},
@@ -181,7 +183,7 @@ func TestCreateUserRejectsShortPassword(t *testing.T) {
 
 func TestCreateUserGeneratesNonStaticPasswordWhenMissing(t *testing.T) {
 	fake := &fakeDirectoryService{createUserID: "user-123"}
-	svc := NewService(fake)
+	svc := NewService(fake, nil)
 
 	req := User{
 		Schemas:  []string{UserSchema},
@@ -207,7 +209,7 @@ func TestListUsersAppliesScimPaginationDefaults(t *testing.T) {
 		users:      []directory.User{{ID: "u1", Email: "u1@wardseal.com", Status: "active", CreatedAt: time.Now(), UpdatedAt: time.Now()}},
 		totalUsers: 42,
 	}
-	svc := NewService(fake)
+	svc := NewService(fake, nil)
 
 	resp, err := svc.ListUsers(context.Background(), "tenant-1", "", 0, 500)
 	if err != nil {
@@ -235,7 +237,7 @@ func TestPatchUserReplaceActiveAndUserName(t *testing.T) {
 	fake := &fakeDirectoryService{
 		currentUser: directory.User{ID: "u1", Email: "old@wardseal.com", Status: "active", CreatedAt: time.Now(), UpdatedAt: time.Now()},
 	}
-	svc := NewService(fake)
+	svc := NewService(fake, nil)
 
 	ops := []PatchOperation{
 		{Op: "replace", Path: "active", Value: false},
@@ -263,7 +265,7 @@ func TestListGroupsAppliesPagination(t *testing.T) {
 		groups:      []directory.Group{{ID: "g1", Name: "Engineering", CreatedAt: time.Now(), UpdatedAt: time.Now()}},
 		totalGroups: 7,
 	}
-	svc := NewService(fake)
+	svc := NewService(fake, nil)
 
 	resp, err := svc.ListGroups(context.Background(), "tenant-1", 2, 1)
 	if err != nil {

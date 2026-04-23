@@ -99,6 +99,18 @@ type CreateGroupResponse struct {
 	GroupID string `json:"group_id"`
 }
 
+// ListGroupsRequest holds the request parameters for listing groups.
+type ListGroupsRequest struct {
+	Limit  int `form:"limit"`
+	Offset int `form:"offset"`
+}
+
+// ListGroupsResponse holds the response values for listing groups.
+type ListGroupsResponse struct {
+	Groups []Group `json:"groups"`
+	Total  int     `json:"total"`
+}
+
 // GetGroupByIDRequest holds the request parameters for the GetGroupByID endpoint.
 type GetGroupByIDRequest struct {
 	ID string `json:"id" validate:"required,uuid"`
@@ -143,6 +155,11 @@ type RemoveUserFromGroupRequest struct {
 
 // RemoveUserFromGroupResponse holds the response values for the RemoveUserFromGroup endpoint.
 type RemoveUserFromGroupResponse struct{}
+
+// ListGroupMembersResponse holds the response values for listing group members.
+type ListGroupMembersResponse struct {
+	Users []User `json:"users"`
+}
 
 // VerifyCredentialsRequest holds the request parameters for credential verification.
 type VerifyCredentialsRequest struct {

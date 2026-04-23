@@ -6,22 +6,23 @@ import (
 	"fmt"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/dhawalhost/wardseal/internal/connector"
 	"github.com/dhawalhost/wardseal/pkg/eventbus"
-	"go.uber.org/zap"
 )
 
 // DiscoveredResource represents a resource found by a scanner.
 type DiscoveredResource struct {
-	ID               string                 `json:"id" db:"id"`
-	TenantID         string                 `json:"tenant_id" db:"tenant_id"`
-	ConnectorID      string                 `json:"connector_id" db:"connector_id"`
-	Type             string                 `json:"type" db:"type"`
-	Name             string                 `json:"name" db:"name"`
-	ExternalID       string                 `json:"external_id" db:"external_id"`
-	Metadata         map[string]interface{} `json:"metadata" db:"metadata"`
-	Status           string                 `json:"status" db:"status"`
-	LastDiscoveredAt time.Time              `json:"last_discovered_at" db:"last_discovered_at"`
+	ID               string    `json:"id" db:"id"`
+	TenantID         string    `json:"tenant_id" db:"tenant_id"`
+	ConnectorID      string    `json:"connector_id" db:"connector_id"`
+	Type             string    `json:"type" db:"type"`
+	Name             string    `json:"name" db:"name"`
+	ExternalID       string    `json:"external_id" db:"external_id"`
+	Metadata         JSONMap   `json:"metadata" db:"metadata"`
+	Status           string    `json:"status" db:"status"`
+	LastDiscoveredAt time.Time `json:"last_discovered_at" db:"last_discovered_at"`
 }
 
 // Repository defines the storage interface for discovered resources.
@@ -69,14 +70,14 @@ func (s *discoveryService) Start(ctx context.Context) {
 
 			// Run the job in a background goroutine to not block the subscriber
 			go func() {
-				// Use a fresh context for the background job
-				jobCtx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+				// Use a fresh context for the background job that doesn't cancel when the event handler returns
+				jobCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Minute)
 				defer cancel()
-				
+
 				if err := s.RunDiscoveryJob(jobCtx, event.JobID, event.TenantID); err != nil {
-					s.log.Error("Discovery job failed", 
-						zap.String("job_id", event.JobID), 
-						zap.String("tenant_id", event.TenantID), 
+					s.log.Error("Discovery job failed",
+						zap.String("job_id", event.JobID),
+						zap.String("tenant_id", event.TenantID),
 						zap.Error(err))
 				}
 			}()
@@ -142,13 +143,13 @@ func (s *discoveryService) RunDiscoveryJob(ctx context.Context, jobID, tenantID 
 
 		resources, err := c.DiscoverResources(ctx)
 		if err != nil {
-			s.log.Warn("Connector discovery failed", 
-				zap.String("connector_id", c.ID()), 
+			s.log.Warn("Connector discovery failed",
+				zap.String("connector_id", c.ID()),
 				zap.Error(err))
 		} else {
 			for _, res := range resources {
 				// Convert map[string]string to map[string]interface{} for metadata
-				metadata := make(map[string]interface{})
+				metadata := make(JSONMap)
 				for k, v := range res.Metadata {
 					metadata[k] = v
 				}

@@ -4,18 +4,14 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
-	"crypto/rsa"
 	"crypto/sha256"
 	"crypto/subtle"
-	"crypto/x509"
-	"crypto/x509/pkix"
 	"database/sql"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
-	"math/big"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -23,11 +19,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dhawalhost/wardseal/internal/oauthclient"
-	"github.com/dhawalhost/wardseal/internal/rbac"
-	"github.com/dhawalhost/wardseal/internal/saml"
-	"github.com/dhawalhost/wardseal/pkg/kms"
-	"github.com/dhawalhost/wardseal/pkg/middleware"
 	"github.com/go-webauthn/webauthn/protocol"
 	"github.com/go-webauthn/webauthn/webauthn"
 	"github.com/golang-jwt/jwt/v5"
@@ -35,6 +26,13 @@ import (
 	"go.uber.org/zap"
 	"golang.org/x/crypto/bcrypt"
 	"gopkg.in/go-jose/go-jose.v2"
+
+	"github.com/dhawalhost/wardseal/internal/authz"
+	"github.com/dhawalhost/wardseal/internal/oauthclient"
+	"github.com/dhawalhost/wardseal/internal/rbac"
+	"github.com/dhawalhost/wardseal/internal/saml"
+	"github.com/dhawalhost/wardseal/pkg/kms"
+	"github.com/dhawalhost/wardseal/pkg/middleware"
 )
 
 // Service defines the interface for the auth service.
@@ -117,6 +115,10 @@ type authService struct {
 	appStore            DeveloperAppRepository
 	rbacStore           rbac.Repository
 	ipPolicyStore       IPPolicyRepository
+	samlIdPRepo         saml.IdPRepository
+	cipher              kms.Cipher
+	graphEngine         *authz.Engine
+	workloadStore       WorkloadRepository
 	deploymentMode      string
 	baseURL             string
 	uiURL               string
@@ -166,6 +168,10 @@ type Config struct {
 	AppStore         DeveloperAppRepository
 	IPPolicyStore    IPPolicyRepository
 	RBACStore        rbac.Repository
+	SAMLIdPRepo      saml.IdPRepository
+	Cipher           kms.Cipher
+	GraphEngine      *authz.Engine
+	WorkloadStore    WorkloadRepository
 	UIURL            string
 	// KMS Signer (optional, defaults to ephemeral local signer)
 	Signer kms.Signer
@@ -186,39 +192,12 @@ func NewService(cfg Config) (Service, error) {
 		header = middleware.DefaultServiceAuthHeader
 	}
 
-	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		return nil, err
-	}
-
-	// Create self-signed certificate for SAML
-	template := x509.Certificate{
-		SerialNumber: big.NewInt(1),
-		Subject: pkix.Name{
-			CommonName: "wardseal-idp",
-		},
-		NotBefore: time.Now(),
-		NotAfter:  time.Now().Add(365 * 24 * time.Hour),
-
-		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
-		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
-		BasicConstraintsValid: true,
-	}
-	certDER, err := x509.CreateCertificate(rand.Reader, &template, &template, &privateKey.PublicKey, privateKey)
-	if err != nil {
-		return nil, err
-	}
-	cert, err := x509.ParseCertificate(certDER)
-	if err != nil {
-		return nil, err
-	}
-
 	samlProvider, err := saml.NewProvider(saml.Config{
-		BaseURL:     cfg.BaseURL,
-		Certificate: cert,
-		PrivateKey:  privateKey,
-		Logger:      zap.L(), // Use global logger for now, ideally passed in config
-		Store:       cfg.SAMLStore,
+		BaseURL: cfg.BaseURL,
+		Logger:  zap.L(),
+		Cipher:  cfg.Cipher,
+		Repo:    cfg.SAMLIdPRepo,
+		Store:   cfg.SAMLStore,
 	})
 	if err != nil {
 		return nil, err
@@ -308,6 +287,10 @@ func NewService(cfg Config) (Service, error) {
 		appStore:            cfg.AppStore,
 		rbacStore:           cfg.RBACStore,
 		ipPolicyStore:       cfg.IPPolicyStore,
+		samlIdPRepo:         cfg.SAMLIdPRepo,
+		cipher:              cfg.Cipher,
+		graphEngine:         cfg.GraphEngine,
+		workloadStore:       cfg.WorkloadStore,
 		deploymentMode:      deploymentMode,
 		baseURL:             cfg.BaseURL,
 		uiURL:               cfg.UIURL,
@@ -360,11 +343,26 @@ func (s *authService) Login(ctx context.Context, username, password, deviceID, u
 		return "", err
 	}
 
-	// 2. Risk Evaluation
+	// 2. Evaluate Risk
 	risk, err := s.riskEngine.Evaluate(ctx, userResp.User.ID, deviceID, ip)
 	if err != nil {
-		zap.L().Error("Risk evaluation failed", zap.Error(err))
+		zap.L().Warn("Risk evaluation failed; proceeding with caution", zap.Error(err))
 	} else {
+		// Persist risk score for autonomous governance
+		factorsJSON, _ := json.Marshal(risk.Factors)
+		err := s.signalStore.UpdateUserRisk(ctx, UserRisk{
+			UserID:          userResp.User.ID,
+			TenantID:        tenantID,
+			Score:           risk.Score,
+			Level:           string(risk.Level),
+			Factors:         string(factorsJSON),
+			LastEvaluatedAt: time.Now(),
+		})
+		if err != nil {
+			zap.L().Warn("Failed to update user risk", zap.Error(err))
+			return "", err
+		}
+
 		if risk.Level == RiskLevelHigh {
 			zap.L().Warn("Login blocked due to high risk",
 				zap.String("user_id", userResp.User.ID),
@@ -408,7 +406,17 @@ func (s *authService) Login(ctx context.Context, username, password, deviceID, u
 		}
 	}
 
-	// 4. Generate a JWT.
+	// 4. Ingest Success Signal for Historical Risk (Impossible Travel)
+	if s.signalStore != nil {
+		_ = s.signalStore.IngestLogin(ctx, &LoginSignal{
+			TenantID:  tenantID,
+			SubjectID: userResp.User.ID,
+			IPAddress: ip,
+			Timestamp: time.Now(),
+		})
+	}
+
+	// 5. Generate a JWT.
 	claims := jwt.MapClaims{
 		"sub":    userResp.User.ID,
 		"iss":    "identity-platform",
@@ -762,6 +770,41 @@ func (s *authService) handleClientCredentialsGrant(ctx context.Context, tenantID
 		return TokenResponse{}, &Error{"invalid_request", "client_id is required"}
 	}
 
+	// 1. Attempt Workload Authentication (Non-Human Identity)
+	if s.workloadStore != nil {
+		workload, err := s.workloadStore.GetByClientID(ctx, req.ClientID)
+		if err == nil {
+			// Found a workload, verify secret
+			if req.ClientSecret == "" {
+				return TokenResponse{}, &Error{"invalid_request", "client_secret is required for workload authentication"}
+			}
+
+			// We use the same bcrypt verification used for standard clients/users
+			if err := verifyClientSecret(req.ClientSecret, []byte(workload.ClientSecretHash)); err != nil {
+				return TokenResponse{}, &Error{"invalid_client", "invalid workload secret"}
+			}
+
+			if workload.Status != "active" {
+				return TokenResponse{}, &Error{"unauthorized_client", "workload is not active"}
+			}
+
+			// Issue token for the workload
+			// Workloads identify themselves by their service_handle (e.g. "service:payment")
+			token, err := s.generateAccessToken(ctx, tenantID, req.ClientID, req.Scope, workload.ServiceHandle)
+			if err != nil {
+				return TokenResponse{}, err
+			}
+
+			return TokenResponse{
+				AccessToken: token,
+				TokenType:   "Bearer",
+				ExpiresIn:   3600,
+				Scope:       req.Scope,
+			}, nil
+		}
+	}
+
+	// 2. Fallback to Standard OAuth2 Client Authentication
 	client, err := s.resolveClient(ctx, tenantID, req.ClientID)
 	if err != nil {
 		return TokenResponse{}, err
@@ -807,7 +850,7 @@ func (s *authService) handleClientCredentialsGrant(ctx context.Context, tenantID
 		}
 	}
 
-	// Issue access token only (no refresh token for client_credentials per RFC 6749)
+	// Issue access token only
 	accessToken, err := s.generateAccessToken(ctx, tenantID, req.ClientID, scope, "")
 	if err != nil {
 		return TokenResponse{}, err

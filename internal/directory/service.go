@@ -34,6 +34,7 @@ type Service interface {
 	// Group membership
 	AddUserToGroup(ctx context.Context, tenantID, userID, groupID string) error
 	RemoveUserFromGroup(ctx context.Context, tenantID, userID, groupID string) error
+	ListGroupMembers(ctx context.Context, tenantID, groupID string) ([]User, error)
 
 	// Credential validation
 	VerifyCredentials(ctx context.Context, tenantID, email, password string) (User, error)
@@ -196,6 +197,10 @@ func (s *directoryService) RemoveUserFromGroup(ctx context.Context, tenantID, us
 		_ = s.bus.Publish(ctx, "GroupMembershipChanged", payload)
 	}
 	return err
+}
+
+func (s *directoryService) ListGroupMembers(ctx context.Context, tenantID, groupID string) ([]User, error) {
+	return s.repo.ListGroupMembers(ctx, tenantID, groupID)
 }
 
 func (s *directoryService) VerifyCredentials(ctx context.Context, tenantID, email, password string) (User, error) {

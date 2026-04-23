@@ -4,8 +4,9 @@ import (
 	"context"
 	"testing"
 
-	"github.com/dhawalhost/wardseal/pkg/middleware"
 	"github.com/google/uuid"
+
+	"github.com/dhawalhost/wardseal/pkg/middleware"
 )
 
 func TestRiskEngine_IPPolicy(t *testing.T) {

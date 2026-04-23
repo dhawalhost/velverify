@@ -9,9 +9,10 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/dhawalhost/wardseal/internal/connector"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
+
+	"github.com/dhawalhost/wardseal/internal/connector"
 )
 
 const (
@@ -48,7 +49,7 @@ func (c *Connector) authenticate(ctx context.Context) error {
 	credJSON := c.config.Credentials["service_account_json"]
 	adminEmail := c.config.Credentials["admin_email"]
 
-	creds, err := google.CredentialsFromJSON(ctx, []byte(credJSON),
+	creds, err := google.CredentialsFromJSONWithType(ctx, []byte(credJSON), google.ServiceAccount,
 		"https://www.googleapis.com/auth/admin.directory.user",
 		"https://www.googleapis.com/auth/admin.directory.group",
 	)

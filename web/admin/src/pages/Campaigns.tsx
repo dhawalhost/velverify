@@ -1,12 +1,31 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { getCampaigns, createCampaign, startCampaign, completeCampaign, getCampaignItems, addCampaignItem, approveItem, revokeItem, getReviewItems } from '../api';
-import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@/components/ui/table';
-import { Loader2, Plus, Play, CheckCircle, XCircle, Search, Target, Layout, Square } from 'lucide-react';
-import { Separator } from '@/components/ui/separator';
+import { TableBody, TableCell } from '@/components/ui/table';
+import {
+    Loader2,
+    Plus,
+    Play,
+    CheckCircle,
+    XCircle,
+    Search,
+    Target,
+    Layout,
+    Square,
+    Award,
+    Filter,
+    ShieldCheck,
+    Box,
+    Activity,
+    Terminal,
+    Fingerprint,
+    ChevronRight,
+    Command
+} from 'lucide-react';
+import { PageHeader, GlassCard, GlassCardHeader, GlassCardTitle, GlassCardContent, GlassTable, GlassTableHeader, GlassTableHead, GlassTableRow } from '@/components/layout';
+import { Label } from '@/components/ui/label';
 
 interface Campaign {
     id: string;
@@ -35,19 +54,14 @@ export default function Campaigns() {
     const [newCampaign, setNewCampaign] = useState({ name: '', description: '', reviewerId: '' });
     const [statusFilter, setStatusFilter] = useState('');
 
-    // My Reviews State
     const [activeTab, setActiveTab] = useState<'all' | 'reviews'>('all');
     const [reviewerId, setReviewerId] = useState('');
     const [myReviewItems, setMyReviewItems] = useState<CertificationItem[]>([]);
-    const [selectedItem, setSelectedItem] = useState<CertificationItem | null>(null);
 
-    // Add Review Item State
     const [showAddItem, setShowAddItem] = useState(false);
     const [newItem, setNewItem] = useState({ user_id: '', resource_type: 'role', resource_id: '', resource_name: '' });
 
-    useEffect(() => {
-        loadCampaigns();
-    }, [statusFilter]);
+    useEffect(() => { loadCampaigns(); }, [statusFilter]);
 
     useEffect(() => {
         if (selectedCampaign) {
@@ -107,23 +121,17 @@ export default function Campaigns() {
         }
     };
 
-    const handleApprove = async (itemId: string) => {
+    const handleAction = async (itemId: string, action: 'approve' | 'revoke') => {
         if (!selectedCampaign) return;
         try {
-            await approveItem(selectedCampaign.id, itemId, 'Approved via Admin UI');
+            if (action === 'approve') {
+                await approveItem(selectedCampaign.id, itemId, 'Approved via Admin UI');
+            } else {
+                await revokeItem(selectedCampaign.id, itemId, 'Revoked via Admin UI');
+            }
             loadItems(selectedCampaign.id);
         } catch (error) {
-            console.error('Failed to approve:', error);
-        }
-    };
-
-    const handleRevoke = async (itemId: string) => {
-        if (!selectedCampaign) return;
-        try {
-            await revokeItem(selectedCampaign.id, itemId, 'Revoked via Admin UI');
-            loadItems(selectedCampaign.id);
-        } catch (error) {
-            console.error('Failed to revoke:', error);
+            console.error('Action failed:', error);
         }
     };
 
@@ -162,344 +170,392 @@ export default function Campaigns() {
                 await revokeItem(item.campaign_id, item.id, 'Revoked by reviewer');
             }
             loadMyReviews(reviewerId);
-            setSelectedItem(null);
         } catch (error) {
             console.error('Action failed:', error);
         }
     };
 
-    const getStatusVariant = (status: string) => {
-        switch (status) {
-            case 'active': return 'default'; // dark/primary
-            case 'completed': return 'secondary';
-            case 'cancelled': return 'destructive';
-            default: return 'outline';
-        }
-    };
-
-    if (loading) return <div className="p-8 flex items-center justify-center h-96"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>;
+    if (loading && campaigns.length === 0) return <div className="h-[400px] flex items-center justify-center"><Loader2 className="h-10 w-10 animate-spin text-primary opacity-20" /></div>;
 
     return (
-        <div className="space-y-6">
-            <div className="flex justify-between items-center">
-                <div>
-                    <h1 className="text-3xl font-bold tracking-tight">Certification Campaigns</h1>
-                    <p className="text-muted-foreground mt-1">
-                        Manage usage certification campaigns and reviews.
-                    </p>
-                </div>
-                <div className="flex bg-muted p-1 rounded-lg">
-                    <Button
-                        variant={activeTab === 'all' ? 'default' : 'ghost'}
-                        size="sm"
-                        onClick={() => setActiveTab('all')}
-                        className="rounded-md"
-                    >
-                        <Target className="mr-2 h-4 w-4" />
-                        Campaigns
-                    </Button>
-                    <Button
-                        variant={activeTab === 'reviews' ? 'default' : 'ghost'}
-                        size="sm"
-                        onClick={() => setActiveTab('reviews')}
-                        className="rounded-md"
-                    >
-                        <Layout className="mr-2 h-4 w-4" />
-                        My Reviews
-                    </Button>
-                </div>
-            </div>
+        <div className="space-y-10 animate-in fade-in duration-700">
+            <PageHeader
+                icon={<Award className="w-8 h-8 text-primary" />}
+                title="Governance Cycles"
+                description="Periodic usage certification and access review orchestrations. Enforcing architectural integrity across the enterprise identity matrix."
+                actions={
+                    <div className="flex bg-surface-container/50 p-1 rounded-2xl ring-1 ring-on-surface/5">
+                         <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setActiveTab('all')}
+                            className={`rounded-xl font-bold text-[11px] h-10 px-6 transition-all ${activeTab === 'all' ? 'bg-white text-primary shadow-sm' : 'text-on-surface-variant/40 hover:text-on-surface'}`}
+                        >
+                            Campaign registry
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setActiveTab('reviews')}
+                            className={`rounded-xl font-bold text-[11px] h-10 px-6 transition-all ${activeTab === 'reviews' ? 'bg-white text-primary shadow-sm' : 'text-on-surface-variant/40 hover:text-on-surface'}`}
+                        >
+                            Duty log terminal
+                        </Button>
+                    </div>
+                }
+            />
 
-            <Separator />
-
-            {/* MAIN CONTENT AREA */}
-            <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
-
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-10 items-start">
                 {activeTab === 'all' ? (
                     <>
-                        {/* LEFT COLUMN: LIST & CREATE */}
-                        <div className="md:col-span-4 space-y-6">
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle className="text-lg">Create Campaign</CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    <form onSubmit={handleCreateCampaign} className="space-y-4">
-                                        <div className="space-y-2">
+                        <div className="md:col-span-4 space-y-10">
+                            <GlassCard className="border-none shadow-xl shadow-on-surface/5 bg-white overflow-hidden rounded-[24px]">
+                                <GlassCardHeader className="bg-primary p-8 text-white">
+                                     <div className="flex items-center gap-4">
+                                        <div className="p-2.5 bg-white/20 rounded-xl backdrop-blur-md">
+                                            <Plus className="w-5 h-5 text-white" />
+                                        </div>
+                                        <GlassCardTitle className="text-xl font-bold tracking-tight">Define campaign</GlassCardTitle>
+                                    </div>
+                                </GlassCardHeader>
+                                <GlassCardContent className="p-8">
+                                    <form onSubmit={handleCreateCampaign} className="space-y-8">
+                                         <div className="space-y-2.5">
+                                            <Label className="text-[12px] font-bold tracking-tight text-on-surface-variant/50 ml-1">Operation slug</Label>
                                             <Input
-                                                placeholder="Campaign Name"
+                                                placeholder="e.g. q3_privilege_audit"
+                                                className="h-12 border-none rounded-xl bg-surface-container/30 ring-1 ring-on-surface/5 focus-visible:ring-2 focus-visible:ring-primary/20 font-medium transition-all"
                                                 value={newCampaign.name}
                                                 onChange={(e) => setNewCampaign({ ...newCampaign, name: e.target.value })}
                                                 required
                                             />
+                                        </div>
+                                         <div className="space-y-2.5">
+                                            <Label className="text-[12px] font-bold tracking-tight text-on-surface-variant/50 ml-1">Lead reviewer id</Label>
                                             <Input
-                                                placeholder="Reviewer ID (User ID)"
+                                                placeholder="usr_vec_..."
+                                                className="h-12 border-none rounded-xl bg-surface-container/30 ring-1 ring-on-surface/5 focus-visible:ring-2 focus-visible:ring-primary/20 font-medium transition-all"
                                                 value={newCampaign.reviewerId}
                                                 onChange={(e) => setNewCampaign({ ...newCampaign, reviewerId: e.target.value })}
                                                 required
                                             />
-                                            <Button type="submit" className="w-full">
-                                                <Plus className="mr-2 h-4 w-4" /> Create
-                                            </Button>
                                         </div>
+                                         <Button type="submit" className="w-full h-12 rounded-xl font-bold text-sm shadow-md shadow-primary/10">
+                                            Initialize orchestration
+                                        </Button>
                                     </form>
-                                </CardContent>
-                            </Card>
+                                </GlassCardContent>
+                            </GlassCard>
 
-                            <Card className="h-[calc(100vh-400px)] flex flex-col">
-                                <CardHeader className="pb-3 border-b">
-                                    <div className="flex items-center justify-between">
-                                        <CardTitle className="text-lg">Campaigns</CardTitle>
-                                        <select
-                                            className="text-sm bg-transparent border-none text-muted-foreground focus:ring-0 cursor-pointer"
-                                            value={statusFilter}
-                                            onChange={(e) => setStatusFilter(e.target.value)}
-                                        >
-                                            <option value="">All Status</option>
-                                            <option value="draft">Draft</option>
-                                            <option value="active">Active</option>
-                                            <option value="completed">Completed</option>
-                                        </select>
+                            <GlassCard className="border-none shadow-xl shadow-on-surface/5 bg-white overflow-hidden flex flex-col h-[600px] rounded-[24px]">
+                                <GlassCardHeader className="py-8 px-8 border-b border-on-surface/5">
+                                         <div className="flex items-center justify-between">
+                                        <GlassCardTitle className="text-lg font-bold tracking-tight text-on-surface">Operational stack</GlassCardTitle>
+                                        <div className="flex items-center gap-2.5 bg-surface-container/50 px-3 py-1.5 rounded-xl ring-1 ring-on-surface/5">
+                                            <Filter className="w-3.5 h-3.5 text-on-surface-variant/40" />
+                                            <select
+                                                className="text-[11px] font-bold bg-transparent border-none p-0 h-4 focus:ring-0 cursor-pointer text-on-surface-variant/60"
+                                                value={statusFilter}
+                                                onChange={(e) => setStatusFilter(e.target.value)}
+                                            >
+                                                <option value="">all states</option>
+                                                <option value="draft">draft</option>
+                                                <option value="active">active</option>
+                                                <option value="completed">complete</option>
+                                            </select>
+                                        </div>
                                     </div>
-                                </CardHeader>
-                                <div className="flex-1 overflow-y-auto p-2 space-y-2">
+                                </GlassCardHeader>
+                                <div className="flex-1 overflow-y-auto p-4 space-y-2 custom-scrollbar">
                                     {campaigns.map(campaign => (
                                         <div
                                             key={campaign.id}
                                             onClick={() => setSelectedCampaign(campaign)}
                                             className={`
-                                                flex items-center justify-between p-3 rounded-md cursor-pointer transition-colors border
+                                                group flex items-center justify-between p-5 cursor-pointer transition-all rounded-2xl
                                                 ${selectedCampaign?.id === campaign.id
-                                                    ? 'bg-primary/5 border-primary/20 shadow-sm'
-                                                    : 'hover:bg-muted border-transparent hover:border-border'}
+                                                    ? 'bg-primary/5 ring-1 ring-primary/20'
+                                                    : 'bg-white hover:bg-surface-container/30 ring-1 ring-on-surface/5 hover:ring-on-surface/10'}
                                             `}
                                         >
-                                            <div className="min-w-0 flex-1 mr-2">
-                                                <div className="font-medium truncate">{campaign.name}</div>
-                                                <div className="flex items-center gap-2 mt-1">
-                                                    <Badge variant={getStatusVariant(campaign.status) as any} className="text-[10px] uppercase px-1.5 py-0 h-5">
+                                            <div className="min-w-0 pr-4">
+                                                <div className={`font-bold text-sm tracking-tight truncate flex items-center gap-3 transition-colors ${selectedCampaign?.id === campaign.id ? 'text-primary' : 'text-on-surface'}`}>
+                                                    <Target className={`h-4 w-4 opacity-40 ${selectedCampaign?.id === campaign.id ? 'text-primary' : ''}`} />
+                                                    {campaign.name}
+                                                </div>
+                                                 <div className="flex items-center gap-3 mt-1.5">
+                                                    <Badge className={`rounded-xl font-bold text-[10px] px-2.5 py-0.5 border-none shadow-sm transition-all ${campaign.status === 'active' ? 'bg-emerald-50 text-emerald-600' :
+                                                        campaign.status === 'completed' ? 'bg-blue-50 text-blue-600' :
+                                                            'bg-amber-50 text-amber-600'
+                                                        }`}>
                                                         {campaign.status}
                                                     </Badge>
-                                                    <span className="text-xs text-muted-foreground">
-                                                        {new Date(campaign.created_at).toLocaleDateString()}
+                                                    <span className="text-[10px] font-medium text-on-surface-variant/40 italic">
+                                                        {campaign.created_at ? new Date(campaign.created_at).toLocaleDateString() : 'initialized'}
                                                     </span>
                                                 </div>
                                             </div>
-                                            {campaign.status === 'draft' && (
-                                                <Button
-                                                    size="icon"
-                                                    variant="ghost"
-                                                    className="h-8 w-8 text-green-600 hover:text-green-700 hover:bg-green-50"
-                                                    onClick={(e) => { e.stopPropagation(); handleStartCampaign(campaign.id); }}
-                                                    title="Start Campaign"
-                                                >
-                                                    <Play className="h-4 w-4" />
-                                                </Button>
-                                            )}
-                                            {campaign.status === 'active' && (
-                                                <Button
-                                                    size="icon"
-                                                    variant="ghost"
-                                                    className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                                                    onClick={(e) => { e.stopPropagation(); handleCompleteCampaign(campaign.id); }}
-                                                    title="Complete Campaign"
-                                                >
-                                                    <Square className="h-4 w-4" />
-                                                </Button>
-                                            )}
+                                            <div className="flex items-center gap-2">
+                                                {campaign.status === 'draft' && (
+                                                    <Button size="icon" variant="ghost" className="h-9 w-9 rounded-xl text-emerald-500 hover:bg-emerald-50 transition-all" onClick={(e) => { e.stopPropagation(); handleStartCampaign(campaign.id); }}>
+                                                        <Play className="h-4 w-4" />
+                                                    </Button>
+                                                )}
+                                                {campaign.status === 'active' && (
+                                                    <Button size="icon" variant="ghost" className="h-9 w-9 rounded-xl text-red-500 hover:bg-red-50 transition-all" onClick={(e) => { e.stopPropagation(); handleCompleteCampaign(campaign.id); }}>
+                                                        <Square className="h-4 w-4" />
+                                                    </Button>
+                                                )}
+                                                {selectedCampaign?.id === campaign.id && <ChevronRight className="h-5 w-5 text-primary/40 animate-in fade-in slide-in-from-left-2" />}
+                                            </div>
                                         </div>
                                     ))}
                                 </div>
-                            </Card>
+                            </GlassCard>
                         </div>
 
-                        {/* RIGHT COLUMN: DETAILS */}
                         <div className="md:col-span-8">
                             {selectedCampaign ? (
-                                <Card className="h-full">
-                                    <CardHeader className="border-b">
+                                <GlassCard className="border-none shadow-2xl shadow-on-surface/5 bg-white overflow-hidden min-h-[850px] flex flex-col rounded-[32px]">
+                                    <GlassCardHeader className="bg-surface-container p-12 ">
                                         <div className="flex items-center justify-between">
-                                            <div>
-                                                <CardTitle>{selectedCampaign.name}</CardTitle>
-                                                <CardDescription className="mt-1">Review Items</CardDescription>
+                                            <div className="space-y-5">
+                                                <div className="flex items-center gap-5">
+                                                     <div className="p-4 bg-primary/10 rounded-2xl">
+                                                        <Target className="w-8 h-8 text-primary" />
+                                                    </div>
+                                                    <h2 className="text-4xl font-bold tracking-tight text-on-surface">{selectedCampaign.name}</h2>
+                                                </div>
+                                                <p className="text-[11px] font-bold text-on-surface-variant/40 italic">Review lead vector: <span className="text-primary">{selectedCampaign.reviewer_id.toLowerCase()}</span></p>
                                             </div>
-                                            <Badge variant={getStatusVariant(selectedCampaign.status) as any}>
-                                                {selectedCampaign.status}
-                                            </Badge>
-                                            {selectedCampaign.status === 'draft' && (
-                                                <Button size="sm" variant="outline" onClick={() => setShowAddItem(!showAddItem)}>
-                                                    <Plus className="h-4 w-4 mr-1" /> Add Item
-                                                </Button>
-                                            )}
+                                            <div className="flex flex-col items-end gap-5">
+                                                 <Badge className="bg-white text-on-surface-variant border-none rounded-xl h-10 px-6 text-xs font-bold shadow-sm italic">
+                                                    {selectedCampaign.status}
+                                                </Badge>
+                                                {selectedCampaign.status === 'draft' && (
+                                                    <Button
+                                                        onClick={() => setShowAddItem(!showAddItem)}
+                                                        className="h-12 rounded-xl font-bold text-sm shadow-md shadow-primary/10 px-6 transition-all"
+                                                        variant={showAddItem ? "ghost" : "default"}
+                                                    >
+                                                        {showAddItem ? <XCircle className="h-4 w-4 mr-2" /> : <Plus className="h-4 w-4 mr-2" />}
+                                                        {showAddItem ? 'Abort injection' : 'Inject manifest'}
+                                                    </Button>
+                                                )}
+                                            </div>
                                         </div>
-                                    </CardHeader>
+                                    </GlassCardHeader>
+
                                     {showAddItem && selectedCampaign.status === 'draft' && (
-                                        <div className="border-b p-4 bg-muted/30">
-                                            <form onSubmit={handleAddItem} className="grid grid-cols-1 md:grid-cols-5 gap-3 items-end">
-                                                <div className="space-y-1">
-                                                    <label className="text-xs font-medium text-muted-foreground">User ID</label>
+                                        <div className="bg-surface-container/30 border-b border-on-surface/5 p-10 animate-in slide-in-from-top-4 duration-500">
+                                            <form onSubmit={handleAddItem} className="grid grid-cols-1 md:grid-cols-4 gap-6 items-end">
+                                                 <div className="space-y-2.5">
+                                                    <Label className="text-[12px] font-bold tracking-tight text-on-surface-variant/50 ml-1">Subject uid</Label>
                                                     <Input
-                                                        placeholder="user-uuid"
+                                                        placeholder="usr_vec_772"
+                                                        className="h-12 border-none rounded-xl bg-white shadow-sm ring-1 ring-on-surface/5 focus-visible:ring-2 focus-visible:ring-primary/20 transition-all font-medium"
                                                         value={newItem.user_id}
                                                         onChange={(e) => setNewItem({ ...newItem, user_id: e.target.value })}
                                                         required
                                                     />
                                                 </div>
-                                                <div className="space-y-1">
-                                                    <label className="text-xs font-medium text-muted-foreground">Resource Type</label>
+                                                 <div className="space-y-2.5">
+                                                    <Label className="text-[12px] font-bold tracking-tight text-on-surface-variant/50 ml-1">Resource class</Label>
                                                     <select
-                                                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                                                        className="flex h-12 w-full border-none rounded-xl bg-white shadow-sm ring-1 ring-on-surface/5 focus:ring-2 focus:ring-primary/20 font-bold text-[11px] px-4 cursor-pointer"
                                                         value={newItem.resource_type}
                                                         onChange={(e) => setNewItem({ ...newItem, resource_type: e.target.value })}
                                                     >
-                                                        <option value="role">Role</option>
-                                                        <option value="group">Group</option>
-                                                        <option value="application">Application</option>
-                                                        <option value="permission">Permission</option>
+                                                        <option value="role">role primitive</option>
+                                                        <option value="group">identity cluster</option>
+                                                        <option value="application">app vector</option>
+                                                        <option value="permission">granular perm</option>
                                                     </select>
                                                 </div>
-                                                <div className="space-y-1">
-                                                    <label className="text-xs font-medium text-muted-foreground">Resource ID</label>
+                                                 <div className="space-y-2.5">
+                                                    <Label className="text-[12px] font-bold tracking-tight text-on-surface-variant/50 ml-1">Resource id</Label>
                                                     <Input
-                                                        placeholder="resource-uuid"
+                                                        placeholder="admin_override"
+                                                        className="h-12 border-none rounded-xl bg-white shadow-sm ring-1 ring-on-surface/5 focus-visible:ring-2 focus-visible:ring-primary/20 transition-all font-medium"
                                                         value={newItem.resource_id}
                                                         onChange={(e) => setNewItem({ ...newItem, resource_id: e.target.value })}
                                                         required
                                                     />
                                                 </div>
-                                                <div className="space-y-1">
-                                                    <label className="text-xs font-medium text-muted-foreground">Display Name</label>
-                                                    <Input
-                                                        placeholder="Optional name"
-                                                        value={newItem.resource_name}
-                                                        onChange={(e) => setNewItem({ ...newItem, resource_name: e.target.value })}
-                                                    />
-                                                </div>
-                                                <Button type="submit">Add</Button>
+                                                <Button type="submit" className="h-12 rounded-xl font-bold text-sm shadow-md shadow-primary/10">
+                                                    Commit manifest
+                                                </Button>
                                             </form>
                                         </div>
                                     )}
-                                    <CardContent className="p-0">
+
+                                    <GlassCardContent className="p-0 flex-1 overflow-y-auto bg-white">
                                         {items.length === 0 ? (
-                                            <div className="p-12 text-center text-muted-foreground">
-                                                No items found for this campaign.
+                                             <div className="py-40 text-center">
+                                                <div className="flex flex-col items-center gap-6 opacity-20">
+                                                    <Activity className="h-16 w-16" />
+                                                    <span className="text-[11px] font-bold italic">Null manifest state</span>
+                                                </div>
                                             </div>
                                         ) : (
-                                            <Table>
-                                                <TableHeader>
-                                                    <TableRow>
-                                                        <TableHead>User</TableHead>
-                                                        <TableHead>Resource</TableHead>
-                                                        <TableHead>Status</TableHead>
-                                                        <TableHead className="text-right">Actions</TableHead>
-                                                    </TableRow>
-                                                </TableHeader>
-                                                <TableBody>
-                                                    {items.map(item => (
-                                                        <TableRow key={item.id}>
-                                                            <TableCell className="font-medium">{item.user_id}</TableCell>
-                                                            <TableCell>
-                                                                <div className="flex flex-col">
-                                                                    <span>{item.resource_name || item.resource_id}</span>
-                                                                    <span className="text-xs text-muted-foreground uppercase tracking-wider">{item.resource_type}</span>
-                                                                </div>
-                                                            </TableCell>
-                                                            <TableCell>
-                                                                {item.decision ? (
-                                                                    <Badge variant={item.decision === 'approve' ? 'default' : 'destructive'} className={item.decision === 'approve' ? 'bg-green-600 hover:bg-green-700' : ''}>
-                                                                        {item.decision}
-                                                                    </Badge>
-                                                                ) : (
-                                                                    <Badge variant="outline" className="text-yellow-600 border-yellow-200 bg-yellow-50">Pending</Badge>
-                                                                )}
-                                                            </TableCell>
-                                                            <TableCell className="text-right">
-                                                                {!item.decision && selectedCampaign.status === 'active' && (
-                                                                    <div className="flex items-center justify-end gap-2">
-                                                                        <Button size="sm" variant="ghost" className="h-8 text-green-600 hover:bg-green-50" onClick={() => handleApprove(item.id)}>
-                                                                            <CheckCircle className="h-4 w-4 mr-1" /> Approve
-                                                                        </Button>
-                                                                        <Button size="sm" variant="ghost" className="h-8 text-destructive hover:bg-destructive/10" onClick={() => handleRevoke(item.id)}>
-                                                                            <XCircle className="h-4 w-4 mr-1" /> Revoke
-                                                                        </Button>
+                                            <div className="overflow-x-auto">
+                                                 <GlassTable>
+                                                    <GlassTableHeader>
+                                                        <GlassTableRow className="hover:bg-transparent border-b border-on-surface/5">
+                                                            <GlassTableHead className="py-6 pl-10 font-bold text-[12px] text-on-surface-variant/40">Subject identity</GlassTableHead>
+                                                            <GlassTableHead className="font-bold text-[12px] text-on-surface-variant/40">Resource artifact</GlassTableHead>
+                                                            <GlassTableHead className="font-bold text-[12px] text-on-surface-variant/40">Verdict trace</GlassTableHead>
+                                                            <GlassTableHead className="text-right font-bold text-[12px] text-on-surface-variant/40 pr-10">Governance audit</GlassTableHead>
+                                                        </GlassTableRow>
+                                                    </GlassTableHeader>
+                                                    <TableBody>
+                                                        {items.map(item => (
+                                                            <GlassTableRow key={item.id} className="hover:bg-surface-container/10 transition-all border-b border-on-surface/5 last:border-0 group">
+                                                                <TableCell className="py-8 pl-10">
+                                                                     <div className="flex items-center gap-5">
+                                                                        <div className="w-10 h-10 rounded-xl bg-surface-container flex items-center justify-center font-bold text-xs group-hover:bg-primary/10 group-hover:text-primary transition-all">@</div>
+                                                                        <div className="flex flex-col">
+                                                                            <span className="text-lg font-bold text-on-surface group-hover:text-primary transition-colors">{item.user_id}</span>
+                                                                            <span className="text-[9px] font-bold text-on-surface-variant/40 mt-1 italic">Subject vector</span>
+                                                                        </div>
                                                                     </div>
-                                                                )}
-                                                            </TableCell>
-                                                        </TableRow>
-                                                    ))}
-                                                </TableBody>
-                                            </Table>
+                                                                </TableCell>
+                                                                <TableCell className="py-8">
+                                                                    <div className="flex items-center gap-3">
+                                                                        <Badge className="bg-surface-container text-on-surface-variant border-none rounded-lg font-bold text-[8px] px-2.5 py-1 uppercase">{item.resource_type}</Badge>
+                                                                        <span className="text-[11px] font-bold text-on-surface-variant/60 uppercase transition-opacity group-hover:text-on-surface">[{item.resource_name || item.resource_id}]</span>
+                                                                    </div>
+                                                                </TableCell>
+                                                                 <TableCell className="py-8">
+                                                                    {item.decision ? (
+                                                                        <Badge className={`rounded-xl font-bold text-[10px] px-4 py-1.5 border-none shadow-sm transition-all italic ${item.decision === 'approve' ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>
+                                                                            {item.decision}_persisted
+                                                                        </Badge>
+                                                                    ) : (
+                                                                        <div className="flex items-center gap-3 text-[10px] font-bold text-amber-600/60 italic">
+                                                                            <Activity className="h-3.5 w-3.5 animate-pulse" />
+                                                                            pending decision
+                                                                        </div>
+                                                                    )}
+                                                                </TableCell>
+                                                                <TableCell className="py-8 text-right pr-10">
+                                                                     {!item.decision && selectedCampaign.status === 'active' && (
+                                                                        <div className="flex items-center justify-end gap-3">
+                                                                            <Button size="sm" onClick={() => handleAction(item.id, 'approve')} className="h-10 rounded-xl bg-emerald-500 text-white hover:bg-emerald-600 font-bold text-[10px] px-5 shadow-lg shadow-emerald-500/10 transition-all border-none">
+                                                                                Verify
+                                                                            </Button>
+                                                                            <Button size="sm" variant="ghost" onClick={() => handleAction(item.id, 'revoke')} className="h-10 rounded-xl text-red-500 hover:bg-red-50 font-bold text-[10px] px-5 transition-all">
+                                                                                Revoke
+                                                                            </Button>
+                                                                        </div>
+                                                                    )}
+                                                                </TableCell>
+                                                            </GlassTableRow>
+                                                        ))}
+                                                    </TableBody>
+                                                </GlassTable>
+                                            </div>
                                         )}
-                                    </CardContent>
-                                </Card>
+                                    </GlassCardContent>
+                                </GlassCard>
                             ) : (
-                                <div className="h-full flex flex-col items-center justify-center border-2 border-dashed rounded-lg p-12 text-muted-foreground bg-muted/20">
-                                    <Target className="h-12 w-12 mb-4 opacity-20" />
-                                    <p>Select a campaign to view details</p>
+                                <div className="h-full flex flex-col items-center justify-center border-2 border-dashed rounded-[40px] border-on-surface/5 bg-surface-container/10 min-h-[850px] animate-in fade-in duration-1000">
+                                    <div className="p-16 bg-white rounded-[32px] shadow-2xl shadow-on-surface/5 flex flex-col items-center text-center max-w-lg mx-auto">
+                                         <div className="w-24 h-24 bg-primary/5 rounded-[32px] flex items-center justify-center mb-10">
+                                            <Target className="h-12 w-12 text-primary/20 animate-pulse" />
+                                        </div>
+                                        <h3 className="text-2xl font-bold tracking-tight text-on-surface mb-4">Null campaign state</h3>
+                                        <p className="text-sm font-medium text-on-surface-variant/40 leading-relaxed max-w-xs transition-opacity opacity-60">Select an operational campaign vector from the registry to initialize the governance auditing window.</p>
+                                    </div>
                                 </div>
                             )}
                         </div>
                     </>
                 ) : (
-                    // MY REVIEWS TAB
-                    <div className="md:col-span-12 max-w-4xl mx-auto w-full space-y-6">
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>My Reviews</CardTitle>
-                                <CardDescription>Enter your user ID to find items assigned to you for review.</CardDescription>
-                            </CardHeader>
-                            <CardContent className="space-y-6">
-                                <div className="flex gap-2 max-w-md">
-                                    <Input
-                                        placeholder="Enter your User ID"
-                                        value={reviewerId}
-                                        onChange={(e) => setReviewerId(e.target.value)}
-                                    />
-                                    <Button onClick={() => loadMyReviews(reviewerId)}>
-                                        <Search className="mr-2 h-4 w-4" /> Load
+                    <div className="col-span-full max-w-6xl mx-auto w-full space-y-12 py-10">
+                        <GlassCard className="border-none shadow-2xl shadow-on-surface/5 bg-white overflow-hidden rounded-[40px]">
+                            <GlassCardHeader className="bg-primary p-16 text-white text-center">
+                                <div className="flex flex-col items-center gap-8">
+                                    <div className="p-6 bg-white/20 rounded-[32px] backdrop-blur-xl">
+                                        <Terminal className="w-12 h-12 text-white" />
+                                    </div>
+                                     <div className="space-y-4">
+                                        <GlassCardTitle className="text-5xl font-bold tracking-tighter">Duty log access</GlassCardTitle>
+                                        <p className="text-white/60 font-bold text-[12px] italic">Authorize subject persistence through deep-vetted reviews.</p>
+                                    </div>
+                                </div>
+                            </GlassCardHeader>
+                            <GlassCardContent className="p-16 space-y-16">
+                                 <div className="flex flex-col md:flex-row gap-8 max-w-3xl mx-auto">
+                                    <div className="flex-1 space-y-3">
+                                        <Label className="text-[12px] font-bold tracking-tight text-on-surface-variant/40 ml-2">Input subject reviewer uid</Label>
+                                        <Input
+                                            placeholder="USR_VEC_772"
+                                            className="h-16 font-mono tracking-widest text-lg border-none rounded-[24px] bg-surface-container/50 px-10 ring-1 ring-on-surface/5 focus:ring-2 focus:ring-primary/20 transition-all text-center"
+                                            value={reviewerId}
+                                            onChange={(e) => setReviewerId(e.target.value)}
+                                        />
+                                    </div>
+                                     <Button
+                                        className="h-16 rounded-[24px] px-12 font-bold text-sm shadow-xl shadow-primary/20 transition-all self-end"
+                                        onClick={() => loadMyReviews(reviewerId)}
+                                    >
+                                        <Search className="mr-3 h-5 w-5" /> Decode vectors
                                     </Button>
                                 </div>
 
-                                <div className="border rounded-md">
+                                <div className="border-none bg-white overflow-hidden ring-1 ring-on-surface/5 rounded-[32px] shadow-2xl shadow-on-surface/5">
                                     {myReviewItems.length === 0 ? (
-                                        <div className="p-12 text-center text-muted-foreground">
-                                            No pending reviews found.
+                                         <div className="py-40 text-center">
+                                            <div className="flex flex-col items-center gap-6 opacity-10">
+                                                <ShieldCheck className="h-20 w-20" />
+                                                <p className="text-[11px] font-bold italic">Zero assigned vectors detected</p>
+                                            </div>
                                         </div>
                                     ) : (
-                                        <Table>
-                                            <TableHeader>
-                                                <TableRow>
-                                                    <TableHead>Resource</TableHead>
-                                                    <TableHead>User</TableHead>
-                                                    <TableHead>Action</TableHead>
-                                                </TableRow>
-                                            </TableHeader>
+                                        <GlassTable>
+                                             <GlassTableHeader>
+                                                <GlassTableRow className="bg-primary/5 hover:bg-primary/5 border-none">
+                                                    <GlassTableHead className="py-8 pl-12">Target vector</GlassTableHead>
+                                                    <GlassTableHead className="py-8 px-12">Subject identity</GlassTableHead>
+                                                    <GlassTableHead className="py-8 px-12 text-right">Commit governance</GlassTableHead>
+                                                </GlassTableRow>
+                                            </GlassTableHeader>
                                             <TableBody>
                                                 {myReviewItems.map(item => (
-                                                    <TableRow key={item.id}>
-                                                        <TableCell>
-                                                            <div className="font-medium">{item.resource_name || item.resource_id}</div>
-                                                            <div className="text-xs text-muted-foreground uppercase">{item.resource_type}</div>
+                                                    <GlassTableRow key={item.id} className="border-b border-on-surface/5 last:border-0 group hover:bg-surface-container/20 transition-all">
+                                                        <TableCell className="py-12 pl-12">
+                                                            <div className="flex items-center gap-8">
+                                                                <div className="w-14 h-14 bg-surface-container rounded-2xl flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-all shadow-sm">
+                                                                    <Command className="h-6 w-6 opacity-40 group-hover:opacity-100" />
+                                                                </div>
+                                                                 <div className="flex flex-col">
+                                                                    <span className="text-2xl font-bold tracking-tight text-on-surface group-hover:text-primary transition-all">{item.resource_name || item.resource_id}</span>
+                                                                    <span className="text-[10px] font-bold text-on-surface-variant/40 mt-1 italic">{item.resource_type}</span>
+                                                                </div>
+                                                            </div>
                                                         </TableCell>
-                                                        <TableCell>{item.user_id}</TableCell>
-                                                        <TableCell>
-                                                            <div className="flex gap-2">
-                                                                <Button size="sm" className="bg-green-600 hover:bg-green-700" onClick={() => handleMyReviewAction(item, 'approve')}>
-                                                                    Approve
+                                                        <TableCell className="py-12 px-12 font-bold font-mono text-[13px] tracking-widest uppercase text-on-surface-variant/30 group-hover:text-on-surface-variant transition-colors">
+                                                            {item.user_id}
+                                                        </TableCell>
+                                                         <TableCell className="py-12 px-12 text-right">
+                                                            <div className="flex justify-end gap-4">
+                                                                <Button className="h-14 rounded-2xl bg-emerald-500 text-white hover:bg-emerald-600 font-bold text-[11px] px-10 shadow-lg shadow-emerald-500/10 transition-all border-none" onClick={() => handleMyReviewAction(item, 'approve')}>
+                                                                    Authorize
                                                                 </Button>
-                                                                <Button size="sm" variant="destructive" onClick={() => handleMyReviewAction(item, 'revoke')}>
-                                                                    Revoke
+                                                                <Button className="h-14 rounded-2xl bg-red-600 text-white hover:bg-red-700 font-bold text-[11px] px-10 shadow-lg shadow-red-500/10 transition-all border-none" onClick={() => handleMyReviewAction(item, 'revoke')}>
+                                                                    Terminate
                                                                 </Button>
                                                             </div>
                                                         </TableCell>
-                                                    </TableRow>
+                                                    </GlassTableRow>
                                                 ))}
                                             </TableBody>
-                                        </Table>
+                                        </GlassTable>
                                     )}
                                 </div>
-                            </CardContent>
-                        </Card>
+                            </GlassCardContent>
+                        </GlassCard>
                     </div>
                 )}
             </div>

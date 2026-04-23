@@ -1,0 +1,48 @@
+# WardSeal UI Layer
+# =================
+# Frontend applications for the WardSeal platform.
+
+services:
+  adminui:
+    build:
+      context: ./web/admin
+      dockerfile: Dockerfile
+      args:
+        VITE_GOVSVC_URL: http://api.wardseal.local
+        VITE_AUTHSVC_URL: http://auth.wardseal.local
+        VITE_DIRSVC_URL: http://api.wardseal.local
+        VITE_APP_MODE: saas
+    container_name: wardseal-adminui
+    depends_on:
+      govsvc:
+        condition: service_healthy
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.adminui.rule=Host(`manage.wardseal.local`)
+      - traefik.http.routers.adminui.entrypoints=web
+      - traefik.http.services.adminui.loadbalancer.server.port=80
+    networks:
+      - wardseal-net
+
+  landingui:
+    build:
+      context: ./web/landing
+      dockerfile: Dockerfile
+      args:
+        VITE_ENVIRONMENT: local
+        VITE_SITE_BASE_URL: http://wardseal.local
+        VITE_CONSOLE_BASE_URL: http://manage.wardseal.local
+        VITE_SUPPORT_EMAIL: support@wardseal.com
+    container_name: wardseal-landingui
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.landingui.rule=Host(`wardseal.local`)
+      - traefik.http.routers.landingui.entrypoints=web
+      - traefik.http.services.landingui.loadbalancer.server.port=80
+    networks:
+      - wardseal-net
+
+networks:
+  wardseal-net:
+    external: true
+    name: wardseal-net

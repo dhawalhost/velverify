@@ -4,7 +4,7 @@ go 1.26.2
 
 require (
 	github.com/crewjam/saml v0.5.1
-	github.com/dhawalhost/gokit v0.0.0-00010101000000-000000000000
+	github.com/dhawalhost/gokit v0.1.0
 	github.com/gin-contrib/cors v1.7.2
 	github.com/gin-gonic/gin v1.11.0
 	github.com/go-ldap/ldap/v3 v3.4.12
@@ -128,5 +128,3 @@ require (
 	google.golang.org/protobuf v1.36.11 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
-
-replace github.com/dhawalhost/gokit => /Users/dhawal.dyavanpalli/go/src/gokit

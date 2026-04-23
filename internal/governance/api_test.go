@@ -9,12 +9,15 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/dhawalhost/wardseal/internal/oauthclient"
-	"github.com/dhawalhost/wardseal/internal/webhook"
-	"github.com/dhawalhost/wardseal/pkg/middleware"
 	"github.com/gin-gonic/gin"
 	"github.com/lib/pq"
 	"go.uber.org/zap"
+
+	"github.com/dhawalhost/wardseal/internal/auth"
+	"github.com/dhawalhost/wardseal/internal/authz"
+	"github.com/dhawalhost/wardseal/internal/oauthclient"
+	"github.com/dhawalhost/wardseal/internal/webhook"
+	"github.com/dhawalhost/wardseal/pkg/middleware"
 )
 
 func TestListOAuthClientsReturnsClients(t *testing.T) {
@@ -280,6 +283,11 @@ type stubService struct {
 	listIPPoliciesFn        func(ctx context.Context, tenantID string) ([]IPPolicy, error)
 	deleteIPPolicyFn        func(ctx context.Context, tenantID, ipPolicyID string) error
 	confirmSafetyActionFn   func(ctx context.Context, tenantID, userID, actionID, comment string) error
+
+	listWorkloadsFn    func(ctx context.Context, tenantID string) ([]auth.Workload, error)
+	getDashboardStatsFn func(ctx context.Context, tenantID string) (DashboardStats, error)
+	createWorkloadFn   func(ctx context.Context, tenantID string, w auth.Workload) (string, error)
+	listRelationshipsFn func(ctx context.Context, tenantID string, query authz.Query) ([]authz.RelationTuple, error)
 }
 
 // GetDevice implements [Service].
@@ -483,4 +491,32 @@ func (s *stubService) ConfirmSafetyAction(ctx context.Context, tenantID, actionI
 		return s.confirmSafetyActionFn(ctx, tenantID, actionID, approverID, comment)
 	}
 	return nil
+}
+
+func (s *stubService) ListWorkloads(ctx context.Context, tenantID string) ([]auth.Workload, error) {
+	if s.listWorkloadsFn != nil {
+		return s.listWorkloadsFn(ctx, tenantID)
+	}
+	return nil, nil
+}
+
+func (s *stubService) CreateWorkload(ctx context.Context, tenantID string, w auth.Workload) (string, error) {
+	if s.createWorkloadFn != nil {
+		return s.createWorkloadFn(ctx, tenantID, w)
+	}
+	return "", nil
+}
+
+func (s *stubService) GetDashboardStats(ctx context.Context, tenantID string) (DashboardStats, error) {
+	if s.getDashboardStatsFn != nil {
+		return s.getDashboardStatsFn(ctx, tenantID)
+	}
+	return DashboardStats{}, nil
+}
+
+func (s *stubService) ListRelationships(ctx context.Context, tenantID string, query authz.Query) ([]authz.RelationTuple, error) {
+	if s.listRelationshipsFn != nil {
+		return s.listRelationshipsFn(ctx, tenantID, query)
+	}
+	return nil, nil
 }

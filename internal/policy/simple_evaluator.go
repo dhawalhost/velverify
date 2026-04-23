@@ -136,7 +136,7 @@ func (e *SimpleEvaluator) resolveAttribute(input Input, attr string) interface{}
 
 func (e *SimpleEvaluator) contains(source interface{}, target interface{}) bool {
 	targetStr := fmt.Sprintf("%v", target)
-	
+
 	switch v := source.(type) {
 	case string:
 		return strings.Contains(v, targetStr)

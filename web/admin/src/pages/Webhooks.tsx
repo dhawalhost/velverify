@@ -1,12 +1,27 @@
 import React, { useEffect, useState } from 'react';
 import { getWebhooks, createWebhook, deleteWebhook } from '../api';
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@/components/ui/table';
+import { TableBody, TableCell } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Plus, Trash2, Webhook as WebhookIcon, Check } from 'lucide-react';
+import { 
+    Loader2, 
+    Plus, 
+    Trash2, 
+    Webhook as WebhookIcon, 
+    Check, 
+    Activity, 
+    Globe, 
+    ShieldCheck, 
+    Terminal, 
+    ExternalLink, 
+    Fingerprint, 
+    Link2, 
+    Binary,
+    Lock
+} from 'lucide-react';
+import { PageHeader, GlassCard, GlassCardHeader, GlassCardTitle, GlassCardContent, GlassTable, GlassTableHeader, GlassTableHead, GlassTableRow } from '@/components/layout';
 
 interface Webhook {
     id: string;
@@ -88,115 +103,178 @@ const Webhooks: React.FC = () => {
         }
     };
 
-    if (loading && webhooks.length === 0) return <div className="p-8 flex justify-center"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>;
+    if (loading && webhooks.length === 0) return <div className="h-[400px] flex items-center justify-center"><Loader2 className="h-10 w-10 animate-spin text-primary opacity-20" /></div>;
 
     return (
-        <div className="space-y-6">
-            <div className="flex justify-between items-center">
-                <div>
-                    <h1 className="text-3xl font-bold tracking-tight">Webhooks</h1>
-                    <p className="text-muted-foreground mt-1">Receive real-time notifications for system events.</p>
-                </div>
-            </div>
+        <div className="space-y-12 animate-in fade-in duration-700">
+            <PageHeader
+                icon={<WebhookIcon className="w-10 h-10 text-primary" />}
+                title="Event Tunnels"
+                description="Synchronous and asynchronous outbound data pipelines. Orchestrating lifecycle notifications across the external digital architecture."
+            />
 
-            <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
-                <div className="md:col-span-4">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="text-lg">Register Webhook</CardTitle>
-                            <CardDescription>Add a new endpoint to receive events.</CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className="space-y-2">
-                                <Label>Endpoint URL</Label>
-                                <Input
-                                    placeholder="https://wardseal.com/webhook"
-                                    value={newUrl}
-                                    onChange={(e) => setNewUrl(e.target.value)}
-                                />
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
+                <div className="lg:col-span-4 space-y-8">
+                    <GlassCard className="border-none shadow-2xl shadow-on-surface/10 bg-white overflow-hidden rounded-[32px]">
+                        <GlassCardHeader className="bg-surface-container/10 border-b border-on-surface/5 py-8 px-8">
+                            <div className="flex items-center gap-4">
+                                <div className="p-3 bg-primary rounded-xl text-white shadow-lg shadow-primary/20">
+                                    <Activity className="w-5 h-5" />
+                                </div>
+                                <GlassCardTitle className="text-xl font-bold tracking-tight text-on-surface">Provision tunnel</GlassCardTitle>
                             </div>
-                            <div className="space-y-2">
-                                <Label>Events to Subscribe</Label>
-                                <div className="grid grid-cols-1 bg-muted/20 p-3 rounded-md gap-2">
+                        </GlassCardHeader>
+                        <GlassCardContent className="p-8 space-y-8">
+                            <div className="space-y-4">
+                                <Label className="text-[12px] font-bold tracking-tight text-on-surface-variant/40 ml-1">Endpoint vector</Label>
+                                <div className="relative">
+                                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant/40">
+                                        <Globe className="h-5 w-5" />
+                                    </div>
+                                    <Input
+                                        placeholder="https://api.external.service/hook"
+                                        className="h-14 border-none rounded-2xl bg-surface-container/50 ring-1 ring-on-surface/5 focus-visible:ring-2 focus-visible:ring-primary/20 transition-all font-mono text-xs pl-12"
+                                        value={newUrl}
+                                        onChange={(e) => setNewUrl(e.target.value)}
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="space-y-4">
+                                <Label className="text-[12px] font-bold tracking-tight text-on-surface-variant/40 ml-1">Event subscription</Label>
+                                <div className="grid grid-cols-1 gap-3 bg-surface-container/30 rounded-2xl p-6 ring-1 ring-on-surface/5">
                                     {availableEvents.map(ev => (
-                                        <div key={ev} className="flex items-center space-x-2">
+                                        <div key={ev} className="flex items-center space-x-4 group cursor-pointer select-none" onClick={() => toggleEvent(ev)}>
                                             <div
-                                                className={`w-4 h-4 rounded border flex items-center justify-center cursor-pointer ${selectedEvents.includes(ev) ? 'bg-primary border-primary text-primary-foreground' : 'border-input bg-background'}`}
-                                                onClick={() => toggleEvent(ev)}
+                                                className={`w-5 h-5 rounded-lg border-2 flex items-center justify-center transition-all ${selectedEvents.includes(ev) ? 'bg-primary border-primary' : 'border-on-surface/10 bg-white group-hover:border-primary/50'}`}
                                             >
-                                                {selectedEvents.includes(ev) && <Check className="h-3 w-3" />}
+                                                {selectedEvents.includes(ev) && <Check className="h-3 w-3 text-white" />}
                                             </div>
-                                            <span className="text-sm cursor-pointer select-none" onClick={() => toggleEvent(ev)}>{ev}</span>
+                                            <span className={`text-[12px] font-bold tracking-tight transition-colors ${selectedEvents.includes(ev) ? 'text-on-surface' : 'text-on-surface-variant/40'}`}>{ev.replace('.', ' ')}</span>
                                         </div>
                                     ))}
                                 </div>
                             </div>
-                            {error && <div className="text-sm text-destructive">{error}</div>}
+
+                            {error && (
+                                <div className="bg-red-50 text-red-600 p-4 rounded-xl border border-red-100 font-bold text-[11px] tracking-tight animate-in slide-in-from-top-2">
+                                    Vector crash: {error}
+                                </div>
+                            )}
+
                             <Button
                                 onClick={handleCreate}
-                                className="w-full"
+                                className="w-full h-14 rounded-2xl font-bold text-sm tracking-tight shadow-xl shadow-primary/20 transition-all"
                                 disabled={creating}
                             >
-                                {creating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
-                                Register Webhook
+                                {creating ? <Loader2 className="mr-3 h-5 w-5 animate-spin" /> : <Plus className="mr-3 h-5 w-5" />}
+                                Establish linkage
                             </Button>
-                        </CardContent>
-                    </Card>
+                        </GlassCardContent>
+                    </GlassCard>
+
+                    <div className="bg-surface-container/30 p-8 rounded-[32px] ring-1 ring-on-surface/5 flex items-start gap-6 relative overflow-hidden group">
+                        <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none transition-transform group-hover:scale-110">
+                            <Binary className="w-20 h-20 -mr-4 -mt-4 text-primary" />
+                        </div>
+                        <div className="p-3 bg-white rounded-2xl shadow-sm ring-1 ring-on-surface/5">
+                            <Lock className="w-6 h-6 text-primary" />
+                        </div>
+                        <div className="space-y-2">
+                            <h4 className="text-[12px] font-bold tracking-tight text-on-surface">Security protocol</h4>
+                            <p className="text-[11px] font-medium leading-relaxed text-on-surface-variant/60 tracking-tight">
+                                All outbound vectors are cryptographically signed with HMAC-SHA256 for structural integrity.
+                            </p>
+                        </div>
+                    </div>
                 </div>
 
-                <div className="md:col-span-8">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Active Webhooks</CardTitle>
-                        </CardHeader>
-                        <CardContent className="p-0">
+                <div className="lg:col-span-8 space-y-8">
+                    <div className="flex items-center gap-6">
+                        <h2 className="text-[12px] font-bold tracking-tight text-on-surface-variant/40 italic flex-shrink-0 opacity-60">Infrastructure index</h2>
+                        <div className="h-px flex-1 bg-on-surface/5" />
+                    </div>
+
+                    <GlassCard className="border-none shadow-2xl shadow-on-surface/5 bg-white overflow-hidden rounded-[32px]">
+                        <GlassCardHeader className="py-8 px-10 border-b border-on-surface/5">
+                            <div className="flex items-center gap-5">
+                                <div className="p-3.5 bg-primary/5 rounded-2xl">
+                                    <ShieldCheck className="w-7 h-7 text-primary" />
+                                </div>
+                                <div>
+                                    <GlassCardTitle className="text-2xl font-bold tracking-tight text-on-surface">Tunnel registry</GlassCardTitle>
+                                    <p className="text-on-surface-variant/40 font-semibold text-[12px] mt-1 tracking-tight italic">Active orchestration pipelines ({webhooks.length})</p>
+                                </div>
+                            </div>
+                        </GlassCardHeader>
+                        <GlassCardContent className="p-0">
                             {webhooks.length === 0 ? (
-                                <div className="p-8 text-center text-muted-foreground">No webhooks registered.</div>
+                                <div className="py-32 text-center text-on-surface-variant/30 flex flex-col items-center gap-6 italic">
+                                    <div className="w-20 h-20 rounded-3xl bg-surface-container/50 flex items-center justify-center">
+                                        <WebhookIcon className="h-10 w-10 opacity-20" />
+                                    </div>
+                                    <span className="max-w-xs font-bold text-[11px] tracking-tight leading-relaxed opacity-60">System silence // Zero communication vectors established.</span>
+                                </div>
                             ) : (
-                                <Table>
-                                    <TableHeader>
-                                        <TableRow>
-                                            <TableHead>URL</TableHead>
-                                            <TableHead>Events</TableHead>
-                                            <TableHead>Status</TableHead>
-                                            <TableHead className="text-right">Actions</TableHead>
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {webhooks.map(wh => (
-                                            <TableRow key={wh.id}>
-                                                <TableCell>
-                                                    <div className="flex items-center gap-2 font-mono text-sm">
-                                                        <WebhookIcon className="h-4 w-4 text-muted-foreground" />
-                                                        {wh.url}
-                                                    </div>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <div className="flex flex-wrap gap-1">
-                                                        {wh.events.map(ev => (
-                                                            <Badge key={ev} variant="secondary" className="text-xs">{ev}</Badge>
-                                                        ))}
-                                                    </div>
-                                                </TableCell>
-                                                <TableCell>
-                                                    {wh.active ? (
-                                                        <Badge className="bg-green-600 hover:bg-green-700">Active</Badge>
-                                                    ) : (
-                                                        <Badge variant="secondary">Inactive</Badge>
-                                                    )}
-                                                </TableCell>
-                                                <TableCell className="text-right">
-                                                    <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:bg-destructive/10" onClick={() => handleDelete(wh.id)}>
-                                                        <Trash2 className="h-4 w-4" />
-                                                    </Button>
-                                                </TableCell>
-                                            </TableRow>
-                                        ))}
-                                    </TableBody>
-                                </Table>
+                                <div className="overflow-x-auto">
+                                    <GlassTable>
+                                        <GlassTableHeader>
+                                            <GlassTableRow className="hover:bg-transparent border-b border-on-surface/5">
+                                                <GlassTableHead className="py-6 pl-10">Endpoint identity</GlassTableHead>
+                                                <GlassTableHead>Subscription</GlassTableHead>
+                                                <GlassTableHead>Status</GlassTableHead>
+                                                <GlassTableHead className="text-right pr-10">Actions</GlassTableHead>
+                                            </GlassTableRow>
+                                        </GlassTableHeader>
+                                        <TableBody>
+                                            {webhooks.map(wh => (
+                                                <GlassTableRow key={wh.id} className="hover:bg-surface-container/10 transition-all border-b border-on-surface/5 last:border-0 group">
+                                                    <TableCell className="py-8 pl-10">
+                                                        <div className="flex items-center gap-6">
+                                                            <div className="w-12 h-12 rounded-xl bg-surface-container/50 text-on-surface-variant/40 flex items-center justify-center transition-all group-hover:bg-primary group-hover:text-white">
+                                                                <ExternalLink className="h-5 w-5" />
+                                                            </div>
+                                                            <div className="flex flex-col gap-1.5">
+                                                                <span className="text-base font-bold tracking-tight text-on-surface group-hover:text-primary transition-colors truncate max-w-[280px]">{wh.url}</span>
+                                                                <span className="text-[10px] font-bold font-mono tracking-tight text-on-surface-variant/20 italic">id // {wh.id?.substring(0, 8).toLowerCase() || 'external'}</span>
+                                                            </div>
+                                                        </div>
+                                                    </TableCell>
+                                                    <TableCell className="py-8">
+                                                        <div className="flex flex-wrap gap-2">
+                                                            {wh.events.map(ev => (
+                                                                <Badge key={ev} className="bg-surface-container/50 text-on-surface-variant/60 border-none rounded-lg font-bold text-[10px] tracking-tight px-3 py-1 group-hover:bg-primary/5 group-hover:text-primary transition-all">
+                                                                    {ev.split('.')[1]}
+                                                                </Badge>
+                                                            ))}
+                                                        </div>
+                                                    </TableCell>
+                                                    <TableCell className="py-8">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className={`h-2 w-2 rounded-full transition-all ${wh.active ? 'bg-emerald-500' : 'bg-on-surface/20'}`} />
+                                                            <span className={`text-[11px] font-bold tracking-tight transition-all ${wh.active ? 'text-emerald-600' : 'text-on-surface-variant/40'}`}>
+                                                                {wh.active ? 'Active' : 'Dormant'}
+                                                            </span>
+                                                        </div>
+                                                    </TableCell>
+                                                    <TableCell className="py-8 text-right pr-10">
+                                                        <Button 
+                                                            variant="ghost" 
+                                                            size="icon" 
+                                                            className="h-11 w-11 rounded-xl text-on-surface-variant/40 hover:text-red-500 hover:bg-red-50 transition-all"
+                                                            onClick={() => handleDelete(wh.id)}
+                                                        >
+                                                            <Trash2 className="w-5 h-5" />
+                                                        </Button>
+                                                    </TableCell>
+                                                </GlassTableRow>
+                                            ))}
+                                        </TableBody>
+                                    </GlassTable>
+                                </div>
                             )}
-                        </CardContent>
-                    </Card>
+                        </GlassCardContent>
+                    </GlassCard>
                 </div>
             </div>
         </div>

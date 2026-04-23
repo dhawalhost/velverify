@@ -5,10 +5,11 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/dhawalhost/wardseal/pkg/middleware"
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
 	"go.uber.org/zap"
+
+	"github.com/dhawalhost/wardseal/pkg/middleware"
 )
 
 // HTTPHandler represents the HTTP API handlers for the directory service.
@@ -74,6 +75,7 @@ func (h *HTTPHandler) RegisterRoutes(router *gin.Engine) {
 	groups := tenantProtected.Group("/groups")
 	{
 		groups.POST("", h.createGroup)
+		groups.GET("", h.listGroups)
 		groups.GET("/:id", h.getGroupByID)
 		groups.PUT("/:id", h.updateGroup)
 		groups.DELETE("/:id", h.deleteGroup)
@@ -82,6 +84,7 @@ func (h *HTTPHandler) RegisterRoutes(router *gin.Engine) {
 	// Group membership routes
 	groupMembership := groups.Group(":id/users")
 	{
+		groupMembership.GET("", h.listGroupMembers)
 		groupMembership.POST("", h.addUserToGroup)
 		groupMembership.DELETE("/:userID", h.removeUserFromGroup)
 	}
@@ -318,6 +321,34 @@ func (h *HTTPHandler) getGroupByID(c *gin.Context) {
 	c.JSON(http.StatusOK, GetGroupByIDResponse{Group: group})
 }
 
+func (h *HTTPHandler) listGroups(c *gin.Context) {
+	tenantID, ok := h.tenantID(c)
+	if !ok {
+		return
+	}
+
+	var req ListGroupsRequest
+	if err := c.ShouldBindQuery(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if req.Limit <= 0 {
+		req.Limit = 10
+	}
+	if req.Offset < 0 {
+		req.Offset = 0
+	}
+
+	groups, total, err := h.svc.ListGroups(c.Request.Context(), tenantID, req.Limit, req.Offset)
+	if err != nil {
+		h.logger.Error("List groups failed", zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, ListGroupsResponse{Groups: groups, Total: total})
+}
+
 func (h *HTTPHandler) updateGroup(c *gin.Context) {
 	tenantID, ok := h.tenantID(c)
 	if !ok {
@@ -417,6 +448,23 @@ func (h *HTTPHandler) removeUserFromGroup(c *gin.Context) {
 		return
 	}
 	c.Status(http.StatusNoContent)
+}
+
+func (h *HTTPHandler) listGroupMembers(c *gin.Context) {
+	tenantID, ok := h.tenantID(c)
+	if !ok {
+		return
+	}
+	groupID := c.Param("id")
+
+	users, err := h.svc.ListGroupMembers(c.Request.Context(), tenantID, groupID)
+	if err != nil {
+		h.logger.Error("List group members failed", zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, ListGroupMembersResponse{Users: users})
 }
 
 func (h *HTTPHandler) verifyCredentials(c *gin.Context) {

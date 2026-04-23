@@ -54,29 +54,25 @@ const features = [
 
 export default function HomePage() {
   const [activeStep, setActiveStep] = useState(1);
-  const [yearly, setYearly] = useState(false)
   const [openFaq, setOpenFaq] = useState(0)
-
-  const proPrice = yearly ? pricing.yearly.pro : pricing.monthly.pro
-  const teamPrice = yearly ? pricing.yearly.team : pricing.monthly.team
 
   const codeSnippets = {
     1: {
-      comment: "# Initialize Cloud Tenant",
+      comment: "// Initialize Cloud Tenant",
       commands: [
         { cmd: "wardseal", text: "login --domain cloud.wardseal.com" },
         { cmd: "wardseal", text: 'tenant create --name "HighGrowth Inc"' }
       ]
     },
     2: {
-      comment: "# Register OIDC Application",
+      comment: "// Register OIDC Application",
       commands: [
         { cmd: "wardseal", text: 'apps create --name "Production App" \\' },
         { cmd: "", text: '  --type "oidc" --redirect-uri "https://app.com/callback"' }
       ]
     },
     3: {
-      comment: "# Configuration & Discovery",
+      comment: "// Configuration & Discovery",
       commands: [
         { cmd: "curl", text: "https://cloud.wardseal.com/auth/.well-known/openid-configuration" },
         { cmd: "wardseal", text: "policies create --file prod-security.yaml" }
@@ -85,19 +81,6 @@ export default function HomePage() {
   };
 
   useEffect(() => {
-    const handleMouseMove = (e) => {
-      const cards = document.querySelectorAll('.feature-card');
-      cards.forEach(card => {
-        const rect = card.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
-        card.style.setProperty('--mouse-x', `${x}px`);
-        card.style.setProperty('--mouse-y', `${y}px`);
-      });
-    };
-
-    window.addEventListener('mousemove', handleMouseMove);
-
     const observer = new IntersectionObserver((entries) => {
       entries.forEach(e => { 
         if (e.isIntersecting) { 
@@ -108,76 +91,71 @@ export default function HomePage() {
     }, { threshold: 0.1 });
 
     document.querySelectorAll('.animate-on-scroll').forEach(el => observer.observe(el));
-    return () => {
-      observer.disconnect();
-      window.removeEventListener('mousemove', handleMouseMove);
-    };
+    return () => observer.disconnect();
   }, []);
 
   return (
     <main>
       <section className="hero">
-        <div className="container hero-content fade-up">
-          <div className="hero-text">
-            <span className="tag"><Zap className="w-3 h-3" /> Public Beta — Cloud Managed</span>
-            <h1 style={{ marginTop: '24px' }}>
-              Identity Infrastructure for <br/>
-              <span className="gradient-text">Cloud-Native Teams</span>
+        <div className="container hero-content">
+          <div className="hero-text fade-up">
+            <span className="tag"><Zap size={14} /> Unified Identity for the Modern Stack</span>
+            <h1>
+              Trusted infrastructure <br/>
+              for <span className="gradient-text">security teams</span>
             </h1>
-            <p style={{ fontSize: '1.4rem', marginTop: '32px' }}>
-              The modern standard for AuthN, AuthZ, and Governance. <br/>
-              Built for performance. Designed for developers.
+            <p>
+              The enterprise standard for AuthN, AuthZ, and Identity Governance. 
+              Built for performance, auditability, and scale.
             </p>
-            <div className="hero-cta" style={{ justifyContent: 'flex-start', marginTop: '40px' }}>
-              <a className="btn btn-primary btn-lg" href={`${consoleBaseUrl}/signup?plan=free`}>
-                Start Building Free <ArrowRight className="w-4 h-4 ml-2" />
+            <div className="hero-cta">
+              <a className="btn btn-primary btn-lg btn-glow" href={`${consoleBaseUrl}/signup`}>
+                Start Building Free <ArrowRight size={18} />
               </a>
-              {/* <a className="btn btn-outline btn-lg" href="https://github.com/dhawalhost/wardseal" target="_blank" rel="noreferrer">
-                <Star className="w-4 h-4 mr-2" /> GitHub
-              </a> */}
+              <a className="btn btn-outline btn-lg" href="https://github.com/dhawalhost/wardseal">
+                Documentation
+              </a>
             </div>
             
-            <div className="hero-trust mt-12 flex items-center gap-6 opacity-60 grayscale hover:grayscale-0 transition-all duration-500" style={{ marginTop: '64px', display: 'flex', alignItems: 'center', gap: '32px' }}>
-              <span style={{ fontSize: '0.8rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Secure by Default</span>
-              <div style={{ display: 'flex', gap: '24px', alignItems: 'center' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.9rem' }}><Lock className="w-4 h-4" /> SHA-256</div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.9rem' }}><ShieldCheck className="w-4 h-4" /> OIDC/SAML</div>
+            <div className="hero-badges">
+              <div className="badge-item">
+                <Lock size={14} />
+                <span>OIDC & SAML 2.0</span>
+              </div>
+              <div className="badge-divider" />
+              <div className="badge-item">
+                <ShieldCheck size={14} />
+                <span>Adaptive MFA</span>
+              </div>
+              <div className="badge-divider" />
+              <div className="badge-item">
+                <Fingerprint size={14} />
+                <span>Passkeys</span>
               </div>
             </div>
           </div>
-          <div className="hero-mockup">
-            <div className="mockup-container glass" style={{ padding: '8px', borderRadius: 'var(--r-lg)', background: 'rgba(255,255,255,0.05)' }}>
-               <img src="/console-preview.png" alt="WardSeal Console Preview" className="mockup-img" style={{ transform: 'none', borderRadius: 'var(--r)' }} />
-               <div className="absolute -bottom-6 -left-6 glass p-4 rounded-xl hidden lg:block" style={{ position: 'absolute', bottom: '-24px', left: '-24px', padding: '16px', borderRadius: 'var(--r)' }}>
-                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                   <div style={{ width: '40px', height: '40px', background: 'var(--primary)', borderRadius: 'var(--r)', display: 'flex', alignItems: 'center', justifyItems: 'center', justifyContent: 'center' }}>
-                     <Fingerprint className="text-white w-6 h-6" />
-                   </div>
-                   <div>
-                     <div style={{ fontSize: '0.8rem', fontWeight: 700 }}>Passkey Active</div>
-                     <div style={{ fontSize: '0.7rem', opacity: 0.6 }}>Biometric verified</div>
-                   </div>
-                 </div>
-               </div>
+
+          <div className="hero-mockup fade-up" style={{ animationDelay: '0.2s' }}>
+            <div className="mockup-container">
+               <img src="/console-preview.png" alt="WardSeal Console Preview" className="mockup-img" />
             </div>
           </div>
         </div>
       </section>
 
-
       <section className="section" id="features">
         <div className="container">
-          <div className="section-header align-center">
+          <div className="section-header align-center animate-on-scroll">
             <span className="tag">Platform</span>
             <h2>Enterprise security, simplified</h2>
             <p>One platform for users, machines, and compliance.</p>
           </div>
           <div className="features-grid">
             {features.map((f, i) => (
-              <article className="feature-card animate-on-scroll" key={i}>
+              <article className="feature-card animate-on-scroll" key={i} style={{ animationDelay: `${i * 0.1}s` }}>
                 <div className="feature-icon">{f.icon}</div>
-                <h3 style={{ fontSize: '1.5rem', marginBottom: '16px' }}>{f.title}</h3>
-                <p style={{ fontSize: '1rem', lineHeight: '1.7' }}>{f.desc}</p>
+                <h3>{f.title}</h3>
+                <p>{f.desc}</p>
               </article>
             ))}
           </div>
@@ -188,8 +166,8 @@ export default function HomePage() {
         <div className="container">
           <div className="how-grid">
             <div className="how-text">
-              <span className="tag mb-4">Quick Start</span>
-              <h2 className="mb-8">Up and running in minutes</h2>
+              <span className="tag" style={{ marginBottom: '16px' }}>Quick Start</span>
+              <h2>Up and running in minutes</h2>
               <div className="steps">
                 {[
                   { n: 1, t: 'Create your account', d: 'Sign up for free. Your tenant is provisioned instantly.' },
@@ -197,31 +175,35 @@ export default function HomePage() {
                   { n: 3, t: 'Configure SSO & MFA', d: 'Enable social login or passkeys in a few clicks.' }
                 ].map(s => (
                   <div 
-                    className={`step cursor-pointer transition-all duration-300 ${activeStep === s.n ? 'opacity-100 scale-105' : 'opacity-50'}`} 
+                    className={`step ${activeStep === s.n ? 'active' : ''}`} 
                     key={s.n}
                     onMouseEnter={() => setActiveStep(s.n)}
                     style={{ cursor: 'pointer' }}
                   >
-                    <div className={`step-num ${activeStep === s.n ? 'glow-blue' : ''}`}>{s.n}</div>
+                    <div className="step-num">{s.n}</div>
                     <div className="step-content">
-                      <h3 className="step-title" style={{ color: activeStep === s.n ? 'var(--text)' : 'var(--text-muted)' }}>{s.t}</h3>
-                      <p className="step-desc" style={{ display: activeStep === s.n ? 'block' : 'none' }}>{s.d}</p>
+                      <h3 style={{ color: activeStep === s.n ? 'var(--primary)' : 'inherit' }}>{s.t}</h3>
+                      {activeStep === s.n && <p style={{ fontSize: '1rem', marginTop: '8px' }}>{s.d}</p>}
                     </div>
                   </div>
                 ))}
               </div>
             </div>
-            <div className="code-box animate-on-scroll glass" style={{ minHeight: '300px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-              <div className="code-content fade-up" key={activeStep}>
+            <div className="code-box animate-on-scroll" style={{ minHeight: '320px' }}>
+              <div className="code-content" key={activeStep}>
                 <span className="comment">{codeSnippets[activeStep].comment}</span><br />
                 {codeSnippets[activeStep].commands.map((c, i) => (
-                  <div key={i} style={{ marginTop: '8px' }}>
-                    <span className="cmd">{c.cmd}</span> {c.text}
+                  <div key={i} style={{ marginTop: '12px' }}>
+                    <span className="cmd" style={{ fontSize: '0.8rem', opacity: 0.7 }}>$</span> <span className="cmd">{c.cmd}</span> {c.text}
                   </div>
                 ))}
-                <div style={{ marginTop: '32px' }}>
-                  <span className="ok" style={{ opacity: 0.8 }}>✓ Step {activeStep} validated</span><br />
-                  <span className="ok" style={{ opacity: 0.8 }}>✓ Environment ready</span>
+                <div style={{ marginTop: '40px', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '20px' }}>
+                  <div className="ok" style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.875rem' }}>
+                    <ShieldCheck size={14} /> Step {activeStep} validated
+                  </div>
+                  <div className="ok" style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.875rem', marginTop: '4px', opacity: 0.8 }}>
+                    <Zap size={14} /> Environment ready
+                  </div>
                 </div>
               </div>
             </div>
@@ -229,60 +211,61 @@ export default function HomePage() {
         </div>
       </section>
 
-
-      <section className="section section-muted" id="pricing">
+      <section className="section" id="pricing">
         <div className="container">
-          <div className="section-header align-center">
+          <div className="section-header align-center animate-on-scroll">
             <span className="tag">Public Beta</span>
             <h2>Simple, transparent pricing</h2>
             <p>During our public beta, all cloud features are free to use.</p>
           </div>
 
-          <div className="pricing-grid" style={{ marginTop: '60px' }}>
+          <div className="pricing-grid">
             <article className="plan-card popular animate-on-scroll">
               <span className="plan-badge">Public Beta</span>
-              <h3 className="plan-name">Cloud Beta</h3>
-              <p className="plan-desc">Fully managed by WardSeal</p>
-              <div className="plan-price"><span className="plan-amount">Free</span><span className="plan-per">/for beta testers</span></div>
+              <h3>Cloud Beta</h3>
+              <p>Fully managed by WardSeal</p>
+              <div className="plan-price"><span className="plan-amount">Free</span><span className="plan-per">/ during beta</span></div>
               <ul className="plan-features">
-                <li className="plan-feature"><span className="check">✓</span> Full SaaS Platform Access</li>
-                <li className="plan-feature"><span className="check">✓</span> Automated Backups & HA</li>
-                <li className="plan-feature"><span className="check">✓</span> **Unlimited System-Admins**</li>
-                <li className="plan-feature"><span className="check">✓</span> **No limits during testing phase**</li>
+                <li className="plan-feature"><ShieldCheck size={18} className="check" /> Full SaaS Platform Access</li>
+                <li className="plan-feature"><ShieldCheck size={18} className="check" /> Automated Backups & HA</li>
+                <li className="plan-feature"><ShieldCheck size={18} className="check" /> Unlimited System-Admins</li>
+                <li className="plan-feature"><ShieldCheck size={18} className="check" /> No limits during testing</li>
               </ul>
-              <a className="btn btn-primary w-full" href={`${consoleBaseUrl}/signup?plan=beta`}>Get Started for Free</a>
+              <a className="btn btn-primary w-full" href={`${consoleBaseUrl}/signup`}>Get Started for Free</a>
             </article>
 
-            <article className="plan-card animate-on-scroll">
-              <h3 className="plan-name">Enterprise</h3>
-              <p className="plan-desc">For large-scale platforms</p>
-              <div className="plan-price"><span className="plan-amount">Coming Soon</span></div>
+            <article className="plan-card animate-on-scroll" style={{ animationDelay: '0.1s' }}>
+              <h3>Enterprise</h3>
+              <p>For large-scale platforms</p>
+              <div className="plan-price"><span className="plan-amount">Custom</span></div>
               <ul className="plan-features">
-                <li className="plan-feature"><span className="check">✓</span> Managed VPC Deployment</li>
-                <li className="plan-feature"><span className="check">✓</span> Custom SLAs & 24/7 Support</li>
-                <li className="plan-feature"><span className="check">✓</span> Advanced Identity Governance</li>
-                <li className="plan-feature"><span className="check">✓</span> **On-prem / Hybrid Options**</li>
+                <li className="plan-feature"><ShieldCheck size={18} className="check" /> Managed VPC Deployment</li>
+                <li className="plan-feature"><ShieldCheck size={18} className="check" /> Custom SLAs & 24/7 Support</li>
+                <li className="plan-feature"><ShieldCheck size={18} className="check" /> Advanced Governance</li>
+                <li className="plan-feature"><ShieldCheck size={18} className="check" /> On-prem / Hybrid Options</li>
               </ul>
-              <a className="btn btn-outline w-full" href="mailto:sales@wardseal.com">Contact for Early Access</a>
+              <a className="btn btn-outline w-full" href="mailto:sales@wardseal.com">Contact Sales</a>
             </article>
           </div>
         </div>
       </section>
 
-      <section className="section">
+      <section className="section section-muted">
         <div className="container faq">
-          <div className="section-header align-center">
+          <div className="section-header align-center animate-on-scroll">
             <span className="tag">FAQ</span>
-            <h2>Frequently asked questions</h2>
+            <h2>Common Questions</h2>
           </div>
           <div className="faq-list">
             {faqItems.map((item, idx) => (
               <div className={`faq-item ${openFaq === idx ? 'open' : ''}`} key={item.q}>
                 <button className="faq-q" onClick={() => setOpenFaq(openFaq === idx ? -1 : idx)}>
                   {item.q}
-                  <span className="faq-icon">+</span>
+                  <span className="faq-icon" style={{ transform: openFaq === idx ? 'rotate(45deg)' : 'none', transition: 'transform 0.3s' }}>+</span>
                 </button>
-                <div className="faq-a">{item.a}</div>
+                <div className="faq-a">
+                  <div style={{ paddingBottom: '24px' }}>{item.a}</div>
+                </div>
               </div>
             ))}
           </div>
@@ -290,14 +273,18 @@ export default function HomePage() {
       </section>
 
       <section className="section">
-        <div className="container text-center">
-          <div className="cta-glass glass" style={{ padding: '80px 48px', borderRadius: 'var(--r-lg)' }}>
-            <span className="tag mb-4">Get Started</span>
-            <h2 className="mb-4">Secure your application today</h2>
-            <p className="cta-desc">Join the managed cloud beta today. No credit card. No complications.</p>
-            <div className="hero-cta" style={{ marginTop: '32px' }}>
-              <a className="btn btn-primary" href={`${consoleBaseUrl}/signup`}>Create Free Account &rarr;</a>
-              <a className="btn btn-outline" href="https://github.com/dhawalhost/wardseal">Read the Docs</a>
+        <div className="container">
+          <div className="cta-glass fade-up">
+            <span className="tag" style={{ marginBottom: '24px' }}>Get Started</span>
+            <h2 style={{ marginBottom: '16px' }}>Secure your application today</h2>
+            <p style={{ marginBottom: '32px', opacity: 0.9 }}>Join the managed cloud beta today. No credit card. No complications.</p>
+            <div className="hero-cta" style={{ justifyContent: 'center' }}>
+              <a className="btn btn-outline btn-lg" style={{ background: 'white', color: 'var(--primary)' }} href={`${consoleBaseUrl}/signup`}>
+                Create Free Account
+              </a>
+              <a className="btn btn-lg" style={{ border: '1px solid rgba(255,255,255,0.3)', color: 'white' }} href="https://github.com/dhawalhost/wardseal">
+                Read Documentation
+              </a>
             </div>
           </div>
         </div>

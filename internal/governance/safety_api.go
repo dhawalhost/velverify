@@ -5,6 +5,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
+
+	"github.com/dhawalhost/wardseal/pkg/middleware"
 )
 
 type SafetyHandler struct {
@@ -26,7 +28,11 @@ func (h *SafetyHandler) RegisterRoutes(rg *gin.RouterGroup) {
 }
 
 func (h *SafetyHandler) ListActions(c *gin.Context) {
-	tenantID := c.MustGet("tenant_id").(string)
+	tenantID, err := middleware.TenantIDFromGinContext(c)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "tenant id required"})
+		return
+	}
 	status := c.Query("status")
 
 	actions, err := h.svc.ListSafetyActions(c.Request.Context(), tenantID, status)
@@ -40,7 +46,11 @@ func (h *SafetyHandler) ListActions(c *gin.Context) {
 }
 
 func (h *SafetyHandler) ConfirmAction(c *gin.Context) {
-	tenantID := c.MustGet("tenant_id").(string)
+	tenantID, err := middleware.TenantIDFromGinContext(c)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "tenant id required"})
+		return
+	}
 	actionID := c.Param("id")
 	approverID := c.GetHeader("X-User-ID") // Assume header for MVP
 
@@ -50,7 +60,7 @@ func (h *SafetyHandler) ConfirmAction(c *gin.Context) {
 		return
 	}
 
-	err := h.svc.ConfirmSafetyAction(c.Request.Context(), tenantID, actionID, approverID, req.Comment)
+	err = h.svc.ConfirmSafetyAction(c.Request.Context(), tenantID, actionID, approverID, req.Comment)
 	if err != nil {
 		h.log.Error("Failed to confirm safety action", zap.Error(err), zap.String("action_id", actionID))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -61,7 +71,11 @@ func (h *SafetyHandler) ConfirmAction(c *gin.Context) {
 }
 
 func (h *SafetyHandler) RejectAction(c *gin.Context) {
-	tenantID := c.MustGet("tenant_id").(string)
+	tenantID, err := middleware.TenantIDFromGinContext(c)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "tenant id required"})
+		return
+	}
 	actionID := c.Param("id")
 	approverID := c.GetHeader("X-User-ID")
 
@@ -71,7 +85,7 @@ func (h *SafetyHandler) RejectAction(c *gin.Context) {
 		return
 	}
 
-	err := h.svc.RejectSafetyAction(c.Request.Context(), tenantID, actionID, approverID, req.Comment)
+	err = h.svc.RejectSafetyAction(c.Request.Context(), tenantID, actionID, approverID, req.Comment)
 	if err != nil {
 		h.log.Error("Failed to reject safety action", zap.Error(err), zap.String("action_id", actionID))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})

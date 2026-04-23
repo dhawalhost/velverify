@@ -1,97 +1,155 @@
 package saml
 
 import (
-	"crypto/rsa"
-	"crypto/x509"
+	"context"
 	"fmt"
 	"net/http"
 	"net/url"
+	"sync"
 
 	"github.com/crewjam/saml/samlidp"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
+
+	"github.com/dhawalhost/wardseal/pkg/kms"
+	"github.com/dhawalhost/wardseal/pkg/middleware"
 )
 
-// Config holds the configuration for the SAML Identity Provider.
+// Config holds the configuration for the SAML Identity Provider factory.
 type Config struct {
-	BaseURL     string
-	Certificate *x509.Certificate
-	PrivateKey  *rsa.PrivateKey
-	Logger      *zap.Logger
-	Store       samlidp.Store
+	BaseURL string
+	Logger  *zap.Logger
+	Cipher  kms.Cipher
+	Repo    IdPRepository
+	Store   samlidp.Store
 }
 
-// Provider represents the SAML Identity Provider.
+// Provider represents the Multi-Tenant SAML Identity Provider.
 type Provider struct {
-	idp    *samlidp.Server
-	logger *zap.Logger
+	baseURL string
+	logger  *zap.Logger
+	cipher  kms.Cipher
+	repo    IdPRepository
+	store   samlidp.Store
+
+	mu      sync.RWMutex
+	servers map[string]*samlidp.Server
 }
 
-// NewProvider creates a new SAML Identity Provider.
+// NewProvider creates a new Multi-Tenant SAML Identity Provider.
 func NewProvider(cfg Config) (*Provider, error) {
-	baseURL, err := url.Parse(cfg.BaseURL)
-	if err != nil {
-		return nil, fmt.Errorf("invalid base URL: %w", err)
-	}
-
-	idpServer, err := samlidp.New(samlidp.Options{
-		URL:         *baseURL,
-		Key:         cfg.PrivateKey,
-		Certificate: cfg.Certificate,
-		Logger:      zapLogger{cfg.Logger},
-		Store:       cfg.Store,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to create IDP server: %w", err)
-	}
-
 	return &Provider{
-		idp:    idpServer,
-		logger: cfg.Logger,
+		baseURL: cfg.BaseURL,
+		logger:  cfg.Logger,
+		cipher:  cfg.Cipher,
+		repo:    cfg.Repo,
+		store:   cfg.Store,
+		servers: make(map[string]*samlidp.Server),
 	}, nil
 }
 
-// ServeHTTP handles SAML requests.
-func (p *Provider) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	p.idp.ServeHTTP(w, r)
+// resolve retrieves or creates a SAML IdP server for the given tenant.
+func (p *Provider) resolve(ctx context.Context, tenantID string) (*samlidp.Server, error) {
+	p.mu.RLock()
+	srv, ok := p.servers[tenantID]
+	p.mu.RUnlock()
+	if ok {
+		return srv, nil
+	}
+
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	// Double check after lock
+	if srv, ok := p.servers[tenantID]; ok {
+		return srv, nil
+	}
+
+	// Fetch tenant-specific IdP config
+	cfg, err := p.repo.GetByTenantID(ctx, tenantID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch IdP config for tenant %s: %w", tenantID, err)
+	}
+
+	cert, privKey, err := cfg.ParseCredentials(ctx, p.cipher)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse IdP credentials for tenant %s: %w", tenantID, err)
+	}
+
+	// Use tenant-specific baseURL or dynamic one based on slug?
+	// For now, we use the global base URL. Real SaaS would use tenant-specific subdomains.
+	baseURL, _ := url.Parse(p.baseURL)
+
+	idpServer, err := samlidp.New(samlidp.Options{
+		URL:         *baseURL,
+		Key:         privKey,
+		Certificate: cert,
+		Logger:      zapLogger{p.logger},
+		Store:       p.store,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create IDP server for tenant %s: %w", tenantID, err)
+	}
+
+	// Hardening: Set secure default signature method.
+	// Signing is automatic since we provided a Key and Certificate.
+	// Encryption is handled automatically if the SP metadata includes a certificate.
+	idpServer.IDP.SignatureMethod = "http://www.w3.org/2001/04/xmldsig-more#rsa-sha256"
+
+	p.servers[tenantID] = idpServer
+	return idpServer, nil
 }
 
-// ServeIDPInitiated handles IdP-initiated SSO flow.
-func (p *Provider) ServeIDPInitiated(w http.ResponseWriter, r *http.Request) {
-	spEntityID := r.URL.Query().Get("sp")
-	if spEntityID == "" {
-		http.Error(w, "sp query parameter required", http.StatusBadRequest)
+// ServeHTTP handles SAML requests with tenant resolution.
+func (p *Provider) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	tenantID, err := middleware.TenantIDFromContext(r.Context())
+	if err != nil {
+		http.Error(w, "tenant identification failed", http.StatusUnauthorized)
 		return
 	}
-	// The library's HandleIDPInitiated expects to be called to handle the flow.
-	// It likely extracts the SP from the path or query.
-	// We'll pass the request through. The query param 'sp' is what we expect,
-	// checking if library respects it or expects something else.
-	// Documentation implies /login/:shortcut, where shortcut maps to an SP.
-	// But without configuring shortcuts, we might need query params.
-	// Let's rely on standard method call.
-	p.idp.HandleIDPInitiated(w, r)
+
+	srv, err := p.resolve(r.Context(), tenantID)
+	if err != nil {
+		p.logger.Error("failed to resolve SAML IDP", zap.String("tenant_id", tenantID), zap.Error(err))
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	srv.ServeHTTP(w, r)
+}
+
+// ServeIDPInitiated handles IdP-initiated SSO flow for a tenant.
+func (p *Provider) ServeIDPInitiated(w http.ResponseWriter, r *http.Request) {
+	tenantID, err := middleware.TenantIDFromContext(r.Context())
+	if err != nil {
+		http.Error(w, "tenant identification failed", http.StatusUnauthorized)
+		return
+	}
+
+	srv, err := p.resolve(r.Context(), tenantID)
+	if err != nil {
+		p.logger.Error("failed to resolve SAML IDP", zap.String("tenant_id", tenantID), zap.Error(err))
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	srv.HandleIDPInitiated(w, r)
 }
 
 // RegisterRoutes registers SAML IdP routes.
 func (p *Provider) RegisterRoutes(rg *gin.RouterGroup) {
-	// The underlying samlidp.Server handles /metadata and /sso based on its internal routing
-	// when ServeHTTP is called. However, since we are using Gin, we might want to register specific paths
-	// to avoid conflicts or strict matching issues.
-	// But samlidp.Server expects to handle the requests itself.
-	// For now, let's mount specific paths that we know samlidp handles.
-
-	rg.GET("/saml/metadata", gin.WrapH(p.idp))
-	rg.POST("/saml/sso", gin.WrapH(p.idp))
-	rg.GET("/saml/sso", gin.WrapH(p.idp)) // Support Redirect binding
+	rg.GET("/saml/metadata", func(c *gin.Context) {
+		p.ServeHTTP(c.Writer, c.Request)
+	})
+	rg.POST("/saml/sso", func(c *gin.Context) {
+		p.ServeHTTP(c.Writer, c.Request)
+	})
+	rg.GET("/saml/sso", func(c *gin.Context) {
+		p.ServeHTTP(c.Writer, c.Request)
+	})
 	rg.GET("/saml/idp-init", func(c *gin.Context) {
 		p.ServeIDPInitiated(c.Writer, c.Request)
 	})
-}
-
-// Handler returns the HTTP handler for the IdP.
-func (p *Provider) Handler() http.Handler {
-	return p.idp
 }
 
 // zapLogger adapts zap.Logger to the saml.Logger interface.

@@ -3,6 +3,9 @@ package connector
 import (
 	"fmt"
 	"sync"
+
+	"github.com/dhawalhost/wardseal/internal/connector/scim"
+	"github.com/dhawalhost/wardseal/internal/connector/slack"
 )
 
 // registry implements the Registry interface.
@@ -12,12 +15,18 @@ type registry struct {
 	mu         sync.RWMutex
 }
 
-// NewRegistry creates a new connector registry.
+// NewRegistry creates a new connector registry with default factories.
 func NewRegistry() Registry {
-	return &registry{
+	r := &registry{
 		factories:  make(map[string]Factory),
 		connectors: make(map[string]Connector),
 	}
+
+	// Register default factories
+	r.Register("scim", scim.New)
+	r.Register("slack", slack.New)
+
+	return r
 }
 
 func (r *registry) Register(connectorType string, factory Factory) {

@@ -63,7 +63,7 @@ type AccessRequest struct {
 	Status       string `json:"status"`
 	Reason       string `json:"reason"`
 	Duration     string `json:"duration,omitempty"` // e.g. "4h", "1d"
-	CreatedAt    string `json:"created_at"` // ISO8601
+	CreatedAt    string `json:"created_at"`         // ISO8601
 	UpdatedAt    string `json:"updated_at"`
 	DeviceID     string `json:"device_id,omitempty"`
 }
@@ -103,6 +103,7 @@ type CreateIPPolicyRequest struct {
 	CountryCode string `json:"country_code"`
 	Reason      string `json:"reason"`
 }
+
 // Safety Action types
 
 type SafetyAction struct {
@@ -126,4 +127,25 @@ type ProposeSafetyActionInput struct {
 
 type ConfirmSafetyActionRequest struct {
 	Comment string `json:"comment"`
+}
+
+// DashboardStats represents a snapshot of the governance landscape.
+type DashboardStats struct {
+	ActiveUsers      int            `json:"active_users"`
+	TotalGroups      int            `json:"total_groups"`
+	PendingRequests  int            `json:"pending_requests"`
+	ActiveWorkloads  int            `json:"active_workloads"`
+	RiskProfile      map[string]int `json:"risk_profile"`  // Level -> Count
+	HygieneScore     int            `json:"hygiene_score"` // 0-100
+	ConnectedOrgs    int            `json:"connected_orgs"`
+	ActiveIPPolicies int            `json:"active_ip_policies"`
+}
+
+// WorkloadResponse is the wire format for machine identities.
+type WorkloadResponse struct {
+	ID            string `json:"id"`
+	Name          string `json:"name"`
+	ServiceHandle string `json:"service_handle"`
+	Status        string `json:"status"`
+	LastUsedAt    string `json:"last_used_at,omitempty"`
 }

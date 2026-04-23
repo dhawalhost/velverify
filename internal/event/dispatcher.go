@@ -10,8 +10,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/dhawalhost/wardseal/internal/webhook"
 	"go.uber.org/zap"
+
+	"github.com/dhawalhost/wardseal/internal/webhook"
 )
 
 // Event represents a system event.

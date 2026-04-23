@@ -14,8 +14,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dhawalhost/wardseal/internal/governance"
 	"go.uber.org/zap"
+
+	"github.com/dhawalhost/wardseal/internal/governance"
 )
 
 // SlackHandler handles incoming Slack slash commands and interactions.
@@ -44,9 +45,13 @@ func NewSlackHandler(govSvc governance.Service, dirSvc governance.DirectoryClien
 
 // HandleCommand processes slash commands like /wardseal request <app>
 func (h *SlackHandler) HandleCommand(w http.ResponseWriter, r *http.Request) {
+	// G120: Limit request body size to 32KB for slash commands
+	r.Body = http.MaxBytesReader(w, r.Body, 32*1024)
+
 	// 1. Capture raw body for signature verification
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
+		h.log.Error("failed to read request body", zap.Error(err))
 		http.Error(w, "could not read request body", http.StatusInternalServerError)
 		return
 	}
@@ -87,18 +92,32 @@ func (h *SlackHandler) HandleCommand(w http.ResponseWriter, r *http.Request) {
 	tenantID := r.Header.Get("X-Tenant-ID")
 
 	if tenantID == "" {
-		tenantID = "default" 
+		tenantID = "default"
 	}
 
-	h.log.Info("received slack command", 
+	h.log.Info("received slack command",
 		zap.String("command", command),
 		zap.String("text", text),
 		zap.String("user", userID),
 	)
 
 	parts := strings.Fields(text)
+	if len(parts) == 0 {
+		h.sendEphemeralResponse(w, "Usage: `/wardseal catalog` or `/wardseal request <app_name>`")
+		return
+	}
+
+	if parts[0] == "catalog" {
+		err := h.HandleCatalogCommand(r.Context(), tenantID, r.FormValue("trigger_id"))
+		if err != nil {
+			h.log.Error("failed to open catalog", zap.Error(err))
+			h.sendEphemeralResponse(w, "❌ We couldn't open the App Catalog right now.")
+		}
+		return
+	}
+
 	if len(parts) < 2 || parts[0] != "request" {
-		h.sendEphemeralResponse(w, "Usage: `/wardseal request <app_name> [reason]`")
+		h.sendEphemeralResponse(w, "Usage: `/wardseal catalog` or `/wardseal request <app_name>`")
 		return
 	}
 
@@ -110,7 +129,7 @@ func (h *SlackHandler) HandleCommand(w http.ResponseWriter, r *http.Request) {
 
 	// PROACTIVE ENHANCEMENT: If the app name is 'any' or vague, we could list options.
 	// For now, we'll try to find a match.
-	
+
 	// Create access request in governance service
 	req, err := h.govSvc.CreateAccessRequest(r.Context(), tenantID, governance.CreateAccessRequest{
 		RequesterID:  userID,
@@ -135,24 +154,34 @@ func (h *SlackHandler) HandleCommand(w http.ResponseWriter, r *http.Request) {
 			},
 		},
 	}
-	
+
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp)
+	err = json.NewEncoder(w).Encode(resp)
+	if err != nil {
+		h.log.Error("failed to encode response", zap.Error(err))
+	}
 }
 
 func (h *SlackHandler) sendEphemeralResponse(w http.ResponseWriter, text string) {
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	err := json.NewEncoder(w).Encode(map[string]interface{}{
 		"response_type": "ephemeral",
 		"text":          text,
 	})
+	if err != nil {
+		h.log.Error("failed to encode response", zap.Error(err))
+	}
 }
 
 // HandleInteraction processes button clicks from Slack.
 func (h *SlackHandler) HandleInteraction(w http.ResponseWriter, r *http.Request) {
+	// G120: Limit request body size for interactions
+	r.Body = http.MaxBytesReader(w, r.Body, 128*1024)
+
 	// 1. Capture raw body for signature verification
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
+		h.log.Error("failed to read interaction body", zap.Error(err))
 		http.Error(w, "could not read request body", http.StatusInternalServerError)
 		return
 	}
@@ -215,9 +244,9 @@ func (h *SlackHandler) HandleInteraction(w http.ResponseWriter, r *http.Request)
 	action := payload.Actions[0]
 	requestID := action.Value
 	approverID := payload.User.ID
-	tenantID := integ.TenantID 
+	tenantID := integ.TenantID
 
-	h.log.Info("received slack interaction", 
+	h.log.Info("received slack interaction",
 		zap.String("tenant", tenantID),
 		zap.String("action", action.ActionID),
 		zap.String("request_id", requestID),
@@ -241,6 +270,17 @@ func (h *SlackHandler) HandleInteraction(w http.ResponseWriter, r *http.Request)
 		err = h.govSvc.RejectSafetyAction(r.Context(), tenantID, action.Value, approverID, "Rejected via Slack")
 		if err == nil {
 			msg = "User Offboarding Cancelled (Access Retained)"
+		}
+	default:
+		if strings.HasPrefix(action.ActionID, "request_access_app:") {
+			appID := strings.TrimPrefix(action.ActionID, "request_access_app:")
+			_, err = h.govSvc.CreateAccessRequest(r.Context(), tenantID, governance.CreateAccessRequest{
+				RequesterID:  approverID, // In this context, the user interacting is the requester
+				ResourceType: "app",
+				ResourceID:   appID,
+				Reason:       "Requested via Slack App Catalog",
+			})
+			msg = "Access Requested via Catalog"
 		}
 	}
 
@@ -271,8 +311,8 @@ func (h *SlackHandler) NotifyProposedRevocation(ctx context.Context, action gove
 		map[string]interface{}{
 			"type": "header",
 			"text": map[string]interface{}{
-				"type": "plain_text",
-				"text": "🛡️ WardSeal Safety Alert",
+				"type":  "plain_text",
+				"text":  "🛡️ WardSeal Safety Alert",
 				"emoji": true,
 			},
 		},
@@ -300,7 +340,7 @@ func (h *SlackHandler) NotifyProposedRevocation(ctx context.Context, action gove
 				},
 				map[string]interface{}{
 					"type": "mrkdwn",
-					"text": fmt.Sprintf("*Status:*\n`Pending Confirmation`"),
+					"text": "*Status:*\n`Pending Confirmation`",
 				},
 			},
 		},
@@ -317,8 +357,8 @@ func (h *SlackHandler) NotifyProposedRevocation(ctx context.Context, action gove
 					"action_id": "confirm_offboard",
 					"value":     action.ID,
 					"confirm": map[string]interface{}{
-						"title": map[string]interface{}{"type": "plain_text", "text": "Are you sure?"},
-						"text":  map[string]interface{}{"type": "plain_text", "text": "This will immediately revoke all organizational access for this user."},
+						"title":   map[string]interface{}{"type": "plain_text", "text": "Are you sure?"},
+						"text":    map[string]interface{}{"type": "plain_text", "text": "This will immediately revoke all organizational access for this user."},
 						"confirm": map[string]interface{}{"type": "plain_text", "text": "Revoke Access"},
 						"deny":    map[string]interface{}{"type": "plain_text", "text": "Cancel"},
 					},
@@ -358,7 +398,7 @@ func (h *SlackHandler) NotifyProposedRevocation(ctx context.Context, action gove
 	}
 
 	if integ.WebhookURL == "" {
-		h.log.Warn("Slack is enabled but no WebhookURL configured for tenant. Logging payload only.", 
+		h.log.Warn("Slack is enabled but no WebhookURL configured for tenant. Logging payload only.",
 			zap.String("tenant_id", action.TenantID),
 			zap.String("action_id", action.ID))
 		payloadJSON, _ := json.MarshalIndent(payload, "", "  ")
@@ -378,7 +418,7 @@ func (h *SlackHandler) NotifyProposedRevocation(ctx context.Context, action gove
 	if err != nil {
 		return fmt.Errorf("failed to send slack notification: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("slack returned non-200 status: %d", resp.StatusCode)
@@ -390,7 +430,10 @@ func (h *SlackHandler) NotifyProposedRevocation(ctx context.Context, action gove
 // NotifyAccessAvailable pushes a proactive suggestion to a user when new matching resources are found.
 func (h *SlackHandler) NotifyAccessAvailable(ctx context.Context, tenantID, slackUserID, resourceName, reason string) error {
 	integ, err := h.repo.GetByTenant(ctx, tenantID)
-	if err != nil || !integ.IsEnabled {
+	if err != nil {
+		return err
+	}
+	if !integ.IsEnabled {
 		return nil
 	}
 
@@ -435,11 +478,11 @@ func (h *SlackHandler) NotifyAccessAvailable(ctx context.Context, tenantID, slac
 	// Post to Slack API (using a hypothetical 'chat.postMessage' endpoint logic)
 	// In a real implementation we would use a Bot Token.
 	h.log.Info("sending proactive access notification", zap.String("user", slackUserID), zap.String("resource", resourceName))
-	
+
 	// Simulation for now
 	payloadJSON, _ := json.MarshalIndent(payload, "", "  ")
 	fmt.Printf("[SLACK PROACTIVE] To: %s | Payload:\n%s\n", slackUserID, string(payloadJSON))
-	
+
 	return nil
 }
 func (h *SlackHandler) verifySignature(r *http.Request, body []byte, secret string) error {
@@ -461,7 +504,7 @@ func (h *SlackHandler) verifySignature(r *http.Request, body []byte, secret stri
 
 	// Construction base string: v0:timestamp:payload
 	baseString := fmt.Sprintf("v0:%s:%s", timestamp, string(body))
-	
+
 	mac := hmac.New(sha256.New, []byte(secret))
 	mac.Write([]byte(baseString))
 	expected := "v0=" + hex.EncodeToString(mac.Sum(nil))

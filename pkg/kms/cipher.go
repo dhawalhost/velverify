@@ -80,7 +80,7 @@ func (c *localCipher) Decrypt(ctx context.Context, ciphertext []byte) ([]byte, e
 
 	nonceSize := gcm.NonceSize()
 	nonce, actualCiphertext := ciphertext[:nonceSize], ciphertext[nonceSize:]
-	
+
 	plaintext, err := gcm.Open(nil, nonce, actualCiphertext, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decrypt: %w", err)

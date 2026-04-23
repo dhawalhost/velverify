@@ -2,18 +2,23 @@ package governance
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math/big"
 	"net/url"
 	"strings"
 	"time"
 
+	"golang.org/x/crypto/bcrypt"
+
+	"github.com/dhawalhost/wardseal/internal/auth"
+	"github.com/dhawalhost/wardseal/internal/authz"
 	"github.com/dhawalhost/wardseal/internal/oauthclient"
 	"github.com/dhawalhost/wardseal/internal/policy"
 	"github.com/dhawalhost/wardseal/internal/rbac"
 	"github.com/dhawalhost/wardseal/pkg/eventbus"
-	"golang.org/x/crypto/bcrypt"
 )
 
 // Service defines the interface for the governance service.
@@ -57,11 +62,24 @@ type Service interface {
 	ConfirmSafetyAction(ctx context.Context, tenantID, actionID, approverID, comment string) error
 	RejectSafetyAction(ctx context.Context, tenantID, actionID, approverID, comment string) error
 
+	// Identity Graph Explorer
+	ListRelationships(ctx context.Context, tenantID string, query authz.Query) ([]authz.RelationTuple, error)
+
 	// Endpoints (Device Trust)
 	RegisterDevice(ctx context.Context, tenantID string, d Device) (string, error)
 	ListDevices(ctx context.Context, tenantID string) ([]Device, error)
 	GetDevice(ctx context.Context, tenantID, id string) (Device, error)
 	UpdateDeviceStatus(ctx context.Context, tenantID, id, status string) error
+
+	// Non-Human Identities (Workloads)
+	ListWorkloads(ctx context.Context, tenantID string) ([]auth.Workload, error)
+	CreateWorkload(ctx context.Context, tenantID string, workload auth.Workload) (string, error)
+
+	// Dashboard & Stats
+	GetDashboardStats(ctx context.Context, tenantID string) (DashboardStats, error)
+
+	// Graph Traversal
+	TraverseGraph(ctx context.Context, tenantID, subjectID string) ([]authz.RelationTuple, error)
 }
 
 type CreateOAuthClientInput struct {
@@ -84,26 +102,30 @@ type UpdateOAuthClientInput struct {
 }
 
 type governanceService struct {
-	clientStore  oauthclient.Repository
-	reqStore     Repository
-	orgStore     OrganizationRepository
-	dirClient    DirectoryClient
-	policyEngine policy.Engine
+	clientStore   oauthclient.Repository
+	reqStore      Repository
+	orgStore      OrganizationRepository
+	dirClient     DirectoryClient
+	policyEngine  policy.Engine
 	rbacSvc       rbac.Service
 	endpointStore EndpointRepository
+	workloadStore auth.WorkloadRepository
+	engine        *authz.Engine
 	bus           eventbus.EventBus
 }
 
 // NewService creates a new governance service.
-func NewService(clientStore oauthclient.Repository, reqStore Repository, orgStore OrganizationRepository, endpointStore EndpointRepository, dirClient DirectoryClient, policyEngine policy.Engine, rbacSvc rbac.Service, bus eventbus.EventBus) Service {
+func NewService(clientStore oauthclient.Repository, reqStore Repository, orgStore OrganizationRepository, endpointStore EndpointRepository, workloadStore auth.WorkloadRepository, dirClient DirectoryClient, policyEngine policy.Engine, rbacSvc rbac.Service, engine *authz.Engine, bus eventbus.EventBus) Service {
 	return &governanceService{
 		clientStore:   clientStore,
 		reqStore:      reqStore,
 		orgStore:      orgStore,
 		endpointStore: endpointStore,
+		workloadStore: workloadStore,
 		dirClient:     dirClient,
 		policyEngine:  policyEngine,
 		rbacSvc:       rbacSvc,
+		engine:        engine,
 		bus:           bus,
 	}
 }
@@ -231,7 +253,7 @@ func (s *governanceService) CreateAccessRequest(ctx context.Context, tenantID st
 	if err != nil {
 		return AccessRequest{}, err
 	}
-	
+
 	s.publishEvent(ctx, "AccessRequestCreated", map[string]interface{}{
 		"tenant_id":     tenantID,
 		"request_id":    id,
@@ -658,13 +680,137 @@ func (s *governanceService) UpdateDeviceStatus(ctx context.Context, tenantID, id
 	if err := s.endpointStore.UpdateDeviceStatus(ctx, tenantID, id, status); err != nil {
 		return err
 	}
-	
+
 	s.publishEvent(ctx, "EndpointTrustUpdated", map[string]interface{}{
 		"tenant_id": tenantID,
 		"device_id": id,
 		"status":    status,
 	})
 	return nil
+}
+
+func (s *governanceService) GetDashboardStats(ctx context.Context, tenantID string) (DashboardStats, error) {
+	if err := requireTenant(tenantID); err != nil {
+		return DashboardStats{}, err
+	}
+
+	stats := DashboardStats{
+		RiskProfile: make(map[string]int),
+	}
+
+	// 1. OAuth Clients
+	clients, err := s.clientStore.ListClientsByTenant(ctx, tenantID)
+	if err == nil {
+		count := 0
+		for _, c := range clients {
+			if c.ClientType == "confidential" {
+				count++
+			}
+		}
+		stats.ConnectedOrgs = len(clients) // Using organizations from client store context
+	}
+
+	// 2. Pending Requests
+	reqs, err := s.reqStore.ListRequests(ctx, tenantID, "pending")
+	if err == nil {
+		stats.PendingRequests = len(reqs)
+	}
+
+	// 3. Active IP Policies
+	policies, err := s.reqStore.ListIPPolicies(ctx, tenantID)
+	if err == nil {
+		stats.ActiveIPPolicies = len(policies)
+	}
+
+	// 4. Identities & Hygiene (Mocked logic for now, using Directory metrics)
+	// In a full implementation, these would come from the directory client
+	stats.ActiveUsers = 42    // Mock
+	stats.TotalGroups = 12    // Mock
+	stats.ActiveWorkloads = 8 // Mock
+	stats.HygieneScore = 88   // Mock
+	stats.RiskProfile["low"] = 35
+	stats.RiskProfile["medium"] = 5
+	stats.RiskProfile["high"] = 2
+
+	return stats, nil
+}
+
+func (s *governanceService) ListWorkloads(ctx context.Context, tenantID string) ([]auth.Workload, error) {
+	if err := requireTenant(tenantID); err != nil {
+		return nil, err
+	}
+	if s.workloadStore == nil {
+		return nil, errors.New("workload store not configured")
+	}
+	return s.workloadStore.List(ctx, tenantID)
+}
+
+func (s *governanceService) CreateWorkload(ctx context.Context, tenantID string, w auth.Workload) (string, error) {
+	if err := requireTenant(tenantID); err != nil {
+		return "", err
+	}
+	if s.workloadStore == nil {
+		return "", errors.New("workload store not configured")
+	}
+	w.TenantID = tenantID
+
+	// AUTOMATION: Generate credentials if not provided by the UI
+	if w.ClientID == "" {
+		w.ClientID = "workload_" + generateRandomString(12)
+	}
+
+	// For a new workload, we always generate a fresh secret if the hash is missing
+	if w.ClientSecretHash == "" {
+		// In a production scenario, we would return the raw secret to the user ONCE
+		// For now, we generate a high-entropy secret and store the hash
+		secret := generateRandomString(32)
+		hash, err := bcrypt.GenerateFromPassword([]byte(secret), bcrypt.DefaultCost)
+		if err != nil {
+			return "", fmt.Errorf("failed to generate secret hash: %w", err)
+		}
+		w.ClientSecretHash = string(hash)
+	}
+
+	if w.Status == "" {
+		w.Status = "active"
+	}
+
+	return s.workloadStore.Create(ctx, w)
+}
+
+func generateRandomString(n int) string {
+	const letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	ret := make([]byte, n)
+	for i := 0; i < n; i++ {
+		num, err := rand.Int(rand.Reader, big.NewInt(int64(len(letters))))
+		if err != nil {
+			return ""
+		}
+		ret[i] = letters[num.Int64()]
+	}
+	return string(ret)
+}
+
+func (s *governanceService) ListRelationships(ctx context.Context, tenantID string, query authz.Query) ([]authz.RelationTuple, error) {
+	if err := requireTenant(tenantID); err != nil {
+		return nil, err
+	}
+	if s.engine == nil {
+		return nil, errors.New("authz engine not configured")
+	}
+
+	return s.engine.ListTuples(ctx, tenantID, query)
+}
+
+func (s *governanceService) TraverseGraph(ctx context.Context, tenantID, subjectID string) ([]authz.RelationTuple, error) {
+	if err := requireTenant(tenantID); err != nil {
+		return nil, err
+	}
+	if s.engine == nil {
+		return nil, errors.New("authz engine not configured")
+	}
+
+	return s.engine.Traverse(ctx, tenantID, subjectID)
 }
 
 func (s *governanceService) publishEvent(ctx context.Context, topic string, data map[string]interface{}) {

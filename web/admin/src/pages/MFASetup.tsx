@@ -1,11 +1,34 @@
 import React, { useState, useEffect } from 'react';
-import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
+import { 
+    PageHeader, 
+    GlassCard, 
+    GlassCardHeader, 
+    GlassCardTitle, 
+    GlassCardContent,
+    GlassCardDescription
+} from '@/components/layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Button as MovingButton } from '@/components/ui/button'; // Just use Button
-import { Loader2, ShieldCheck, Smartphone, CheckCircle, XCircle, Trash2 } from 'lucide-react';
+import { 
+    Loader2, 
+    ShieldCheck, 
+    Smartphone, 
+    CheckCircle, 
+    XCircle, 
+    Trash2, 
+    ShieldAlert, 
+    Key, 
+    Activity, 
+    QrCode,
+    Lock,
+    Unlock,
+    Info,
+    Layout,
+    ArrowRight
+} from 'lucide-react';
 import { api } from '../api';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 const MFASetup: React.FC = () => {
     const [enrolling, setEnrolling] = useState(false);
@@ -77,91 +100,215 @@ const MFASetup: React.FC = () => {
         }
     };
 
-    if (loading) return <div className="p-8 flex justify-center"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>;
+    if (loading) return (
+        <div className="h-[400px] flex flex-col items-center justify-center gap-6">
+            <Loader2 className="h-12 w-12 animate-spin text-primary opacity-20" />
+            <p className="text-[10px] font-bold uppercase tracking-[0.4em] text-on-surface-variant/20 italic">Resolving Security Profile...</p>
+        </div>
+    );
 
     return (
-        <div className="space-y-6 max-w-lg mx-auto">
-            <div className="text-center space-y-2">
-                <h1 className="text-3xl font-bold tracking-tight">Two-Factor Authentication</h1>
-                <p className="text-muted-foreground">Enhance your account security with an authenticator app.</p>
+        <div className="max-w-4xl mx-auto space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-700 py-12">
+            <PageHeader 
+                icon={<Smartphone className="w-10 h-10 text-primary" />}
+                title="Identity Entropy"
+                description="Harden your authentication handshake with enterprise-grade TOTP multi-factor verification."
+                actions={
+                    verified ? (
+                        <Badge className="bg-emerald-500/10 text-emerald-600 border-none rounded-xl font-bold uppercase text-[9px] tracking-widest px-5 py-2 flex items-center gap-2">
+                            <ShieldCheck className="w-3.5 h-3.5" />
+                            Profile Hardened
+                        </Badge>
+                    ) : (
+                        <Badge className="bg-amber-500/10 text-amber-600 border-none rounded-xl font-bold uppercase text-[9px] tracking-widest px-5 py-2 flex items-center gap-2">
+                            <ShieldAlert className="w-3.5 h-3.5" />
+                            Vulnerable State
+                        </Badge>
+                    )
+                }
+            />
+
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
+                <div className="lg:col-span-8">
+                    <GlassCard className="border-none shadow-2xl shadow-on-surface/5 bg-white overflow-hidden rounded-[40px]">
+                        <GlassCardHeader className="py-10 px-10 border-b border-on-surface/5 bg-surface-container/5">
+                            <div className="flex items-center gap-6">
+                                <div className="p-4 bg-primary/10 text-primary rounded-2xl">
+                                    <Key className="w-7 h-7" />
+                                </div>
+                                <div>
+                                    <GlassCardTitle className="text-3xl font-bold tracking-tight text-on-surface">Authenticator Protocol</GlassCardTitle>
+                                    <p className="text-on-surface-variant/60 font-medium uppercase tracking-widest text-[10px] mt-2">Time-Based One-Time Password Implementation</p>
+                                </div>
+                            </div>
+                        </GlassCardHeader>
+                        <GlassCardContent className="p-10">
+                            {error && (
+                                <Alert variant="destructive" className="mb-10 rounded-2xl border-none bg-red-50 text-red-600 animate-in slide-in-from-top-2">
+                                    <AlertDescription className="font-bold text-xs uppercase tracking-tight flex items-center gap-3">
+                                        <XCircle className="w-4 h-4" />
+                                        Verification Alert: {error}
+                                    </AlertDescription>
+                                </Alert>
+                            )}
+
+                            {!enrolled && (
+                                <div className="text-center py-16 space-y-10">
+                                    <div className="relative group mx-auto">
+                                        <div className="mx-auto w-32 h-32 bg-surface-container/50 rounded-[40px] flex items-center justify-center transition-all duration-500 group-hover:scale-105">
+                                            <Unlock className="h-14 w-14 text-on-surface/20" />
+                                        </div>
+                                        <div className="absolute -bottom-2 -right-2 w-10 h-10 bg-white border border-on-surface/5 rounded-2xl shadow-lg flex items-center justify-center">
+                                            <ShieldAlert className="w-5 h-5 text-amber-500 animate-pulse" />
+                                        </div>
+                                    </div>
+                                    <div className="space-y-4">
+                                        <h3 className="text-2xl font-bold tracking-tight text-on-surface uppercase opacity-40">Status: Dormant</h3>
+                                        <p className="text-on-surface-variant/60 font-medium max-w-sm mx-auto leading-relaxed italic">
+                                            Multi-factor authentication is not currently enforced for this identity node. Verification frequency is reduced.
+                                        </p>
+                                    </div>
+                                    <Button onClick={handleEnroll} disabled={enrolling} className="h-16 px-12 rounded-[24px] font-bold text-[11px] uppercase tracking-widest shadow-2xl shadow-primary/30 hover:scale-[1.02] active:scale-[0.98] transition-all">
+                                        {enrolling ? <Loader2 className="mr-3 h-5 w-5 animate-spin" /> : <Plus className="mr-3 h-4 w-4" />}
+                                        Initialize MFA Vector
+                                    </Button>
+                                </div>
+                            )}
+
+                            {enrolled && !verified && qrCode && (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-12 animate-in zoom-in-95 duration-500">
+                                    <div className="space-y-8">
+                                        <div className="space-y-4">
+                                            <Label className="text-[11px] font-bold uppercase tracking-widest text-on-surface-variant/40 ml-1 flex items-center gap-2">
+                                                <QrCode className="w-3.5 h-3.5" />
+                                                01 // Optical Handshake
+                                            </Label>
+                                            <div className="bg-white p-8 rounded-[32px] ring-1 ring-on-surface/5 flex justify-center shadow-inner overflow-hidden group">
+                                                <img
+                                                    src={`data:image/png;base64,${qrCode}`}
+                                                    alt="TOTP QR Code"
+                                                    className="w-full aspect-square mix-blend-multiply transition-transform group-hover:scale-105 duration-500"
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="space-y-4 bg-surface-container/30 p-8 rounded-3xl ring-1 ring-on-surface/5">
+                                            <Label className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/40 italic flex items-center gap-2">
+                                                <Terminal className="w-3.5 h-3.5" />
+                                                Manual Seed Identifier
+                                            </Label>
+                                            <div className="font-mono text-xs font-bold tracking-widest text-center select-all bg-white py-4 rounded-xl border border-on-surface/5 shadow-sm text-primary">
+                                                {secret}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex flex-col justify-center space-y-10">
+                                        <div className="space-y-4">
+                                            <Label className="text-[11px] font-bold uppercase tracking-widest text-on-surface-variant/40 ml-1 flex items-center gap-2">
+                                                <Activity className="w-3.5 h-3.5" />
+                                                02 // Entropy Verification
+                                            </Label>
+                                            <Input
+                                                value={verifyCode}
+                                                onChange={(e) => setVerifyCode(e.target.value)}
+                                                placeholder="000 000"
+                                                className="h-20 text-center text-5xl font-bold tracking-[0.2em] border-none bg-surface-container ring-1 ring-on-surface/5 rounded-[24px] focus-visible:ring-2 focus-visible:ring-primary/20 transition-all font-mono"
+                                                maxLength={6}
+                                                autoFocus
+                                            />
+                                            <p className="text-[10px] text-on-surface-variant/40 italic text-center px-4 leading-relaxed mt-4 font-medium">
+                                                Enter the current deterministic transient code generated by your device.
+                                            </p>
+                                        </div>
+                                        <Button onClick={handleVerify} className="h-16 rounded-[24px] font-bold text-[11px] uppercase tracking-widest shadow-2xl shadow-primary/30 hover:scale-[1.02] active:scale-[0.98] transition-all">
+                                            Commit Protocol
+                                        </Button>
+                                    </div>
+                                </div>
+                            )}
+
+                            {enrolled && verified && (
+                                <div className="text-center space-y-12 py-16 animate-in zoom-in duration-700">
+                                    <div className="flex flex-col items-center gap-10">
+                                        <div className="relative group">
+                                            <div className="w-32 h-32 bg-emerald-50 rounded-[40px] flex items-center justify-center ring-1 ring-emerald-100 shadow-xl shadow-emerald-500/10 group-hover:scale-110 transition-transform duration-500">
+                                                <CheckCircle className="h-16 w-16 text-emerald-500" />
+                                            </div>
+                                            <div className="absolute -bottom-2 -right-2 w-10 h-10 bg-white border border-emerald-100 rounded-2xl shadow-lg flex items-center justify-center">
+                                                <Lock className="w-5 h-5 text-emerald-500" />
+                                            </div>
+                                        </div>
+                                        <div className="space-y-3">
+                                            <h3 className="text-3xl font-bold tracking-tight text-on-surface uppercase">Profile Hardened</h3>
+                                            <div className="flex items-center gap-2.5 justify-center py-1.5 px-6 bg-emerald-50 rounded-full border border-emerald-100 w-fit mx-auto">
+                                                <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
+                                                <span className="text-[9px] font-bold uppercase tracking-widest text-emerald-600">Verified Identity Vector</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <p className="text-on-surface-variant/60 font-medium max-w-md mx-auto text-sm leading-relaxed italic">
+                                        Your account node is now cryptographically hardened. Secondary entropy verification will be mandated for all future authentication cycles.
+                                    </p>
+
+                                    <div className="pt-12 border-t border-on-surface/5">
+                                        <Button variant="ghost" className="h-14 px-10 rounded-2xl font-bold text-[10px] uppercase tracking-[0.2em] text-red-500 hover:bg-red-50 hover:text-red-600 transition-all" onClick={handleDisable}>
+                                            <Trash2 className="mr-3 h-4 w-4" /> Revert Hardening
+                                        </Button>
+                                    </div>
+                                </div>
+                            )}
+                        </GlassCardContent>
+                    </GlassCard>
+                </div>
+
+                <div className="lg:col-span-4 space-y-10">
+                    <GlassCard className="border-none shadow-2xl shadow-on-surface/5 bg-on-surface text-white overflow-hidden rounded-[32px] p-10 h-fit">
+                        <div className="space-y-10">
+                            <div className="flex items-center gap-5">
+                                <div className="p-3 bg-white/10 rounded-2xl">
+                                    <Info className="w-6 h-6 text-primary" />
+                                </div>
+                                <h4 className="text-xl font-bold tracking-tight">Security Intel</h4>
+                            </div>
+
+                            <div className="space-y-8">
+                                {[
+                                    { label: 'Latency Threshold', value: '< 20ms', icon: <Activity className="w-4 h-4" /> },
+                                    { label: 'Seed Algorithm', value: 'SHA1_TRANSIENT', icon: <Binary className="w-4 h-4" /> },
+                                    { label: 'Cluster Mode', value: 'DETERMINISTIC', icon: <Layout className="w-4 h-4" /> },
+                                ].map((stat) => (
+                                    <div key={stat.label} className="group flex items-center justify-between border-b border-white/5 pb-4 last:border-0 last:pb-0">
+                                        <div className="flex items-center gap-4">
+                                            <div className="text-primary group-hover:scale-110 transition-transform">
+                                                {stat.icon}
+                                            </div>
+                                            <span className="text-[10px] font-bold uppercase tracking-widest opacity-40">{stat.label}</span>
+                                        </div>
+                                        <span className="text-xs font-bold font-mono text-primary">{stat.value}</span>
+                                    </div>
+                                ))}
+                            </div>
+
+                            <div className="bg-white/5 p-6 rounded-3xl border border-white/5">
+                                <p className="text-[10px] leading-relaxed tracking-wider font-bold opacity-40 uppercase italic">
+                                    Structural default: Multi-factor verification is enforced at the organizational cluster level.
+                                </p>
+                            </div>
+                        </div>
+                    </GlassCard>
+
+                    <div className="p-8 rounded-[40px] border-2 border-dashed border-on-surface/5 bg-surface-container/10 flex flex-col items-center gap-6 group hover:border-primary/20 transition-all cursor-default">
+                        <div className="p-4 bg-white rounded-2xl shadow-lg ring-1 ring-on-surface/5 group-hover:scale-110 transition-transform">
+                             <ShieldCheck className="h-8 w-8 text-primary" />
+                        </div>
+                        <div className="text-center space-y-2">
+                            <h5 className="font-bold text-xs uppercase tracking-widest text-on-surface opacity-60">Verified Node</h5>
+                            <p className="text-[9px] font-medium text-on-surface-variant/40 leading-relaxed uppercase tracking-widest">Structural handshake validated by wardseal governance layer.</p>
+                        </div>
+                    </div>
+                </div>
             </div>
-
-            <Card>
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                        <Smartphone className="h-5 w-5" /> Authenticator App
-                    </CardTitle>
-                    <CardDescription>
-                        Use Google Authenticator, Authy, or Microsoft Authenticator.
-                    </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                    {error && (
-                        <div className="bg-destructive/10 text-destructive p-3 rounded-md text-sm flex items-center gap-2">
-                            <XCircle className="h-4 w-4" /> {error}
-                        </div>
-                    )}
-
-                    {!enrolled && (
-                        <div className="text-center py-6">
-                            <ShieldCheck className="h-16 w-16 mx-auto text-muted-foreground mb-4 opacity-50" />
-                            <p className="mb-6">TOTP MFA is currently disabled.</p>
-                            <Button onClick={handleEnroll} disabled={enrolling} className="w-full">
-                                {enrolling ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                                Enable TOTP
-                            </Button>
-                        </div>
-                    )}
-
-                    {enrolled && !verified && qrCode && (
-                        <div className="space-y-4">
-                            <div className="bg-white p-4 rounded-lg border flex justify-center">
-                                <img
-                                    src={`data:image/png;base64,${qrCode}`}
-                                    alt="TOTP QR Code"
-                                    className="w-48 h-48"
-                                />
-                            </div>
-                            <div className="text-center space-y-2">
-                                <Label className="text-muted-foreground">Or enter this code manually:</Label>
-                                <div className="font-mono bg-muted p-2 rounded text-center select-all border">
-                                    {secret}
-                                </div>
-                            </div>
-                            <div className="space-y-2 pt-2">
-                                <Label>Verify Code</Label>
-                                <div className="flex gap-2">
-                                    <Input
-                                        value={verifyCode}
-                                        onChange={(e) => setVerifyCode(e.target.value)}
-                                        placeholder="000000"
-                                        className="text-center text-lg tracking-[0.5em] font-mono"
-                                        maxLength={6}
-                                    />
-                                    <Button onClick={handleVerify}>Verify</Button>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {enrolled && verified && (
-                        <div className="text-center space-y-6 py-4">
-                            <div className="flex flex-col items-center gap-2 text-green-600 dark:text-green-400">
-                                <CheckCircle className="h-16 w-16" />
-                                <span className="font-bold text-lg">MFA Enabled & Verified</span>
-                            </div>
-                            <p className="text-muted-foreground text-sm">
-                                Your account is secured. You will be asked for a code when you log in.
-                            </p>
-                            <div className="pt-4 border-t">
-                                <Button variant="outline" className="w-full border-destructive/30 text-destructive hover:bg-destructive/10" onClick={handleDisable}>
-                                    <Trash2 className="mr-2 h-4 w-4" /> Disable MFA
-                                </Button>
-                            </div>
-                        </div>
-                    )}
-                </CardContent>
-            </Card>
         </div>
     );
 };

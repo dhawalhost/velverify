@@ -4,9 +4,10 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/dhawalhost/wardseal/pkg/middleware"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
+
+	"github.com/dhawalhost/wardseal/pkg/middleware"
 )
 
 // CampaignHTTPHandler handles campaign HTTP requests.

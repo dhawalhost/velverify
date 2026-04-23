@@ -11,7 +11,7 @@ import (
 type Service interface {
 	HealthCheck(ctx context.Context) (bool, error)
 	Evaluate(ctx context.Context, input Input) (bool, string, error)
-	
+
 	// Policy Management
 	ListPolicies(ctx context.Context, tenantID string) ([]Policy, error)
 	GetPolicy(ctx context.Context, tenantID, id string) (Policy, error)

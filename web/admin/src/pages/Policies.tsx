@@ -1,7 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import { getPolicies, createPolicy, Policy } from '../api';
-import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
-import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { 
@@ -13,12 +11,22 @@ import {
     FileJson,
     Trash2,
     X,
-    AlertCircle
+    AlertCircle,
+    Info,
+    Layout,
+    Fingerprint,
+    Command,
+    Zap,
+    ExternalLink,
+    Terminal,
+    Binary
 } from 'lucide-react';
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { PageHeader, GlassCard, GlassCardHeader, GlassCardTitle, GlassCardContent, GlassTable, GlassTableHeader, GlassTableHead, GlassTableRow, GlassCardDescription, GlassCardFooter } from '@/components/layout';
+import { TableBody, TableCell } from '@/components/ui/table';
 
 const Policies: React.FC = () => {
     const [policies, setPolicies] = useState<Policy[]>([]);
@@ -80,164 +88,207 @@ const Policies: React.FC = () => {
         }
     };
 
-    if (loading && policies.length === 0) {
-        return (
-            <div className="h-[400px] flex items-center justify-center">
-                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-            </div>
-        );
-    }
+    if (loading && policies.length === 0) return <div className="h-[400px] flex items-center justify-center"><Loader2 className="h-12 w-12 animate-spin text-primary opacity-20" /></div>;
 
     return (
-        <div className="space-y-8 max-w-[1400px] mx-auto">
-            <div className="flex justify-between items-end">
-                <div className="space-y-1">
-                    <h1 className="text-4xl font-black tracking-tighter uppercase italic">Security Policies</h1>
-                    <p className="text-muted-foreground text-sm font-medium">Configure granular access control and governance constraints.</p>
-                </div>
-                
-                {!isCreateOpen && (
-                    <Button 
-                        onClick={() => setIsCreateOpen(true)}
-                        className="bg-foreground text-background hover:bg-foreground/90 font-bold uppercase tracking-widest text-xs px-6 py-6 rounded-none"
-                    >
-                        <Plus className="w-4 h-4 mr-2" /> New Policy Rule
-                    </Button>
-                )}
-            </div>
+        <div className="max-w-6xl mx-auto space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-700 py-12">
+            <PageHeader
+                icon={<ShieldCheck className="w-12 h-12 text-primary" />}
+                title="Security Policies"
+                description="Configure granular access control and governance constraints. Orchestrate enforcement logic across the organizational perimeter."
+                actions={
+                    !isCreateOpen && (
+                        <Button 
+                            onClick={() => setIsCreateOpen(true)}
+                            className="h-14 rounded-2xl font-bold text-sm shadow-2xl shadow-primary/30 transition-all hover:scale-[1.02] active:scale-[0.98] px-10"
+                        >
+                            <Plus className="w-4 h-4 mr-3" /> Initialize policy rule
+                        </Button>
+                    )
+                }
+            />
 
             {message && (
-                <Alert variant={message.type === 'error' ? 'destructive' : 'default'} className="bg-card/50 backdrop-blur-md border-2">
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertDescription className="font-bold uppercase text-[10px] tracking-widest">{message.text}</AlertDescription>
+                <Alert variant={message.type === 'error' ? 'destructive' : 'default'} className="rounded-2xl border-none bg-surface-container/50 backdrop-blur-md">
+                    <AlertDescription className="font-bold text-xs tracking-tight flex items-center gap-3">
+                        {message.type === 'error' ? <ShieldAlert className="w-4 h-4 text-red-500" /> : <ShieldCheck className="w-4 h-4 text-emerald-500" />}
+                        {message.text}
+                    </AlertDescription>
                 </Alert>
             )}
 
             {isCreateOpen && (
-                <Card className="border-4 border-foreground shadow-2xl rounded-none animate-in fade-in slide-in-from-top-4 duration-300">
-                    <CardHeader className="bg-foreground text-background py-6">
+                <GlassCard className="border-none shadow-2xl shadow-on-surface/10 bg-white overflow-hidden rounded-[40px] animate-in slide-in-from-top-12 duration-700">
+                    <GlassCardHeader className="py-12 px-10 border-b border-on-surface/5 bg-surface-container/10">
                         <div className="flex justify-between items-center">
-                            <div>
-                                <CardTitle className="text-2xl font-black uppercase tracking-tighter italic">Deploy Security Policy</CardTitle>
-                                <CardDescription className="text-background/60 font-medium">Define a new technical constraint for your enterprise tenant.</CardDescription>
+                            <div className="flex items-center gap-8">
+                                <div className="p-5 bg-primary/10 rounded-3xl text-primary">
+                                    <Fingerprint className="w-10 h-10" />
+                                </div>
+                                <div>
+                                    <GlassCardTitle className="text-4xl font-bold tracking-tight text-on-surface">Deploy policy logic</GlassCardTitle>
+                                    <p className="text-on-surface-variant/40 font-bold text-[12px] mt-1 tracking-tight italic">Architectural perimeter definition protocol</p>
+                                </div>
                             </div>
-                            <Button variant="ghost" size="icon" onClick={() => setIsCreateOpen(false)} className="text-background hover:bg-background/20">
+                            <Button variant="ghost" size="icon" onClick={() => setIsCreateOpen(false)} className="rounded-[20px] h-12 w-12 hover:bg-red-50 hover:text-red-500 transition-all">
                                 <X className="w-6 h-6" />
                             </Button>
                         </div>
-                    </CardHeader>
-                    <CardContent className="grid gap-6 p-8">
-                        <div className="grid gap-2">
-                            <Label htmlFor="name" className="text-[10px] font-black uppercase tracking-widest">Policy Identifier</Label>
-                            <Input 
-                                id="name" 
-                                placeholder="e.g. SOC2_ADMIN_RESTRICTION" 
-                                className="rounded-none border-2 border-foreground/5 bg-muted/30 h-12 focus-visible:ring-foreground/20 font-bold tracking-tight"
-                                value={newPolicy.name}
-                                onChange={(e) => setNewPolicy({...newPolicy, name: e.target.value})}
-                            />
+                    </GlassCardHeader>
+                    <GlassCardContent className="p-10 space-y-10">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                            <div className="space-y-4">
+                                <Label htmlFor="name" className="text-[12px] font-bold tracking-tight text-on-surface-variant/40 ml-1">Policy identifier</Label>
+                                <Input 
+                                    id="name" 
+                                    placeholder="e.g. SOC2_CORE_ACCESS" 
+                                    className="h-16 rounded-[24px] border-none bg-surface-container/50 ring-1 ring-on-surface/5 focus-visible:ring-2 focus-visible:ring-primary/20 transition-all font-bold text-sm px-8 italic"
+                                    value={newPolicy.name}
+                                    onChange={(e) => setNewPolicy({...newPolicy, name: e.target.value})}
+                                />
+                            </div>
+                            <div className="space-y-4">
+                                <Label htmlFor="type" className="text-[12px] font-bold tracking-tight text-on-surface-variant/40 ml-1">Rule engine kernel</Label>
+                                <Input 
+                                    id="type" 
+                                    value={newPolicy.rule_type}
+                                    className="h-16 rounded-[24px] border-none bg-surface-container ring-1 ring-on-surface/5 font-bold text-sm px-8 select-none tracking-tight opacity-50"
+                                    readOnly
+                                />
+                            </div>
                         </div>
-                        <div className="grid gap-2">
-                            <Label htmlFor="type" className="text-[10px] font-black uppercase tracking-widest">Rule engine context</Label>
-                            <Input 
-                                id="type" 
-                                value={newPolicy.rule_type}
-                                className="rounded-none border-2 border-foreground/5 bg-muted/10 font-mono text-xs uppercase"
-                                readOnly
-                            />
+                        <div className="space-y-4">
+                            <Label htmlFor="rule" className="text-[12px] font-bold tracking-tight text-on-surface-variant/40 ml-1">Behavioral definition json</Label>
+                            <div className="relative group">
+                                <Textarea 
+                                    id="rule" 
+                                    rows={10} 
+                                    className="font-mono text-sm rounded-[32px] border-none bg-on-surface text-primary p-10 focus-visible:ring-2 focus-visible:ring-primary/20 resize-none shadow-2xl transition-all"
+                                    value={newPolicy.rule_data}
+                                    onChange={(e) => setNewPolicy({...newPolicy, rule_data: e.target.value})}
+                                />
+                                <div className="absolute right-8 top-8 opacity-10 pointer-events-none group-hover:opacity-40 transition-opacity">
+                                    <Binary className="w-12 h-12 text-primary" />
+                                </div>
+                            </div>
                         </div>
-                        <div className="grid gap-2">
-                            <Label htmlFor="rule" className="text-[10px] font-black uppercase tracking-widest">Rule Definition (JSON)</Label>
-                            <Textarea 
-                                id="rule" 
-                                rows={8} 
-                                className="font-mono text-xs rounded-none border-2 border-foreground/5 bg-muted/30 focus-visible:ring-foreground/20"
-                                value={newPolicy.rule_data}
-                                onChange={(e) => setNewPolicy({...newPolicy, rule_data: e.target.value})}
-                            />
+                        
+                        <div className="flex flex-col md:flex-row justify-end gap-6 pt-6 italic">
+                            <Button variant="ghost" onClick={() => setIsCreateOpen(false)} className="h-16 px-10 rounded-2xl font-bold text-sm tracking-tight text-on-surface-variant/40 hover:bg-surface-container transition-all">Discard logic</Button>
+                            <Button onClick={handleCreate} className="h-16 px-16 rounded-[24px] font-bold text-sm tracking-tight shadow-2xl shadow-primary/30 transition-all hover:scale-[1.02] active:scale-[0.98]">Commit deployment</Button>
                         </div>
-                    </CardContent>
-                    <CardFooter className="bg-muted/30 p-6 flex justify-end gap-4 border-t-2 border-foreground/5">
-                        <Button variant="ghost" onClick={() => setIsCreateOpen(false)} className="rounded-none font-black uppercase text-[10px] tracking-widest px-8">Discard</Button>
-                        <Button onClick={handleCreate} className="bg-foreground text-background hover:bg-foreground/90 rounded-none font-black uppercase text-[10px] tracking-widest px-12 h-12 shadow-[4px_4px_0_0_rgba(0,0,0,0.1)]">Deploy Policy</Button>
-                    </CardFooter>
-                </Card>
+                    </GlassCardContent>
+                </GlassCard>
             )}
 
-            <Card className="border-2 border-foreground/10 shadow-xl overflow-hidden rounded-none">
-                <CardHeader className="bg-muted/30 border-b-2 border-foreground/5 py-8">
-                    <div className="flex items-center gap-3">
-                        <ShieldCheck className="w-6 h-6 text-foreground" />
+            <GlassCard className="border-none shadow-2xl shadow-on-surface/5 bg-white overflow-hidden rounded-[40px]">
+                <GlassCardHeader className="py-10 px-10 border-b border-on-surface/5 bg-surface-container/5">
+                    <div className="flex items-center gap-6">
+                        <div className="p-4 bg-primary/10 rounded-2xl text-primary">
+                            <Zap className="w-7 h-7" />
+                        </div>
                         <div>
-                            <CardTitle className="text-2xl font-black uppercase tracking-tighter italic">Policy Registry</CardTitle>
-                            <CardDescription className="text-muted-foreground font-medium italic">Active governance rules governing role assumption and identity operations.</CardDescription>
+                            <GlassCardTitle className="text-3xl font-bold tracking-tight text-on-surface">Policy registry</GlassCardTitle>
+                            <p className="text-on-surface-variant/40 font-bold text-[12px] mt-1 tracking-tight italic">Verified structural constraints ({policies.length}) enforcing organizational security</p>
                         </div>
                     </div>
-                </CardHeader>
-                <CardContent className="p-0">
-                    {policies.length === 0 ? (
-                        <div className="py-32 text-center text-muted-foreground flex flex-col items-center gap-6">
-                            <div className="w-20 h-20 rounded-full bg-muted flex items-center justify-center border-4 border-dashed border-muted-foreground/20">
-                                <Settings2 className="h-10 w-10 opacity-20" />
-                            </div>
-                            <div className="max-w-[300px] font-bold uppercase text-xs tracking-widest leading-relaxed"> No security policies have been defined for this tenant. </div>
-                        </div>
-                    ) : (
-                        <Table>
-                            <TableHeader className="bg-muted/50 border-b-2 border-foreground/5">
-                                <TableRow className="hover:bg-transparent">
-                                    <TableHead className="py-4 font-black uppercase text-[10px] tracking-widest text-foreground">Policy Name</TableHead>
-                                    <TableHead className="font-black uppercase text-[10px] tracking-widest text-foreground">Engine Type</TableHead>
-                                    <TableHead className="font-black uppercase text-[10px] tracking-widest text-foreground text-center">Enforcement</TableHead>
-                                    <TableHead className="font-black uppercase text-[10px] tracking-widest text-foreground">Last Adjusted</TableHead>
-                                    <TableHead className="text-right font-black uppercase text-[10px] tracking-widest text-foreground pr-8">Actions</TableHead>
-                                </TableRow>
-                            </TableHeader>
+                </GlassCardHeader>
+                <GlassCardContent className="p-0">
+                    <div className="overflow-x-auto min-h-[500px]">
+                        <GlassTable>
+                            <GlassTableHeader>
+                                <GlassTableRow className="hover:bg-transparent border-b border-on-surface/5">
+                                    <GlassTableHead className="py-8 pl-10 font-bold text-[12px] tracking-tight text-on-surface-variant/40">Rule identity</GlassTableHead>
+                                    <GlassTableHead className="font-bold text-[12px] tracking-tight text-on-surface-variant/40">Engine kernel</GlassTableHead>
+                                    <GlassTableHead className="text-center font-bold text-[12px] tracking-tight text-on-surface-variant/40">Enforcement state</GlassTableHead>
+                                    <GlassTableHead className="font-bold text-[12px] tracking-tight text-on-surface-variant/40">Sync stamp</GlassTableHead>
+                                    <GlassTableHead className="text-right font-bold text-[12px] tracking-tight text-on-surface-variant/40 pr-10">Directives</GlassTableHead>
+                                </GlassTableRow>
+                            </GlassTableHeader>
                             <TableBody>
-                                {policies.map(policy => (
-                                    <TableRow key={policy.id} className="hover:bg-muted/30 transition-all border-b border-foreground/5 group">
-                                        <TableCell className="py-6 pr-4">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-8 h-8 rounded-sm bg-foreground/5 flex items-center justify-center border border-foreground/10 group-hover:bg-foreground group-hover:text-background transition-colors">
-                                                    <FileJson className="w-4 h-4" />
+                                {policies.length === 0 ? (
+                                    <GlassTableRow>
+                                        <TableCell colSpan={5} className="py-40 text-center">
+                                            <div className="flex flex-col items-center gap-6 opacity-20 italic">
+                                                <div className="w-24 h-24 rounded-[32px] bg-surface-container flex items-center justify-center p-6 border-2 border-dashed border-on-surface/10">
+                                                    <FileJson className="h-full w-full" />
                                                 </div>
-                                                <div className="flex flex-col">
-                                                    <span className="text-sm font-black tracking-tight uppercase leading-none">{policy.name}</span>
-                                                    <span className="text-[9px] font-mono text-muted-foreground tracking-tighter mt-1 uppercase italic">{policy.id}</span>
-                                                </div>
+                                                <span className="text-[12px] font-bold tracking-tight text-on-surface-variant opacity-60">Null policy cell // Directory clear</span>
                                             </div>
                                         </TableCell>
-                                        <TableCell>
-                                            <Badge variant="secondary" className="bg-foreground/5 text-foreground hover:bg-foreground/10 rounded-sm font-black text-[9px] uppercase tracking-widest border-none">
+                                    </GlassTableRow>
+                                ) : (
+                                    policies.map(policy => (
+                                        <GlassTableRow key={policy.id} className="hover:bg-surface-container/10 transition-all border-b border-on-surface/5 last:border-0 group">
+                                            <TableCell className="py-10 pl-10">
+                                                <div className="flex items-center gap-6">
+                                                    <div className="w-12 h-12 rounded-2xl bg-surface-container flex items-center justify-center shadow-lg group-hover:bg-primary/10 group-hover:text-primary transition-all duration-500">
+                                                        <FileJson className="w-5 h-5 opacity-40 group-hover:opacity-100" />
+                                                    </div>
+                                                    <div className="flex flex-col">
+                                                        <span className="text-xl font-bold tracking-tight text-on-surface group-hover:text-primary transition-all duration-300">{policy.name}</span>
+                                                        <span className="text-[10px] font-bold text-on-surface-variant/20 tracking-tight mt-1 opacity-60 italic">ID: {policy.id.substring(0, 16)}...</span>
+                                                    </div>
+                                                </div>
+                                            </TableCell>
+                                            <TableCell className="py-10 text-[11px] font-bold tracking-tight text-on-surface-variant/40 italic">
                                                 {policy.rule_type}
-                                            </Badge>
-                                        </TableCell>
-                                        <TableCell className="text-center">
-                                            {policy.is_enabled ? 
-                                                <Badge className="bg-green-600/10 text-green-600 border-green-600/20 gap-1 rounded-sm"><ShieldCheck className="w-3 h-3" /> ACTIVE</Badge> : 
-                                                <Badge variant="secondary" className="bg-muted text-muted-foreground gap-1 rounded-sm"><ShieldAlert className="w-3 h-3" /> INACTIVE</Badge>
-                                            }
-                                        </TableCell>
-                                        <TableCell className="text-muted-foreground font-mono text-[10px] uppercase italic">
-                                            {new Date(policy.updated_at).toLocaleDateString()}
-                                        </TableCell>
-                                        <TableCell className="text-right pr-8">
-                                            <div className="flex justify-end gap-2">
-                                                <Button size="icon" variant="ghost" className="h-8 w-8 hover:bg-foreground hover:text-background border border-foreground/5 transition-colors">
-                                                    <Settings2 className="w-4 h-4" />
-                                                </Button>
-                                                <Button size="icon" variant="ghost" className="h-8 w-8 hover:bg-destructive/10 hover:text-destructive border border-foreground/5 transition-colors">
-                                                    <Trash2 className="w-4 h-4" />
-                                                </Button>
-                                            </div>
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
+                                            </TableCell>
+                                            <TableCell className="text-center py-10">
+                                                {policy.is_enabled ? 
+                                                    <Badge className="bg-emerald-500/10 text-emerald-600 border-none rounded-xl font-bold text-[10px] tracking-tight px-6 py-2 italic">Enforcement active</Badge> : 
+                                                    <Badge className="bg-surface-container text-on-surface-variant/40 border-none rounded-xl font-bold text-[10px] tracking-tight px-6 py-2 italic">Rules halted</Badge>
+                                                }
+                                            </TableCell>
+                                            <TableCell className="py-10">
+                                                <span className="text-[11px] font-medium text-on-surface-variant/40 italic flex items-center gap-3">
+                                                    <div className="w-2 h-2 bg-on-surface/5 rounded-full" />
+                                                    {new Date(policy.updated_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                                                </span>
+                                            </TableCell>
+                                            <TableCell className="py-10 text-right pr-10">
+                                                <div className="flex justify-end gap-3 opacity-20 group-hover:opacity-100 transition-opacity">
+                                                    <Button size="icon" variant="ghost" className="h-10 w-10 border border-on-surface/5 hover:border-primary/20 hover:bg-primary/5 rounded-xl transition-all">
+                                                        <Settings2 className="w-4 h-4" />
+                                                    </Button>
+                                                    <Button size="icon" variant="ghost" className="h-10 w-10 border border-transparent hover:border-red-100 hover:bg-red-50 hover:text-red-500 rounded-xl transition-all">
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </Button>
+                                                </div>
+                                            </TableCell>
+                                        </GlassTableRow>
+                                    ))
+                                )}
                             </TableBody>
-                        </Table>
-                    )}
-                </CardContent>
-            </Card>
+                        </GlassTable>
+                    </div>
+                </GlassCardContent>
+            </GlassCard>
+
+            <div className="bg-on-surface text-white p-12 rounded-[48px] shadow-2xl shadow-on-surface/10 relative overflow-hidden group">
+                <div className="absolute top-0 right-0 p-8 opacity-5 pointer-events-none group-hover:scale-110 transition-transform duration-700">
+                    <Command className="w-40 h-40 -mr-12 -mt-12 text-primary" />
+                </div>
+                <div className="flex flex-col lg:flex-row items-center gap-12 relative z-10">
+                    <div className="p-6 bg-white/5 rounded-[32px] backdrop-blur-xl border border-white/10 shadow-inner">
+                        <Terminal className="w-10 h-10 text-primary animate-pulse" />
+                    </div>
+                    <div className="space-y-4 flex-1 text-center lg:text-left">
+                        <h3 className="text-3xl font-bold tracking-tight">Post-login policy engine</h3>
+                        <p className="text-sm font-medium opacity-60 max-w-2xl leading-relaxed italic tracking-tight">
+                            Policy sync triggers real-time event propagation across all active identity cells. Ensure structural JSON compliance to prevent enforcement lockout. 
+                        </p>
+                    </div>
+                    <div className="flex gap-4">
+                        <Button variant="outline" className="h-14 px-10 rounded-2xl border-white/10 bg-white/5 hover:bg-white/10 text-white font-bold tracking-tight text-[11px]">
+                            Logic manifest
+                        </Button>
+                        <Button className="h-14 px-10 rounded-2xl font-bold tracking-tight text-[11px] shadow-2xl shadow-primary/20">
+                            Audit stream
+                        </Button>
+                    </div>
+                </div>
+            </div>
         </div>
     );
 };

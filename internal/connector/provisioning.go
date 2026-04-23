@@ -10,16 +10,16 @@ import (
 	"go.uber.org/zap"
 )
 
-// ProvisioningService manages async provisioning tasks.
-type ProvisioningService struct {
+// sqlProvisioningService implements ProvisioningService using a SQL database as a queue.
+type sqlProvisioningService struct {
 	db       *sqlx.DB
 	registry Registry
 	logger   *zap.Logger
 }
 
-// NewProvisioningService creates a new provisioning service.
-func NewProvisioningService(db *sqlx.DB, registry Registry, logger *zap.Logger) *ProvisioningService {
-	return &ProvisioningService{
+// NewProvisioningService creates a new SQL-backed provisioning service.
+func NewProvisioningService(db *sqlx.DB, registry Registry, logger *zap.Logger) ProvisioningService {
+	return &sqlProvisioningService{
 		db:       db,
 		registry: registry,
 		logger:   logger,
@@ -27,7 +27,7 @@ func NewProvisioningService(db *sqlx.DB, registry Registry, logger *zap.Logger) 
 }
 
 // EnqueueTask adds a provisioning task to the queue.
-func (s *ProvisioningService) EnqueueTask(ctx context.Context, task ProvisioningTask) (string, error) {
+func (s *sqlProvisioningService) EnqueueTask(ctx context.Context, task ProvisioningTask) (string, error) {
 	payloadBytes, err := json.Marshal(task.Payload)
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal payload: %w", err)
@@ -51,37 +51,35 @@ func (s *ProvisioningService) EnqueueTask(ctx context.Context, task Provisioning
 	return id, nil
 }
 
-// GetTask retrieves a task by ID.
-func (s *ProvisioningService) GetTask(ctx context.Context, tenantID, taskID string) (ProvisioningTask, error) {
-	var t taskRow
-	err := s.db.GetContext(ctx, &t,
-		`SELECT * FROM provisioning_tasks WHERE id = $1 AND tenant_id = $2`, taskID, tenantID)
-	if err != nil {
-		return ProvisioningTask{}, err
-	}
-	return t.toTask(), nil
+// Start runs the background worker loop.
+func (s *sqlProvisioningService) Start(ctx context.Context) {
+	s.logger.Info("Provisioning background worker started")
+	ticker := time.NewTicker(time.Second * 5)
+
+	go func() {
+		for {
+			select {
+			case <-ticker.C:
+				tasks, err := s.listPendingTasks(ctx, 10)
+				if err != nil {
+					s.logger.Error("Failed to list pending tasks", zap.Error(err))
+					continue
+				}
+				for _, t := range tasks {
+					if err := s.ExecuteTask(ctx, t.ID); err != nil {
+						s.logger.Error("Failed to execute task", zap.String("task_id", t.ID), zap.Error(err))
+					}
+				}
+			case <-ctx.Done():
+				ticker.Stop()
+				return
+			}
+		}
+	}()
 }
 
-// ListPendingTasks returns tasks that are ready to be processed.
-func (s *ProvisioningService) ListPendingTasks(ctx context.Context, limit int) ([]ProvisioningTask, error) {
-	var rows []taskRow
-	err := s.db.SelectContext(ctx, &rows,
-		`SELECT * FROM provisioning_tasks 
-		 WHERE status = 'pending' AND scheduled_at <= NOW()
-		 ORDER BY scheduled_at LIMIT $1`, limit)
-	if err != nil {
-		return nil, err
-	}
-
-	tasks := make([]ProvisioningTask, len(rows))
-	for i, r := range rows {
-		tasks[i] = r.toTask()
-	}
-	return tasks, nil
-}
-
-// ProcessTask executes a single provisioning task.
-func (s *ProvisioningService) ProcessTask(ctx context.Context, taskID string) error {
+// ExecuteTask executes a single provisioning task.
+func (s *sqlProvisioningService) ExecuteTask(ctx context.Context, taskID string) error {
 	// Mark as processing
 	_, err := s.db.ExecContext(ctx,
 		`UPDATE provisioning_tasks SET status = 'processing' WHERE id = $1`, taskID)
@@ -125,14 +123,31 @@ func (s *ProvisioningService) ProcessTask(ctx context.Context, taskID string) er
 	return err
 }
 
-func (s *ProvisioningService) failTask(ctx context.Context, taskID, errMsg string) error {
+func (s *sqlProvisioningService) listPendingTasks(ctx context.Context, limit int) ([]ProvisioningTask, error) {
+	var rows []taskRow
+	err := s.db.SelectContext(ctx, &rows,
+		`SELECT * FROM provisioning_tasks 
+		 WHERE status = 'pending' AND scheduled_at <= NOW()
+		 ORDER BY scheduled_at LIMIT $1`, limit)
+	if err != nil {
+		return nil, err
+	}
+
+	tasks := make([]ProvisioningTask, len(rows))
+	for i, r := range rows {
+		tasks[i] = r.toTask()
+	}
+	return tasks, nil
+}
+
+func (s *sqlProvisioningService) failTask(ctx context.Context, taskID, errMsg string) error {
 	_, err := s.db.ExecContext(ctx,
 		`UPDATE provisioning_tasks SET status = 'failed', error_message = $1, processed_at = NOW() WHERE id = $2`,
 		errMsg, taskID)
 	return err
 }
 
-func (s *ProvisioningService) executeOperation(ctx context.Context, conn Connector, task ProvisioningTask) error {
+func (s *sqlProvisioningService) executeOperation(ctx context.Context, conn Connector, task ProvisioningTask) error {
 	switch task.Operation {
 	case "create_user":
 		var user User

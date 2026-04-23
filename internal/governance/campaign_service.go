@@ -60,7 +60,7 @@ func (s *campaignService) initSubscriptions() {
 		if err := json.Unmarshal(payload, &event); err != nil {
 			return err
 		}
-		
+
 		// One-Click Offboarding trigger (Safe Mode):
 		// Fetch tracked access and propose a safety action in the DB.
 		orgIDs, err := s.dirClient.ListUserOrganizations(ctx, event.TenantID, event.UserID)
@@ -75,7 +75,7 @@ func (s *campaignService) initSubscriptions() {
 				Reason:     "User deactivation safety check",
 			})
 		}
-		
+
 		// In a fully automated system, we might also auto-cancel or auto-revoke pending campaign items here.
 		return nil
 	})
@@ -200,8 +200,8 @@ func (s *campaignService) GenerateRecertificationCampaign(ctx context.Context, t
 	}
 
 	// 2. Fetch list of something to review (e.g. all users in the organization)
-	// For MVP, we'll just log and assume items are added via other event hooks 
+	// For MVP, we'll just log and assume items are added via other event hooks
 	// or we could query dirClient here.
-	
+
 	return s.StartCampaign(ctx, tenantID, campaign.ID)
 }

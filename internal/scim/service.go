@@ -6,20 +6,25 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"regexp"
+	"strings"
 	"time"
 
+	"github.com/dhawalhost/wardseal/internal/audit"
 	"github.com/dhawalhost/wardseal/internal/directory"
 )
 
 // Service defines the business logic for SCIM operations.
 type Service struct {
-	dirSvc directory.Service
+	dirSvc   directory.Service
+	auditSvc audit.Service
 }
 
 // NewService creates a new SCIM service.
-func NewService(dirSvc directory.Service) *Service {
+func NewService(dirSvc directory.Service, auditSvc audit.Service) *Service {
 	return &Service{
-		dirSvc: dirSvc,
+		dirSvc:   dirSvc,
+		auditSvc: auditSvc,
 	}
 }
 
@@ -61,6 +66,13 @@ func (s *Service) CreateUser(ctx context.Context, tenantID string, req User) (Us
 		return User{}, fmt.Errorf("failed to create user: %w", err)
 	}
 
+	// Process Group Memberships
+	for _, g := range req.Groups {
+		if g.Value != "" {
+			_ = s.dirSvc.AddUserToGroup(ctx, tenantID, id, g.Value)
+		}
+	}
+
 	req.ID = id
 	req.Meta = Meta{
 		ResourceType: "User",
@@ -68,6 +80,23 @@ func (s *Service) CreateUser(ctx context.Context, tenantID string, req User) (Us
 		LastModified: time.Now().Format(time.RFC3339),
 		Location:     fmt.Sprintf("/scim/v2/Users/%s", id),
 	}
+
+	if s.auditSvc != nil {
+		_ = s.auditSvc.Log(ctx, audit.LogInput{
+			TenantID:     tenantID,
+			Action:       "scim.user.create",
+			ResourceType: "user",
+			ResourceID:   &id,
+			ResourceName: &email,
+			Outcome:      "success",
+			Details: map[string]interface{}{
+				"userName": req.UserName,
+				"active":   req.Active,
+				"groups":   len(req.Groups),
+			},
+		})
+	}
+
 	return req, nil
 }
 
@@ -113,6 +142,31 @@ func (s *Service) ListUsers(ctx context.Context, tenantID, filter string, startI
 	}
 	offset := startIndex - 1 // SCIM is 1-indexed
 
+	// Handle basic filtering (e.g., userName eq "john@example.com")
+	if filter != "" {
+		attr, val, ok := parseFilter(filter)
+		if ok && strings.EqualFold(attr, "userName") {
+			u, err := s.dirSvc.GetUserByEmail(ctx, tenantID, val)
+			if err != nil {
+				// SCIM expects an empty list for filter misses, not an error
+				return ListResponse{
+					Schemas:      []string{ListSchema},
+					TotalResults: 0,
+					StartIndex:   startIndex,
+					Resources:    []interface{}{},
+				}, err
+			}
+			scimUser := s.mapToSCIMUser(u)
+			return ListResponse{
+				Schemas:      []string{ListSchema},
+				TotalResults: 1,
+				StartIndex:   1,
+				ItemsPerPage: 1,
+				Resources:    []interface{}{scimUser},
+			}, nil
+		}
+	}
+
 	users, total, err := s.dirSvc.ListUsers(ctx, tenantID, count, offset)
 	if err != nil {
 		return ListResponse{}, fmt.Errorf("failed to list users: %w", err)
@@ -121,22 +175,7 @@ func (s *Service) ListUsers(ctx context.Context, tenantID, filter string, startI
 	// Convert to SCIM Users
 	resources := make([]interface{}, 0, len(users))
 	for _, u := range users {
-		scimUser := User{
-			Schemas:  []string{UserSchema},
-			ID:       u.ID,
-			UserName: u.Email,
-			Active:   u.Status == "active",
-			Emails: []Email{
-				{Value: u.Email, Type: "work", Primary: true},
-			},
-			Meta: Meta{
-				ResourceType: "User",
-				Created:      u.CreatedAt.Format(time.RFC3339),
-				LastModified: u.UpdatedAt.Format(time.RFC3339),
-				Location:     fmt.Sprintf("/scim/v2/Users/%s", u.ID),
-			},
-		}
-		resources = append(resources, scimUser)
+		resources = append(resources, s.mapToSCIMUser(u))
 	}
 
 	return ListResponse{
@@ -146,6 +185,34 @@ func (s *Service) ListUsers(ctx context.Context, tenantID, filter string, startI
 		ItemsPerPage: len(resources),
 		Resources:    resources,
 	}, nil
+}
+
+var filterRegex = regexp.MustCompile(`(?i)(\w+)\s+eq\s+"([^"]+)"`)
+
+func parseFilter(filter string) (string, string, bool) {
+	matches := filterRegex.FindStringSubmatch(filter)
+	if len(matches) == 3 {
+		return matches[1], matches[2], true
+	}
+	return "", "", false
+}
+
+func (s *Service) mapToSCIMUser(u directory.User) User {
+	return User{
+		Schemas:  []string{UserSchema},
+		ID:       u.ID,
+		UserName: u.Email,
+		Active:   u.Status == "active",
+		Emails: []Email{
+			{Value: u.Email, Type: "work", Primary: true},
+		},
+		Meta: Meta{
+			ResourceType: "User",
+			Created:      u.CreatedAt.Format(time.RFC3339),
+			LastModified: u.UpdatedAt.Format(time.RFC3339),
+			Location:     fmt.Sprintf("/scim/v2/Users/%s", u.ID),
+		},
+	}
 }
 
 // ReplaceUser handles PUT /scim/v2/Users/{id} - full replacement.
@@ -173,6 +240,17 @@ func (s *Service) ReplaceUser(ctx context.Context, tenantID, id string, req User
 
 	if err := s.dirSvc.UpdateUser(ctx, tenantID, id, dirUser); err != nil {
 		return User{}, fmt.Errorf("failed to update user: %w", err)
+	}
+
+	if s.auditSvc != nil {
+		_ = s.auditSvc.Log(ctx, audit.LogInput{
+			TenantID:     tenantID,
+			Action:       "scim.user.update",
+			ResourceType: "user",
+			ResourceID:   &id,
+			ResourceName: &email,
+			Outcome:      "success",
+		})
 	}
 
 	// Return updated user
@@ -214,6 +292,18 @@ func (s *Service) PatchUser(ctx context.Context, tenantID, id string, ops []Patc
 		return User{}, fmt.Errorf("failed to patch user: %w", err)
 	}
 
+	if s.auditSvc != nil {
+		_ = s.auditSvc.Log(ctx, audit.LogInput{
+			TenantID:     tenantID,
+			Action:       "scim.user.patch",
+			ResourceType: "user",
+			ResourceID:   &id,
+			ResourceName: &current.Email,
+			Outcome:      "success",
+			Details:      map[string]interface{}{"ops_count": len(ops)},
+		})
+	}
+
 	return s.GetUser(ctx, tenantID, id)
 }
 
@@ -222,6 +312,17 @@ func (s *Service) DeleteUser(ctx context.Context, tenantID, id string) error {
 	if err := s.dirSvc.DeleteUser(ctx, tenantID, id); err != nil {
 		return fmt.Errorf("failed to delete user: %w", err)
 	}
+
+	if s.auditSvc != nil {
+		_ = s.auditSvc.Log(ctx, audit.LogInput{
+			TenantID:     tenantID,
+			Action:       "scim.user.delete",
+			ResourceType: "user",
+			ResourceID:   &id,
+			Outcome:      "success",
+		})
+	}
+
 	return nil
 }
 
@@ -242,6 +343,17 @@ func (s *Service) CreateGroup(ctx context.Context, tenantID string, req Group) (
 		return Group{}, fmt.Errorf("failed to create group: %w", err)
 	}
 
+	if s.auditSvc != nil {
+		_ = s.auditSvc.Log(ctx, audit.LogInput{
+			TenantID:     tenantID,
+			Action:       "scim.group.create",
+			ResourceType: "group",
+			ResourceID:   &id,
+			ResourceName: &req.DisplayName,
+			Outcome:      "success",
+		})
+	}
+
 	return s.GetGroup(ctx, tenantID, id)
 }
 
@@ -252,10 +364,27 @@ func (s *Service) GetGroup(ctx context.Context, tenantID, id string) (Group, err
 		return Group{}, fmt.Errorf("failed to get group: %w", err)
 	}
 
+	// Fetch members
+	members, err := s.dirSvc.ListGroupMembers(ctx, tenantID, id)
+	if err != nil {
+		// Non-critical, just log it? For now, proceed with empty members
+		members = []directory.User{}
+	}
+
+	scimMembers := make([]Member, 0, len(members))
+	for _, m := range members {
+		scimMembers = append(scimMembers, Member{
+			Value:   m.ID,
+			Display: m.Email,
+			Type:    "User",
+		})
+	}
+
 	return Group{
 		Schemas:     []string{GroupSchema},
 		ID:          g.ID,
 		DisplayName: g.Name,
+		Members:     scimMembers,
 		Meta: Meta{
 			ResourceType: "Group",
 			Created:      g.CreatedAt.Format(time.RFC3339),
@@ -315,26 +444,87 @@ func (s *Service) ReplaceGroup(ctx context.Context, tenantID, id string, req Gro
 		return Group{}, fmt.Errorf("failed to update group: %w", err)
 	}
 
+	if s.auditSvc != nil {
+		_ = s.auditSvc.Log(ctx, audit.LogInput{
+			TenantID:     tenantID,
+			Action:       "scim.group.replace",
+			ResourceType: "group",
+			ResourceID:   &id,
+			ResourceName: &req.DisplayName,
+			Outcome:      "success",
+		})
+	}
+
 	return s.GetGroup(ctx, tenantID, id)
 }
 
 // PatchGroup handles PATCH /scim/v2/Groups/{id}.
 func (s *Service) PatchGroup(ctx context.Context, tenantID, id string, ops []PatchOperation) (Group, error) {
-	current, err := s.dirSvc.GetGroupByID(ctx, tenantID, id)
-	if err != nil {
-		return Group{}, fmt.Errorf("failed to get group: %w", err)
-	}
-
 	for _, op := range ops {
-		if op.Op == "replace" && op.Path == "displayName" {
-			if name, ok := op.Value.(string); ok {
-				current.Name = name
+		switch op.Op {
+		case "replace":
+			if op.Path == "displayName" {
+				if name, ok := op.Value.(string); ok {
+					_ = s.dirSvc.UpdateGroup(ctx, tenantID, id, directory.Group{Name: name})
+					if s.auditSvc != nil {
+						_ = s.auditSvc.Log(ctx, audit.LogInput{
+							TenantID:     tenantID,
+							Action:       "scim.group.update",
+							ResourceType: "group",
+							ResourceID:   &id,
+							ResourceName: &name,
+							Outcome:      "success",
+						})
+					}
+				}
+			}
+		case "add":
+			// SCIM 'add' members
+			if op.Path == "members" || op.Path == "" {
+				if members, ok := op.Value.([]interface{}); ok {
+					for _, m := range members {
+						if mv, ok := m.(map[string]interface{}); ok {
+							if val, ok := mv["value"].(string); ok {
+								_ = s.dirSvc.AddUserToGroup(ctx, tenantID, val, id)
+								if s.auditSvc != nil {
+									_ = s.auditSvc.Log(ctx, audit.LogInput{
+										TenantID:     tenantID,
+										Action:       "scim.group.membership_add",
+										ResourceType: "group",
+										ResourceID:   &id,
+										Details:      map[string]interface{}{"user_id": val},
+										Outcome:      "success",
+									})
+								}
+							}
+						}
+					}
+				}
+			}
+		case "remove":
+			// SCIM 'remove' members
+			// Format: Members[value eq "id"]
+			if op.Path != "" {
+				// Very basic parsing for Members[value eq "id"]
+				if strings.Contains(op.Path, "value eq") {
+					parts := strings.Split(op.Path, "\"")
+					if len(parts) >= 2 {
+						userID := parts[1]
+						_ = s.dirSvc.RemoveUserFromGroup(ctx, tenantID, userID, id)
+						if s.auditSvc != nil {
+							_ = s.auditSvc.Log(ctx, audit.LogInput{
+								TenantID:     tenantID,
+								Action:       "scim.group.membership_remove",
+								ResourceType: "group",
+								ResourceID:   &id,
+								Details:      map[string]interface{}{"user_id": userID},
+								Outcome:      "success",
+							})
+						}
+					}
+				}
 			}
 		}
-	}
-
-	if err := s.dirSvc.UpdateGroup(ctx, tenantID, id, current); err != nil {
-		return Group{}, fmt.Errorf("failed to patch group: %w", err)
 	}
 
 	return s.GetGroup(ctx, tenantID, id)
@@ -345,5 +535,16 @@ func (s *Service) DeleteGroup(ctx context.Context, tenantID, id string) error {
 	if err := s.dirSvc.DeleteGroup(ctx, tenantID, id); err != nil {
 		return fmt.Errorf("failed to delete group: %w", err)
 	}
+
+	if s.auditSvc != nil {
+		_ = s.auditSvc.Log(ctx, audit.LogInput{
+			TenantID:     tenantID,
+			Action:       "scim.group.delete",
+			ResourceType: "group",
+			ResourceID:   &id,
+			Outcome:      "success",
+		})
+	}
+
 	return nil
 }

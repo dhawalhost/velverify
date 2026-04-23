@@ -10,9 +10,10 @@ import (
 
 	"strings"
 
-	"github.com/dhawalhost/wardseal/pkg/middleware"
 	"go.uber.org/zap"
 	"golang.org/x/oauth2"
+
+	"github.com/dhawalhost/wardseal/pkg/middleware"
 )
 
 // SocialLogin handles the login/registration via an external provider.

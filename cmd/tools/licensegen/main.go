@@ -12,8 +12,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dhawalhost/wardseal/internal/license"
 	"github.com/golang-jwt/jwt/v5"
+
+	"github.com/dhawalhost/wardseal/internal/license"
 )
 
 func main() {

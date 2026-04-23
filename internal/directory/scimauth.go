@@ -5,11 +5,12 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/dhawalhost/wardseal/pkg/middleware"
 	"github.com/gin-gonic/gin"
 	jwtlib "github.com/golang-jwt/jwt/v5"
 	"go.uber.org/zap"
 	"golang.org/x/crypto/bcrypt"
+
+	"github.com/dhawalhost/wardseal/pkg/middleware"
 )
 
 // RequireSCIMBearerToken authenticates requests using the Authorization: Bearer header.

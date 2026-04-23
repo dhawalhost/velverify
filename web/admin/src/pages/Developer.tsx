@@ -1,42 +1,80 @@
 import React from 'react';
 import { RedocStandalone } from 'redoc';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { Separator } from '@/components/ui/separator';
-import { Terminal } from 'lucide-react';
+import { Terminal, BookOpen, Code2, Cpu } from 'lucide-react';
+import { 
+    PageHeader, 
+    GlassCard, 
+    GlassCardHeader, 
+    GlassCardTitle, 
+    GlassCardContent 
+} from '@/components/layout';
 
 const Developer: React.FC = () => {
     return (
-        <div className="space-y-6">
-            <div>
-                <h1 className="text-3xl font-bold tracking-tight">API Reference</h1>
-                <p className="text-muted-foreground mt-1">Explore the REST API documentation and integration resources.</p>
-            </div>
+        <div className="space-y-12 animate-in fade-in duration-700">
+            <PageHeader 
+                icon={<BookOpen className="w-8 h-8 text-primary" />}
+                title="Protocol Documentation"
+                description="Explore the REST architecture, integration vectors, and cryptographic handshake protocols."
+            />
 
-            <Separator />
-
-            <div className="grid grid-cols-1 gap-6">
-                <Card className="bg-slate-900 text-white border-none shadow-lg">
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2"><Terminal className="h-5 w-5" /> Quick Start: Go SDK</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="bg-black/50 p-4 rounded-md font-mono text-sm border border-white/10 flex justify-between items-center">
-                            <code>go get github.com/dhawalhost/wardseal/pkg/client</code>
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-10">
+                <div className="lg:col-span-1 space-y-8">
+                    <div className="space-y-4">
+                        <p className="text-[10px] font-bold text-on-surface-variant/40 uppercase tracking-[0.2em]">Developer Resources</p>
+                        <div className="space-y-2">
+                            {[
+                                { label: 'Go SDK Client', icon: <Cpu className="w-4 h-4" /> },
+                                { label: 'CLI Reference', icon: <Terminal className="w-4 h-4" /> },
+                                { label: 'OpenAPI Spec', icon: <Code2 className="w-4 h-4" /> },
+                            ].map(link => (
+                                <button key={link.label} className="w-full text-left p-4 rounded-xl hover:bg-surface-container/40 transition-all flex items-center gap-3 group">
+                                    <div className="text-on-surface-variant/40 group-hover:text-primary transition-colors">{link.icon}</div>
+                                    <span className="text-sm font-bold text-on-surface group-hover:translate-x-1 transition-transform">{link.label}</span>
+                                </button>
+                            ))}
                         </div>
-                    </CardContent>
-                </Card>
-
-                <Card className="overflow-hidden">
-                    <div className="redoc-wrapper bg-white">
-                        <RedocStandalone specUrl="/openapi.yaml" />
                     </div>
-                </Card>
+
+                    <GlassCard className="bg-primary text-white border-none shadow-xl shadow-primary/20 overflow-hidden relative">
+                        <div className="absolute top-0 right-0 p-4 opacity-10">
+                            <Terminal className="w-24 h-24 rotate-12" />
+                        </div>
+                        <GlassCardContent className="p-8 space-y-6 relative z-10">
+                            <div className="space-y-1">
+                                <p className="text-[10px] font-black uppercase tracking-[0.3em] opacity-60">Distribution</p>
+                                <h4 className="text-xl font-black italic tracking-tighter">WARDSEAL_GO</h4>
+                            </div>
+                            <div className="bg-black/20 p-4 rounded-xl font-mono text-[11px] border border-white/10 backdrop-blur-sm">
+                                <code>go get github.com/dhawalhost/wardseal/pkg/client</code>
+                            </div>
+                        </GlassCardContent>
+                    </GlassCard>
+                </div>
+
+                <div className="lg:col-span-3">
+                    <GlassCard className="overflow-hidden border-none shadow-xl shadow-on-surface/5 bg-white min-h-[800px]">
+                        <GlassCardHeader className="py-8 px-10 border-b border-on-surface/5">
+                            <div className="flex items-center gap-4">
+                                <Code2 className="w-6 h-6 text-primary" />
+                                <GlassCardTitle className="text-2xl font-bold tracking-tight">API Infrastructure</GlassCardTitle>
+                            </div>
+                        </GlassCardHeader>
+                        <GlassCardContent className="p-0">
+                            <div className="redoc-wrapper bg-white">
+                                <RedocStandalone specUrl="/openapi.yaml" />
+                            </div>
+                        </GlassCardContent>
+                    </GlassCard>
+                </div>
             </div>
 
             <style>{`
-                /* ReDoc styling */
-                .redoc-wrapper { overflow: hidden; }
+                /* ReDoc Modernist Refinement */
+                .redoc-wrapper { overflow: hidden; border-radius: 1.5rem; }
                 [role="main"] { padding: 0 !important; }
+                .menu-content { background-color: transparent !important; }
+                .sc-fzoLag { font-family: inherit !important; }
             `}</style>
         </div>
     );

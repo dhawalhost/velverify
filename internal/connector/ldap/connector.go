@@ -5,8 +5,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/dhawalhost/wardseal/internal/connector"
 	"github.com/go-ldap/ldap/v3"
+
+	"github.com/dhawalhost/wardseal/internal/connector"
 )
 
 // Connector implements the connector.Connector interface for LDAP/Active Directory.

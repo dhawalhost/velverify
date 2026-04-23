@@ -6,23 +6,27 @@ import {
     DiscoveredResource,
     DiscoveryJobStatus 
 } from '../api';
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
-import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { TableBody, TableCell } from '@/components/ui/table';
 import { 
     Loader2, 
+    Activity, 
     Search, 
     RefreshCcw, 
+    CheckCircle2, 
+    Clock, 
     Database, 
     Globe, 
-    ShieldPlus,
-    Clock,
-    CheckCircle2,
-    Server,
+    Server, 
+    ShieldPlus, 
     AlertCircle,
-    Activity
+    Binary,
+    Link2,
+    Eye,
+    Fingerprint
 } from 'lucide-react';
+import { PageHeader, GlassCard, GlassCardHeader, GlassCardTitle, GlassCardContent, GlassTable, GlassTableHeader, GlassTableHead, GlassTableRow } from '@/components/layout';
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const Discovery: React.FC = () => {
@@ -70,7 +74,7 @@ const Discovery: React.FC = () => {
                     console.error("Polling error:", err);
                     clearInterval(pollInterval);
                 }
-            }, 2000); // Poll every 2 seconds
+            }, 2000); 
         }
 
         return () => {
@@ -102,190 +106,224 @@ const Discovery: React.FC = () => {
     const getStatusBadge = (status: string) => {
         switch (status) {
             case 'promoted':
-                return <Badge className="bg-green-600/10 text-green-600 border-green-600/20 gap-1 rounded-sm"><CheckCircle2 className="w-3 h-3" /> Managed</Badge>;
+                return <Badge className="bg-emerald-50 text-emerald-600 border-none rounded-xl font-bold text-[10px] tracking-tight px-4 py-1.5 shadow-sm gap-2.5"><CheckCircle2 className="w-3.5 h-3.5" /> Managed</Badge>;
             default:
-                return <Badge variant="outline" className="gap-1 rounded-sm"><Clock className="w-3 h-3" /> Discovered</Badge>;
+                return <Badge className="bg-on-surface/5 text-on-surface/40 border-none rounded-xl font-bold text-[10px] tracking-tight px-4 py-1.5 gap-2.5"><Clock className="w-3.5 h-3.5" /> Discovered</Badge>;
         }
     };
 
     const getSourceIcon = (source: string) => {
         if (source.toLowerCase().includes('ldap') || source.toLowerCase().includes('ad')) {
-            return <Database className="w-3 h-3 text-blue-500" />;
+            return <Database className="w-4 h-4" />;
         }
-        return <Globe className="w-3 h-3 text-indigo-500" />;
+        return <Globe className="w-4 h-4" />;
     };
 
     const isScanning = currentJob?.status === 'queued' || currentJob?.status === 'processing';
 
-    if (loading && resources.length === 0) {
-        return (
-            <div className="h-[400px] flex items-center justify-center">
-                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-            </div>
-        );
-    }
+    if (loading && resources.length === 0) return <div className="h-[400px] flex items-center justify-center"><Loader2 className="h-10 w-10 animate-spin text-primary opacity-20" /></div>;
 
     return (
-        <div className="space-y-8 max-w-[1400px] mx-auto">
-            <div className="flex justify-between items-end">
-                <div className="space-y-1">
-                    <h1 className="text-4xl font-black tracking-tighter uppercase italic leading-none">Resource Discovery</h1>
-                    <p className="text-muted-foreground text-sm font-medium italic">Architectural asset detection & inventory orchestration.</p>
-                </div>
-                <Button 
-                    onClick={handleRunScan} 
-                    disabled={isScanning}
-                    className="bg-foreground text-background hover:bg-foreground/90 font-bold uppercase tracking-widest text-[10px] px-8 py-6 rounded-none shadow-[4px_4px_0_0_rgba(0,0,0,0.1)] h-12"
-                >
-                    {isScanning ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <RefreshCcw className="w-4 h-4 mr-2" />}
-                    {isScanning ? 'Scan in Progress' : 'Scan Infrastructure'}
-                </Button>
-            </div>
+        <div className="space-y-12 animate-in fade-in duration-700">
+            <PageHeader
+                icon={<Activity className="w-10 h-10 text-primary" />}
+                title="Infrastructure Discovery"
+                description="Architectural asset detection and inventory orchestration. Real-time scanning of connected directory services and cloud providers."
+                actions={
+                    <Button 
+                        onClick={handleRunScan} 
+                        disabled={isScanning}
+                        className="h-11 rounded-xl font-bold text-[12px] tracking-tight px-8 shadow-xl shadow-primary/20 transition-all font-semibold"
+                    >
+                        {isScanning ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <RefreshCcw className="w-4 h-4 mr-2" />}
+                        {isScanning ? 'Scrutinizing...' : 'Trigger Discovery'}
+                    </Button>
+                }
+            />
 
             {currentJob && isScanning && (
-                <Card className="border-4 border-foreground rounded-none bg-muted/30 overflow-hidden relative">
+                <GlassCard className="border-none shadow-2xl shadow-primary/10 bg-white overflow-hidden rounded-[32px] relative">
                     <div 
-                        className="absolute top-0 left-0 h-full bg-foreground/5 transition-all duration-1000" 
+                        className="absolute top-0 left-0 h-1.5 bg-primary transition-all duration-1000 shadow-[0_0_12px_rgba(var(--primary),0.4)]" 
                         style={{ width: `${currentJob.progress}%` }}
                     />
-                    <CardContent className="p-8 relative z-10 flex items-center justify-between">
+                    <GlassCardContent className="p-10 flex flex-col md:flex-row items-center justify-between gap-10">
                         <div className="flex items-center gap-6">
-                            <div className="w-16 h-16 bg-foreground text-background flex items-center justify-center">
-                                <Activity className="w-8 h-8 animate-pulse" />
+                            <div className="w-16 h-16 bg-primary/5 rounded-2xl flex items-center justify-center">
+                                <Activity className="w-8 h-8 animate-pulse text-primary" />
                             </div>
-                            <div className="space-y-1">
-                                <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Orchestration Phase</span>
-                                <h3 className="text-xl font-black uppercase tracking-tight italic transition-all">{currentJob.message || 'Scanning connected directories...'}</h3>
+                            <div className="space-y-1.5">
+                                <span className="text-[11px] font-bold tracking-tight text-primary animate-pulse">Sync Protocol Active</span>
+                                <h3 className="text-2xl font-bold tracking-tight text-on-surface">{currentJob.message || 'Scanning remote endpoints...'}</h3>
+                                <div className="flex items-center gap-3 text-on-surface-variant/40">
+                                    <Binary className="w-3.5 h-3.5" />
+                                    <span className="text-[11px] font-bold tracking-tight italic">Batch ID // {currentJob.id?.substring(0, 8).toLowerCase() || 'scan-pool'}</span>
+                                </div>
                             </div>
                         </div>
                         <div className="text-right">
-                            <span className="text-6xl font-black tracking-tighter tabular-nums">{currentJob.progress}%</span>
+                            <span className="text-6xl font-bold tracking-tighter tabular-nums text-on-surface">{currentJob.progress}<span className="text-2xl ml-1 opacity-20">%</span></span>
                         </div>
-                    </CardContent>
-                </Card>
+                    </GlassCardContent>
+                </GlassCard>
             )}
 
             {message && (
-                <Alert variant={message.type === 'error' ? 'destructive' : 'default'} className="bg-card/50 backdrop-blur-md border-2 border-foreground/10 rounded-none">
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertDescription className="font-bold uppercase text-[10px] tracking-widest">{message.text}</AlertDescription>
+                <Alert variant={message.type === 'error' ? 'destructive' : 'default'} className={`border-none rounded-2xl p-6 flex items-center gap-6 animate-in slide-in-from-top-4 duration-500 ${message.type === 'error' ? 'bg-red-50 text-red-600' : 'bg-emerald-50 text-emerald-600'}`}>
+                    <div className={`p-2.5 rounded-xl ${message.type === 'error' ? 'bg-red-100' : 'bg-emerald-100'}`}>
+                        {message.type === 'error' ? <AlertCircle className="h-5 w-5" /> : <ShieldPlus className="h-5 w-5" />}
+                    </div>
+                    <AlertDescription className="font-bold text-[12px] tracking-tight">{message.text}</AlertDescription>
                 </Alert>
             )}
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <Card className="border-2 border-foreground/5 shadow-none bg-card/50 backdrop-blur-md rounded-none">
-                    <CardContent className="p-8">
-                        <div className="flex flex-col gap-1">
-                            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground italic">Total Assets</span>
-                            <span className="text-6xl font-black tracking-tighter tabular-nums">{resources.length}</span>
+                <GlassCard className="border-none shadow-xl shadow-on-surface/5 bg-white overflow-hidden rounded-[32px]">
+                    <GlassCardContent className="p-10 relative group">
+                        <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none group-hover:scale-110 transition-transform">
+                            <Server className="w-20 h-20 -mr-4 -mt-4 text-on-surface" />
                         </div>
-                    </CardContent>
-                </Card>
-                <Card className="border-2 border-foreground/5 shadow-none bg-card/50 backdrop-blur-md rounded-none">
-                    <CardContent className="p-8">
-                        <div className="flex flex-col gap-1">
-                            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground italic">Shadow IT Ratio</span>
-                            <span className="text-6xl font-black tracking-tighter tabular-nums">
-                                {Math.round((resources.filter(r => r.status === 'discovered').length / (resources.length || 1)) * 100)}%
+                        <div className="flex flex-col gap-2">
+                            <span className="text-[12px] font-bold tracking-tight text-on-surface-variant/40">Discovered Nodes</span>
+                            <span className="text-6xl font-bold tracking-tighter tabular-nums transition-colors group-hover:text-primary">{resources.length}</span>
+                        </div>
+                    </GlassCardContent>
+                </GlassCard>
+                
+                <GlassCard className="border-none shadow-xl shadow-on-surface/5 bg-white overflow-hidden rounded-[32px]">
+                    <GlassCardContent className="p-10 relative group">
+                        <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none group-hover:scale-110 transition-transform">
+                            <Activity className="w-20 h-20 -mr-4 -mt-4 text-on-surface" />
+                        </div>
+                        <div className="flex flex-col gap-2">
+                            <span className="text-[12px] font-bold tracking-tight text-on-surface-variant/40">Shadow Entropy</span>
+                            <span className="text-6xl font-bold tracking-tighter tabular-nums transition-colors group-hover:text-red-500">
+                                {Math.round((resources.filter(r => r.status === 'discovered').length / (resources.length || 1)) * 100)}<span className="text-2xl opacity-20 ml-1">%</span>
                             </span>
                         </div>
-                    </CardContent>
-                </Card>
-                <Card className="border-2 border-foreground/5 shadow-none bg-card/50 backdrop-blur-md border-l-green-500 rounded-none">
-                    <CardContent className="p-8">
-                        <div className="flex flex-col gap-1">
-                            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground italic">Managed Hygiene</span>
-                            <span className="text-6xl font-black tracking-tighter tabular-nums">
+                    </GlassCardContent>
+                </GlassCard>
+
+                <GlassCard className="border-none shadow-xl shadow-on-surface/5 bg-white overflow-hidden rounded-[32px]">
+                    <GlassCardContent className="p-10 relative group">
+                        <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none group-hover:scale-110 transition-transform">
+                            <ShieldPlus className="w-20 h-20 -mr-4 -mt-4 text-emerald-500" />
+                        </div>
+                        <div className="flex flex-col gap-2">
+                            <span className="text-[12px] font-bold tracking-tight text-on-surface-variant/40">Managed Assets</span>
+                            <span className="text-6xl font-bold tracking-tighter tabular-nums text-emerald-600">
                                 {resources.filter(r => r.status === 'promoted').length}
                             </span>
                         </div>
-                    </CardContent>
-                </Card>
+                    </GlassCardContent>
+                </GlassCard>
             </div>
 
-            <Card className="border-2 border-foreground/10 shadow-xl overflow-hidden rounded-none bg-card">
-                <CardHeader className="bg-muted/50 border-b-2 border-foreground/5 py-10">
-                    <div className="flex items-center gap-4">
-                        <div className="p-2 bg-foreground text-background">
-                            <Search className="w-6 h-6" />
-                        </div>
-                        <div>
-                            <CardTitle className="text-3xl font-black uppercase tracking-tighter italic leading-none">Asset Inventory</CardTitle>
-                            <CardDescription className="text-muted-foreground font-medium italic mt-1">Review architectural components detected across enterprise infrastructure.</CardDescription>
-                        </div>
-                    </div>
-                </CardHeader>
-                <CardContent className="p-0">
-                    {resources.length === 0 ? (
-                        <div className="py-32 text-center text-muted-foreground flex flex-col items-center gap-6">
-                            <div className="w-20 h-20 rounded-full bg-muted flex items-center justify-center border-4 border-dashed border-muted-foreground/20">
-                                <Server className="h-10 w-10 opacity-20" />
+            <div className="space-y-8">
+                <div className="flex items-center gap-6">
+                    <h2 className="text-[12px] font-bold tracking-tight text-on-surface-variant/40 italic flex-shrink-0 opacity-60">Infrastructure Index</h2>
+                    <div className="h-px flex-1 bg-on-surface/5" />
+                </div>
+
+                <GlassCard className="border-none shadow-2xl shadow-on-surface/5 bg-white overflow-hidden rounded-[32px]">
+                    <GlassCardHeader className="py-8 px-10 border-b border-on-surface/5">
+                        <div className="flex items-center gap-5">
+                            <div className="p-3.5 bg-primary/5 rounded-2xl">
+                                <Search className="w-7 h-7 text-primary" />
                             </div>
-                            <div className="max-w-[300px] font-bold uppercase text-[10px] tracking-widest leading-relaxed"> No resources detected. Start a scan to discovery unmanaged assets. </div>
+                            <div>
+                                <GlassCardTitle className="text-2xl font-bold tracking-tight text-on-surface">Detection Registry</GlassCardTitle>
+                                <p className="text-on-surface-variant/40 font-semibold text-[12px] mt-1 tracking-tight">Verified structural anomalies identified within the scanning perimeter.</p>
+                            </div>
                         </div>
-                    ) : (
-                        <div className="overflow-x-auto">
-                            <Table>
-                                <TableHeader className="bg-muted/30 border-b-2 border-foreground/5">
-                                    <TableRow className="hover:bg-transparent">
-                                        <TableHead className="py-6 pl-8 font-black uppercase text-[10px] tracking-widest text-foreground">Resource Identity</TableHead>
-                                        <TableHead className="font-black uppercase text-[10px] tracking-widest text-foreground">Source Provider</TableHead>
-                                        <TableHead className="font-black uppercase text-[10px] tracking-widest text-foreground">Type</TableHead>
-                                        <TableHead className="font-black uppercase text-[10px] tracking-widest text-foreground">Governance</TableHead>
-                                        <TableHead className="font-black uppercase text-[10px] tracking-widest text-foreground">Last Detected</TableHead>
-                                        <TableHead className="text-right font-black uppercase text-[10px] tracking-widest text-foreground pr-8">Context</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {resources.map(resource => (
-                                        <TableRow key={resource.id} className="hover:bg-muted/30 transition-all border-b border-foreground/5 group">
-                                            <TableCell className="py-8 pl-8">
-                                                <div className="flex items-center gap-4">
-                                                    <div className="w-10 h-10 bg-foreground/5 flex items-center justify-center border border-foreground/10 group-hover:bg-foreground group-hover:text-background transition-colors">
-                                                        <Server className="w-5 h-5" />
+                    </GlassCardHeader>
+                    <GlassCardContent className="p-0">
+                        {resources.length === 0 ? (
+                            <div className="py-32 text-center text-on-surface-variant/30 flex flex-col items-center gap-6 italic">
+                                <div className="w-20 h-20 rounded-3xl bg-surface-container/50 flex items-center justify-center">
+                                    <Server className="h-10 w-10 opacity-20" />
+                                </div>
+                                <span className="max-w-xs font-bold text-[11px] tracking-tight leading-relaxed text-on-surface-variant/40">System Vacuum // Execute discovery protocol to populate registry.</span>
+                            </div>
+                        ) : (
+                            <div className="overflow-x-auto">
+                                <GlassTable>
+                                    <GlassTableHeader>
+                                        <GlassTableRow className="hover:bg-transparent border-b border-on-surface/5">
+                                            <GlassTableHead className="py-6 pl-10">Node Identity</GlassTableHead>
+                                            <GlassTableHead>Source</GlassTableHead>
+                                            <GlassTableHead>Type</GlassTableHead>
+                                            <GlassTableHead>Status</GlassTableHead>
+                                            <GlassTableHead className="text-right pr-10">Orchestration</GlassTableHead>
+                                        </GlassTableRow>
+                                    </GlassTableHeader>
+                                    <TableBody>
+                                        {resources.map(resource => (
+                                            <GlassTableRow key={resource.id} className="hover:bg-surface-container/10 transition-all border-b border-on-surface/5 last:border-0 group">
+                                                <TableCell className="py-8 pl-10">
+                                                    <div className="flex items-center gap-6">
+                                                        <div className="w-12 h-12 rounded-xl bg-surface-container/50 text-on-surface-variant/40 flex items-center justify-center transition-all group-hover:bg-primary group-hover:text-white">
+                                                            <Fingerprint className="w-6 h-6" />
+                                                        </div>
+                                                        <div className="flex flex-col gap-1">
+                                                            <span className="text-lg font-bold tracking-tight text-on-surface group-hover:text-primary transition-colors">{resource.name}</span>
+                                                            <span className="text-[11px] font-bold font-mono tracking-tight opacity-20 italic truncate max-w-[200px]">{resource.external_id}</span>
+                                                        </div>
                                                     </div>
-                                                    <div className="flex flex-col">
-                                                        <span className="text-base font-black tracking-tight uppercase leading-none">{resource.name}</span>
-                                                        <span className="text-[10px] font-mono text-muted-foreground tracking-tighter mt-1 uppercase italic">{resource.external_id}</span>
+                                                </TableCell>
+                                                <TableCell className="py-8">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="p-2 rounded-lg bg-surface-container/50 text-on-surface-variant/60 group-hover:bg-primary/5 group-hover:text-primary transition-colors">
+                                                            {getSourceIcon(resource.source)}
+                                                        </div>
+                                                        <span className="text-[12px] font-bold tracking-tight text-on-surface">{resource.source}</span>
                                                     </div>
-                                                </div>
-                                            </TableCell>
-                                            <TableCell>
-                                                <div className="flex items-center gap-2">
-                                                    {getSourceIcon(resource.source)}
-                                                    <span className="text-[11px] font-black uppercase tracking-tight italic">{resource.source}</span>
-                                                </div>
-                                            </TableCell>
-                                            <TableCell>
-                                                <Badge variant="secondary" className="bg-foreground/5 text-foreground hover:bg-foreground/10 rounded-none font-black text-[9px] uppercase tracking-[0.1em] border-none px-2 py-0.5">
-                                                    {resource.resource_type}
-                                                </Badge>
-                                            </TableCell>
-                                            <TableCell>
-                                                {getStatusBadge(resource.status)}
-                                            </TableCell>
-                                            <TableCell className="text-muted-foreground font-mono text-[10px] uppercase italic">
-                                                {new Date(resource.discovered_at).toLocaleDateString()}
-                                            </TableCell>
-                                            <TableCell className="text-right pr-8">
-                                                <Button 
-                                                    size="sm" 
-                                                    variant="ghost" 
-                                                    disabled={resource.status === 'promoted'}
-                                                    className="h-9 font-black uppercase text-[10px] tracking-widest hover:bg-foreground hover:text-background transition-all border border-foreground/10 rounded-none px-4"
-                                                >
-                                                    <ShieldPlus className="w-4 h-4 mr-2" /> 
-                                                    {resource.status === 'promoted' ? 'Managed' : 'Onboard'}
-                                                </Button>
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        </div>
-                    )}
-                </CardContent>
-            </Card>
+                                                </TableCell>
+                                                <TableCell className="py-8">
+                                                    <Badge className="bg-surface-container/50 text-on-surface-variant/60 border-none rounded-lg font-bold text-[10px] tracking-tight px-3 py-1 group-hover:bg-surface-container transition-all">
+                                                        {resource.resource_type}
+                                                    </Badge>
+                                                </TableCell>
+                                                <TableCell className="py-8">
+                                                    {resource.status === 'promoted' ? (
+                                                        <Badge className="bg-emerald-500/10 text-emerald-600 border-none rounded-lg font-bold text-[10px] tracking-tight px-3 py-1 flex items-center gap-2 w-fit">
+                                                            <CheckCircle2 className="w-3 h-3" /> Managed
+                                                        </Badge>
+                                                    ) : (
+                                                        <Badge className="bg-surface-container/50 text-on-surface-variant/60 border-none rounded-lg font-bold text-[10px] tracking-tight px-3 py-1 flex items-center gap-2 w-fit">
+                                                            <Clock className="w-3 h-3" /> Discovered
+                                                        </Badge>
+                                                    )}
+                                                </TableCell>
+                                                <TableCell className="py-8 text-right pr-10">
+                                                    <Button 
+                                                        size="sm" 
+                                                        variant={resource.status === 'promoted' ? "ghost" : "outline"} 
+                                                        disabled={resource.status === 'promoted'}
+                                                        className={`h-10 rounded-xl font-bold text-[11px] tracking-tight px-6 transition-all ${resource.status === 'promoted' ? 'text-emerald-600/40' : 'bg-white ring-1 ring-on-surface/5 hover:bg-surface-container'}`}
+                                                    >
+                                                        {resource.status === 'promoted' ? (
+                                                            <div className="flex items-center gap-2">
+                                                                <CheckCircle2 className="w-4 h-4" />
+                                                                Secured
+                                                            </div>
+                                                        ) : (
+                                                            <div className="flex items-center gap-2">
+                                                                <ShieldPlus className="w-4 h-4" /> 
+                                                                Adopt Node
+                                                            </div>
+                                                        )}
+                                                    </Button>
+                                                </TableCell>
+                                            </GlassTableRow>
+                                        ))}
+                                    </TableBody>
+                                </GlassTable>
+                            </div>
+                        )}
+                    </GlassCardContent>
+                </GlassCard>
+            </div>
         </div>
     );
 };

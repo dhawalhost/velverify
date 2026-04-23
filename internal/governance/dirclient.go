@@ -163,7 +163,7 @@ func (c *directoryHTTPClient) AddUserToOrganization(ctx context.Context, tenantI
 	if c.authToken != "" {
 		req.Header.Set(c.authHeader, c.authToken)
 	}
-	
+
 	return c.cb.Execute(func() error {
 		resp, err := c.httpClient.Do(req)
 		if err != nil {

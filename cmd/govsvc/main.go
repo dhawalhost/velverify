@@ -9,37 +9,40 @@ import (
 	"syscall"
 	"time"
 
+	gokitconfig "github.com/dhawalhost/gokit/config"
+	"github.com/dhawalhost/gokit/health"
+	"github.com/dhawalhost/gokit/logger"
+	gokitmiddleware "github.com/dhawalhost/gokit/middleware"
+	"github.com/dhawalhost/gokit/observability"
+	"github.com/gin-contrib/cors"
+	"github.com/gin-gonic/gin"
+	"github.com/go-redis/redis/v8"
+	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
+	"go.uber.org/zap"
+
 	"github.com/dhawalhost/wardseal/internal/audit"
+	"github.com/dhawalhost/wardseal/internal/auth"
+	"github.com/dhawalhost/wardseal/internal/authz"
+	"github.com/dhawalhost/wardseal/internal/chatops"
 	"github.com/dhawalhost/wardseal/internal/connector"
 	"github.com/dhawalhost/wardseal/internal/connector/azuread"
 	"github.com/dhawalhost/wardseal/internal/connector/google"
 	"github.com/dhawalhost/wardseal/internal/connector/ldap"
 	"github.com/dhawalhost/wardseal/internal/connector/scim"
+	"github.com/dhawalhost/wardseal/internal/discovery"
 	"github.com/dhawalhost/wardseal/internal/governance"
 	"github.com/dhawalhost/wardseal/internal/oauthclient"
 	"github.com/dhawalhost/wardseal/internal/policy"
 	"github.com/dhawalhost/wardseal/internal/rbac"
 	"github.com/dhawalhost/wardseal/internal/sso"
 	"github.com/dhawalhost/wardseal/internal/webhook"
-	"github.com/dhawalhost/wardseal/internal/chatops"
-	"github.com/dhawalhost/wardseal/internal/discovery"
-	"github.com/dhawalhost/wardseal/pkg/kms"
 	"github.com/dhawalhost/wardseal/pkg/config"
 	"github.com/dhawalhost/wardseal/pkg/database"
-	"github.com/dhawalhost/wardseal/pkg/middleware"
-	wardsealobs "github.com/dhawalhost/wardseal/pkg/observability"
-	gokitconfig "github.com/dhawalhost/gokit/config"
-	"github.com/dhawalhost/gokit/health"
-	"github.com/dhawalhost/gokit/logger"
-	gokitmiddleware "github.com/dhawalhost/gokit/middleware"
-	"github.com/dhawalhost/gokit/observability"
 	"github.com/dhawalhost/wardseal/pkg/eventbus"
 	"github.com/dhawalhost/wardseal/pkg/eventbus/redisbus"
-	"github.com/gin-contrib/cors"
-	"github.com/gin-gonic/gin"
-	"github.com/go-redis/redis/v8"
-	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
-	"go.uber.org/zap"
+	"github.com/dhawalhost/wardseal/pkg/kms"
+	"github.com/dhawalhost/wardseal/pkg/middleware"
+	wardsealobs "github.com/dhawalhost/wardseal/pkg/observability"
 )
 
 func main() {
@@ -76,7 +79,7 @@ func main() {
 
 	policyRepo := policy.NewRepository(db)
 	policyEngine := policy.NewSimpleEngine(policyRepo)
-	
+
 	// Initialize metrics
 	metrics := wardsealobs.NewMetrics()
 
@@ -97,8 +100,13 @@ func main() {
 	}
 
 	rbacRepo := rbac.NewRepository(db)
-	rbacSvc := rbac.NewService(rbacRepo)
+	authzRepo := authz.NewRepository(db)
+	authzEngine := authz.NewEngine(authzRepo, log)
+	rbacSvc := rbac.NewService(rbacRepo, authzEngine)
+
+	signalStore := auth.NewSignalRepository(db)
 	endpointRepo := governance.NewEndpointRepository(db)
+	workloadRepo := auth.NewWorkloadRepository(db)
 
 	// PROPER ENCRYPTION: Initialize KMS Cipher for per-tenant secret protection
 	kmsCfg := kms.Config{
@@ -124,9 +132,24 @@ func main() {
 	chatOpsRepo := chatops.NewRepository(db, cipher)
 	chatOpsHandlers := chatops.NewHTTPHandler(chatOpsRepo, log)
 
-	svc := governance.NewService(clientRepo, reqRepo, orgRepo, endpointRepo, dirClient, policyEngine, rbacSvc, bus)
+	svc := governance.NewService(clientRepo, reqRepo, orgRepo, endpointRepo, workloadRepo, dirClient, policyEngine, rbacSvc, authzEngine, bus)
 
 	router := gin.Default()
+	
+	// Standardized CORS configuration (Must be at the TOP for Pre-flights)
+	origins := cfg.Governance.CORSAllowedOrigins
+	if len(origins) == 0 {
+		origins = []string{"http://localhost:5173", "http://127.0.0.1:5173"}
+	}
+
+	router.Use(cors.New(cors.Config{
+		AllowOrigins:     origins,
+		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization", "X-Tenant-ID", "X-User-ID", "X-Device-ID", "X-OS-Version", "X-Tenant-Role", "Accept", "X-Requested-With", "Accept-Encoding", "Cache-Control"},
+		ExposeHeaders:    []string{"Content-Length", "Access-Control-Allow-Origin", "X-Service-Auth"},
+		AllowCredentials: true,
+		MaxAge:           12 * time.Hour,
+	}))
 
 	// Initialize OpenTelemetry tracing
 	shutdownTracer, err := observability.InitTracer(context.Background(), gokitconfig.TelemetryConfig{
@@ -143,7 +166,6 @@ func main() {
 	router.Use(otelgin.Middleware("govsvc"))
 	router.Use(wardsealobs.PrometheusMiddleware(metrics))
 	router.Use(middleware.Wrap(gokitmiddleware.RequestID())) // Inject tracing ID
-	router.Use(middleware.APILogger(nil, log))
 
 	// Security Middleware
 	router.Use(middleware.Wrap(gokitmiddleware.SecureHeaders()))
@@ -152,7 +174,7 @@ func main() {
 	if redisClient != nil {
 		rateLimitRedisClient = redisClient
 	}
-	
+
 	router.Use(middleware.DistributedRateLimitMiddleware(middleware.DistributedRateLimitConfig{
 		RedisClient: rateLimitRedisClient,
 		KeyPrefix:   cfg.Auth.RateLimitKeyPrefix + ":govsvc",
@@ -187,29 +209,6 @@ func main() {
 
 	// API Logger Middleware
 	router.Use(middleware.APILogger(db, log))
-
-	corsConfig := cors.Config{
-		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowHeaders:     []string{"Origin", "Content-Type", "X-Tenant-ID", "X-User-ID", "X-Device-ID", "X-OS-Version", "Authorization"},
-		ExposeHeaders:    []string{"Content-Length"},
-		AllowCredentials: true,
-		MaxAge:           12 * time.Hour,
-	}
-
-	origins := cfg.Governance.CORSAllowedOrigins
-	if len(origins) == 0 {
-		origins = []string{"http://localhost:5173", "http://127.0.0.1:5173"}
-	}
-
-	if allowsAllOrigins(origins) {
-		corsConfig.AllowAllOrigins = true
-	} else {
-		corsConfig.AllowOrigins = origins
-	}
-	router.Use(cors.New(corsConfig))
-
-	// Add metrics endpoint
-	router.GET("/metrics", gin.WrapH(wardsealobs.PrometheusHandler()))
 
 	// Register standardized health checks
 	healthHandler := health.NewHandler()
@@ -271,6 +270,14 @@ func main() {
 	connHandlers := connector.NewHTTPHandler(connSvc, log)
 	connHandlers.RegisterRoutes(apiGroup)
 
+	// Outbound Provisioning Engine
+	provSvc := connector.NewProvisioningService(db, connRegistry, log)
+	provSvc.Start(context.Background()) // Start the worker loop
+
+	// Autonomous Risk Response (The Edge)
+	riskGovernor := governance.NewRiskGovernor(signalStore, provSvc, log)
+	riskGovernor.Start(context.Background())
+
 	// Resource Discovery Framework
 	discoveryRepo := discovery.NewRepository(db)
 	discoveryJobStore := discovery.NewRedisJobStore(redisClient)
@@ -284,7 +291,7 @@ func main() {
 
 	// Slack ChatOps integration (Dynamic/Multi-tenant)
 	slackHandler := chatops.NewSlackHandler(svc, dirClient, chatOpsRepo, cfg.Auth.UIURL, string(cfg.Environment), log)
-	
+
 	// Dashboard Management API
 	chatOpsHandlers.RegisterRoutes(apiGroup)
 
@@ -320,7 +327,7 @@ func main() {
 		WriteTimeout: 30 * time.Second,
 		IdleTimeout:  120 * time.Second,
 	}
-	
+
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 
@@ -328,7 +335,7 @@ func main() {
 	go func() {
 		ticker := time.NewTicker(24 * time.Hour) // Run daily sweep
 		defer ticker.Stop()
-		
+
 		log.Info("Compliance recertification worker started")
 		for {
 			select {
@@ -364,13 +371,13 @@ func main() {
 					for _, asg := range expired {
 						err := rbacSvc.RemoveRoleFromUser(ctx, asg.UserID, asg.RoleID)
 						if err != nil {
-							log.Error("Failed to revoke expired role", 
-								zap.String("user_id", asg.UserID), 
-								zap.String("role_id", asg.RoleID), 
+							log.Error("Failed to revoke expired role",
+								zap.String("user_id", asg.UserID),
+								zap.String("role_id", asg.RoleID),
 								zap.Error(err))
 						} else {
-							log.Info("Successfully revoked expired JIT role", 
-								zap.String("user_id", asg.UserID), 
+							log.Info("Successfully revoked expired JIT role",
+								zap.String("user_id", asg.UserID),
 								zap.String("role_id", asg.RoleID))
 						}
 					}
@@ -399,13 +406,4 @@ func main() {
 		log.Error("Governance service forced to shutdown", zap.Error(err))
 	}
 	log.Info("Governance service exited gracefully")
-}
-
-func allowsAllOrigins(origins []string) bool {
-	for _, origin := range origins {
-		if origin == "*" {
-			return true
-		}
-	}
-	return false
 }

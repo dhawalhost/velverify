@@ -5,6 +5,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
+
+	"github.com/dhawalhost/wardseal/pkg/middleware"
 )
 
 // EndpointHandler handles device registration and trust.
@@ -18,10 +20,10 @@ func NewEndpointHandler(svc Service, logger *zap.Logger) *EndpointHandler {
 }
 
 func (h *EndpointHandler) RegisterRoutes(rg *gin.RouterGroup) {
-	rg.POST("/endpoints/register", h.registerDevice)
-	rg.GET("/endpoints", h.listDevices)
-	rg.GET("/endpoints/:id", h.getDevice)
-	rg.PUT("/endpoints/:id/status", h.updateDeviceStatus)
+	rg.POST("/governance/endpoints/register", h.registerDevice)
+	rg.GET("/governance/endpoints", h.listDevices)
+	rg.GET("/governance/endpoints/:id", h.getDevice)
+	rg.PUT("/governance/endpoints/:id/status", h.updateDeviceStatus)
 }
 
 func (h *EndpointHandler) registerDevice(c *gin.Context) {
@@ -105,13 +107,11 @@ func (h *EndpointHandler) updateDeviceStatus(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"status": req.Status})
 }
 
-// Helper to reuse logic from api.go if moved or duplicated for now
 func tenantIDFromContext(c *gin.Context) (string, bool) {
-	// Re-implementing for local scope or move to a common helper if refactoring
-	v, exists := c.Get("tenant_id")
-	if !exists {
+	tenantID, err := middleware.TenantIDFromGinContext(c)
+	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "tenant id required"})
 		return "", false
 	}
-	return v.(string), true
+	return tenantID, true
 }

@@ -1,0 +1,123 @@
+# WardSeal Application Layer
+# ========================
+# Core backend services for the WardSeal platform.
+
+services:
+  authsvc:
+    build:
+      context: .
+      dockerfile: cmd/authsvc/Dockerfile
+    container_name: wardseal-authsvc
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    env_file: .env
+    environment:
+      - APP_DATABASE_HOST=postgres
+      - APP_AUTH_DIRECTORY_SERVICE_URL=http://dirsvc:8081
+    volumes:
+      - ./deploy/dev-keys:/etc/wardseal/keys:ro
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/healthz"]
+      interval: 10s
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.authsvc.rule=Host(`auth.wardseal.local`)
+      - traefik.http.routers.authsvc.entrypoints=web
+      - traefik.http.services.authsvc.loadbalancer.server.port=8080
+    networks:
+      - wardseal-net
+
+  dirsvc:
+    build:
+      context: .
+      dockerfile: cmd/dirsvc/Dockerfile
+    container_name: wardseal-dirsvc
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    env_file: .env
+    environment:
+      - APP_DATABASE_HOST=postgres
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8081/healthz"]
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.dirsvc.rule=Host(`api.wardseal.local`) && (PathPrefix(`/scim`) || PathPrefix(`/groups`))"
+      - "traefik.http.routers.dirsvc.entrypoints=web"
+      - "traefik.http.services.dirsvc.loadbalancer.server.port=8081"
+    networks:
+      - wardseal-net
+
+  govsvc:
+    build:
+      context: .
+      dockerfile: cmd/govsvc/Dockerfile
+    container_name: wardseal-govsvc
+    depends_on:
+      postgres:
+        condition: service_healthy
+      dirsvc:
+        condition: service_healthy
+    env_file: .env
+    environment:
+      - APP_DATABASE_HOST=postgres
+      - APP_GOVERNANCE_DIRECTORY_SERVICE_URL=http://dirsvc:8081
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8082/healthz"]
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.govsvc.rule=Host(`api.wardseal.local`) && (PathPrefix(`/api/v1/oauth`) || PathPrefix(`/api/v1/governance`) || PathPrefix(`/api/v1/roles`) || PathPrefix(`/api/v1/permissions`) || PathPrefix(`/api/v1/users`) || PathPrefix(`/api/v1/sso`) || PathPrefix(`/api/v1/connectors`) || PathPrefix(`/api/v1/campaigns`) || PathPrefix(`/api/v1/organizations`) || PathPrefix(`/api/v1/safety`) || PathPrefix(`/api/v1/discovery`) || PathPrefix(`/api/v1/integrations`) || PathPrefix(`/api/v1/audit`) || PathPrefix(`/integrations/slack`))"
+      - "traefik.http.routers.govsvc.entrypoints=web"
+      - "traefik.http.services.govsvc.loadbalancer.server.port=8082"
+    networks:
+      - wardseal-net
+
+  policysvc:
+    build:
+      context: .
+      dockerfile: cmd/policysvc/Dockerfile
+    container_name: wardseal-policysvc
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file: .env
+    environment:
+      - APP_DATABASE_HOST=postgres
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.policysvc.rule=Host(`api.wardseal.local`) && (PathPrefix(`/api/v1/policy`) || PathPrefix(`/api/v1/policies`))"
+      - "traefik.http.routers.policysvc.entrypoints=web"
+      - "traefik.http.services.policysvc.loadbalancer.server.port=8083"
+    networks:
+      - wardseal-net
+
+  provsvc:
+    build:
+      context: .
+      dockerfile: cmd/provsvc/Dockerfile
+    container_name: wardseal-provsvc
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file: .env
+    environment:
+      - APP_DATABASE_HOST=postgres
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.provsvc.rule=Host(`api.wardseal.local`) && PathPrefix(`/api/v1/provisioning`)
+      - traefik.http.routers.provsvc.entrypoints=web
+      - traefik.http.services.provsvc.loadbalancer.server.port=8084
+    networks:
+      - wardseal-net
+
+networks:
+  wardseal-net:
+    external: true
+    name: wardseal-net

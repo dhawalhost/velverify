@@ -5,8 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/dhawalhost/wardseal/pkg/eventbus"
 	"go.uber.org/zap"
+
+	"github.com/dhawalhost/wardseal/pkg/eventbus"
 )
 
 // AuditSubscriber listens to EventBus topics and records them in the audit logs.
@@ -106,7 +107,7 @@ func (s *AuditSubscriber) handleEvent(ctx context.Context, topic string, payload
 		Outcome:      "success",
 		Details:      data,
 	}
-	
+
 	if resourceID != "" {
 		input.ResourceID = &resourceID
 	}

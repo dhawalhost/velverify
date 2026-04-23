@@ -4,12 +4,15 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/dhawalhost/gokit/logger"
+	"github.com/gin-contrib/cors"
+	"github.com/gin-gonic/gin"
+	"go.uber.org/zap"
+	"time"
+
 	"github.com/dhawalhost/wardseal/internal/policy"
 	"github.com/dhawalhost/wardseal/pkg/config"
 	"github.com/dhawalhost/wardseal/pkg/database"
-	"github.com/dhawalhost/gokit/logger"
-	"github.com/gin-gonic/gin"
-	"go.uber.org/zap"
 )
 
 func main() {
@@ -47,6 +50,22 @@ func main() {
 
 	// 5. Setup Router
 	router := gin.Default()
+
+	// CORS configuration
+	origins := cfg.Governance.CORSAllowedOrigins
+	if len(origins) == 0 {
+		origins = []string{"http://localhost:5173", "http://127.0.0.1:5173"}
+	}
+
+	router.Use(cors.New(cors.Config{
+		AllowOrigins:     origins,
+		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization", "X-Tenant-ID", "X-User-ID", "X-Device-ID", "X-OS-Version", "Accept", "X-Requested-With", "Accept-Encoding", "Cache-Control"},
+		ExposeHeaders:    []string{"Content-Length", "Access-Control-Allow-Origin"},
+		AllowCredentials: true,
+		MaxAge:           12 * time.Hour,
+	}))
+
 	policyHandlers := policy.NewHTTPHandler(svc, log)
 	policyHandlers.RegisterRoutes(router)
 

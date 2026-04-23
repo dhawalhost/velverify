@@ -4,10 +4,12 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/dhawalhost/wardseal/pkg/eventbus"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
+
+	"github.com/dhawalhost/wardseal/pkg/eventbus"
+	"github.com/dhawalhost/wardseal/pkg/middleware"
 )
 
 const (
@@ -42,7 +44,7 @@ func NewHTTPHandler(svc Service, repo Repository, jobs JobStore, publisher event
 
 // RegisterRoutes registers the discovery routes.
 func (h *HTTPHandler) RegisterRoutes(router *gin.RouterGroup) {
-	api := router.Group("/discovery")
+	api := router.Group("/governance/discovery")
 	{
 		api.GET("/resources", h.listResources)
 		api.POST("/scan", h.triggerScan)
@@ -51,9 +53,9 @@ func (h *HTTPHandler) RegisterRoutes(router *gin.RouterGroup) {
 }
 
 func (h *HTTPHandler) listResources(c *gin.Context) {
-	tenantID := c.GetHeader("X-Tenant-ID")
-	if tenantID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "X-Tenant-ID header is required"})
+	tenantID, err := middleware.TenantIDFromGinContext(c)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -69,9 +71,9 @@ func (h *HTTPHandler) listResources(c *gin.Context) {
 }
 
 func (h *HTTPHandler) triggerScan(c *gin.Context) {
-	tenantID := c.GetHeader("X-Tenant-ID")
-	if tenantID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "X-Tenant-ID header is required"})
+	tenantID, err := middleware.TenantIDFromGinContext(c)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -93,7 +95,7 @@ func (h *HTTPHandler) triggerScan(c *gin.Context) {
 
 	if err := h.publisher.Publish(c.Request.Context(), TopicDiscoveryScanRequested, payload); err != nil {
 		h.logger.Error("Failed to publish discovery event", zap.Error(err))
-		
+
 		// Cleanup the failed job state
 		// (In a high-scale system, we'd rely on TTL, but here we can try to be clean)
 		_ = h.jobs.Update(c.Request.Context(), jobID, func(s *JobState) {
@@ -124,10 +126,10 @@ func (h *HTTPHandler) getScanStatus(c *gin.Context) {
 		return
 	}
 
-	// Basic security: Ensure the job belongs to the requesting tenant
-	tenantID := c.GetHeader("X-Tenant-ID")
-	if tenantID != "" && state.TenantID != tenantID {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+	// Security: Ensure the job belongs to the requesting tenant
+	requestTenantID, _ := middleware.TenantIDFromGinContext(c)
+	if requestTenantID != "" && state.TenantID != requestTenantID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied to discovery job"})
 		return
 	}
 

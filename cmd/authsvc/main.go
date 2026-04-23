@@ -6,28 +6,31 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
 	"time"
 
+	gokitconfig "github.com/dhawalhost/gokit/config"
+	"github.com/dhawalhost/gokit/health"
+	"github.com/dhawalhost/gokit/logger"
+	gokitmiddleware "github.com/dhawalhost/gokit/middleware"
+	"github.com/dhawalhost/gokit/observability"
+	"github.com/gin-contrib/cors"
+	"github.com/gin-gonic/gin"
+	"github.com/go-redis/redis/v8"
+	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
+	"go.uber.org/zap"
+
 	"github.com/dhawalhost/wardseal/internal/auth"
+	"github.com/dhawalhost/wardseal/internal/authz"
 	"github.com/dhawalhost/wardseal/internal/license"
 	"github.com/dhawalhost/wardseal/internal/oauthclient"
+	"github.com/dhawalhost/wardseal/internal/rbac"
 	"github.com/dhawalhost/wardseal/internal/saml"
 	"github.com/dhawalhost/wardseal/pkg/config"
 	"github.com/dhawalhost/wardseal/pkg/database"
 	"github.com/dhawalhost/wardseal/pkg/kms"
 	"github.com/dhawalhost/wardseal/pkg/middleware"
 	wardsealobs "github.com/dhawalhost/wardseal/pkg/observability"
-	gokitconfig "github.com/dhawalhost/gokit/config"
-	"github.com/dhawalhost/gokit/health"
-	"github.com/dhawalhost/gokit/logger"
-	gokitmiddleware "github.com/dhawalhost/gokit/middleware"
-	"github.com/dhawalhost/gokit/observability"
-	"github.com/gin-gonic/gin"
-	"github.com/go-redis/redis/v8"
-	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
-	"go.uber.org/zap"
 )
 
 func main() {
@@ -93,7 +96,7 @@ func main() {
 		os.Exit(1)
 	}
 	clientStore := oauthclient.NewRepository(db)
-	samlStore := saml.NewStore(db)
+	samlStore := saml.NewStore(db, cfg.Auth.DirectoryServiceURL, cfg.Auth.ServiceAuthToken.Raw(), cfg.Auth.ServiceAuthHeader)
 	deviceStore := auth.NewDeviceRepository(db)
 	signalStore := auth.NewSignalRepository(db)
 	webauthnStore := auth.NewWebAuthnRepository(db)
@@ -101,6 +104,14 @@ func main() {
 	ssoProviderStore := auth.NewSSOProviderRepository(db)
 	tenantStore := auth.NewTenantRepository(db)
 	federationStore := auth.NewFederationRepository(db)
+	ipPolicyStore := auth.NewIPPolicyRepository(db)
+	rbacRepo := rbac.NewRepository(db)
+
+	// Phase 2: The Graph (ReBAC)
+	authzRepo := authz.NewRepository(db)
+	authzEngine := authz.NewEngine(authzRepo, log)
+	// rbacSvc := rbac.NewService(rbacRepo, authzEngine) // Currently unintegrated in authsvc logic
+	_ = rbacRepo // To avoid 'declared and not used' if rbacSvc is commented
 
 	authServiceURL := cfg.Auth.BaseURL
 
@@ -110,6 +121,7 @@ func main() {
 	revocationStore := auth.NewRevocationRepository(db)
 	totpStore := auth.NewTOTPRepository(db)
 	appStore := auth.NewDeveloperAppRepository(db)
+	workloadStore := auth.NewWorkloadRepository(db)
 
 	// Initialize Key Management Service
 	kmsConfig := kms.Config{
@@ -123,6 +135,7 @@ func main() {
 		VaultNamespace: cfg.KMS.VaultNamespace,
 		VaultRoleID:    cfg.KMS.VaultRoleID,
 		VaultSecretID:  cfg.KMS.VaultSecretID,
+		MasterKey:      cfg.KMS.MasterKey,
 	}
 
 	signer, err := kms.NewSigner(kmsConfig)
@@ -131,6 +144,14 @@ func main() {
 		os.Exit(1)
 	}
 	defer func() { _ = signer.Close() }()
+
+	cipher, err := kms.NewCipher(kmsConfig)
+	if err != nil {
+		log.Error("Failed to initialize KMS cipher", zap.Error(err))
+		os.Exit(1)
+	}
+
+	samlIdPRepo := saml.NewIdPRepository(db, cipher)
 
 	svc, err := auth.NewService(auth.Config{
 		DirectoryServiceURL: directoryServiceURL,
@@ -145,6 +166,11 @@ func main() {
 		FederationStore:     federationStore,
 		BaseURL:             authServiceURL,
 		Signer:              signer,
+		Cipher:              cipher,
+		SAMLIdPRepo:         samlIdPRepo,
+		IPPolicyStore:       ipPolicyStore,
+		RBACStore:           rbacRepo,
+		GraphEngine:         authzEngine,
 		// Use SQL stores for persistence
 		CodeStore:        codeStore,
 		RefreshStore:     refreshStore,
@@ -153,6 +179,7 @@ func main() {
 		SSOProviderStore: ssoProviderStore,
 		TenantStore:      tenantStore,
 		AppStore:         appStore,
+		WorkloadStore:    workloadStore,
 		UIURL:            cfg.Auth.UIURL,
 		DeploymentMode:   cfg.Auth.DeploymentMode,
 	})
@@ -162,28 +189,20 @@ func main() {
 	}
 
 	router := gin.Default()
-
 	// CORS configuration
-	if len(cfg.Governance.CORSAllowedOrigins) > 0 {
-		origins := cfg.Governance.CORSAllowedOrigins
-		router.Use(func(c *gin.Context) {
-			origin := c.Request.Header.Get("Origin")
-			for _, allowed := range origins {
-				if strings.TrimSpace(allowed) == origin {
-					c.Header("Access-Control-Allow-Origin", origin)
-					c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-					c.Header("Access-Control-Allow-Headers", "Origin, Content-Type, Authorization, X-Tenant-ID, X-User-ID, X-Device-ID, X-OS-Version")
-					c.Header("Access-Control-Allow-Credentials", "true")
-					break
-				}
-			}
-			if c.Request.Method == "OPTIONS" {
-				c.AbortWithStatus(204)
-				return
-			}
-			c.Next()
-		})
+	origins := cfg.Governance.CORSAllowedOrigins
+	if len(origins) == 0 {
+		origins = []string{"http://localhost:5173", "http://127.0.0.1:5173"}
 	}
+
+	router.Use(cors.New(cors.Config{
+		AllowOrigins:     origins,
+		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization", "X-Tenant-ID", "X-User-ID", "X-Device-ID", "X-OS-Version", "X-Tenant-Role", "Accept", "X-Requested-With", "Accept-Encoding", "Cache-Control"},
+		ExposeHeaders:    []string{"Content-Length", "Access-Control-Allow-Origin", "X-Service-Auth"},
+		AllowCredentials: true,
+		MaxAge:           12 * time.Hour,
+	}))
 
 	// Initialize OpenTelemetry tracing
 	shutdownTracer, err := observability.InitTracer(context.Background(), gokitconfig.TelemetryConfig{
@@ -201,7 +220,6 @@ func main() {
 	router.Use(otelgin.Middleware("authsvc"))
 	router.Use(wardsealobs.PrometheusMiddleware(metrics))
 	router.Use(middleware.Wrap(gokitmiddleware.RequestID())) // Inject tracing ID
-	router.Use(middleware.APILogger(nil, log)) // Simplified request logging
 
 	// Security Middleware
 	router.Use(middleware.Wrap(gokitmiddleware.SecureHeaders()))
@@ -303,7 +321,7 @@ func main() {
 	// SAML Setup
 
 	// Register SAML management API
-	samlHandlers := saml.NewHTTPHandler(samlStore, log)
+	samlHandlers := saml.NewHTTPHandler(samlStore, samlIdPRepo, cipher, log)
 	samlHandlers.RegisterRoutes(router.Group("/api/v1"))
 
 	// Developer Portal API (self-service app registration, API keys)

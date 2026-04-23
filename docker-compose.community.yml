@@ -1,0 +1,53 @@
+# WardSeal Community Edition (CE)
+# ==============================
+# Pre-built, zero-config deployment for community users.
+# Usage: docker compose -f docker-compose.yml -f docker-compose.community.yml up -d
+
+services:
+  authsvc:
+    image: ghcr.io/dhawalhost/wardseal-authsvc:latest
+    container_name: wardseal-authsvc
+    pull_policy: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file: .env
+    networks:
+      - wardseal-net
+
+  dirsvc:
+    image: ghcr.io/dhawalhost/wardseal-dirsvc:latest
+    container_name: wardseal-dirsvc
+    pull_policy: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file: .env
+    networks:
+      - wardseal-net
+
+  govsvc:
+    image: ghcr.io/dhawalhost/wardseal-govsvc:latest
+    container_name: wardseal-govsvc
+    pull_policy: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file: .env
+    networks:
+      - wardseal-net
+
+  adminui:
+    image: ghcr.io/dhawalhost/wardseal-adminui:latest
+    container_name: wardseal-adminui
+    pull_policy: always
+    depends_on:
+      govsvc:
+        condition: service_healthy
+    networks:
+      - wardseal-net
+
+networks:
+  wardseal-net:
+    external: true
+    name: wardseal-net

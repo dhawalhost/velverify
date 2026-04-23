@@ -8,9 +8,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dhawalhost/wardseal/pkg/middleware"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
+
+	"github.com/dhawalhost/wardseal/pkg/middleware"
 )
 
 const testServiceToken = "test-token"
@@ -271,5 +272,9 @@ func (m *mockDirectoryService) RemoveUserFromOrganization(ctx context.Context, t
 }
 
 func (m *mockDirectoryService) ListUserOrganizations(ctx context.Context, tenantID, userID string) ([]string, error) {
+	return nil, nil
+}
+
+func (m *mockDirectoryService) ListGroupMembers(ctx context.Context, tenantID, groupID string) ([]User, error) {
 	return nil, nil
 }

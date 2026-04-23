@@ -9,17 +9,17 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/dhawalhost/wardseal/internal/connector"
+	"github.com/dhawalhost/wardseal/internal/connector/model"
 )
 
-// Connector implements the connector.Connector interface for SCIM 2.0 targets.
+// Connector implements the model.Connector interface for SCIM 2.0 targets.
 type Connector struct {
-	config     connector.Config
+	config     model.Config
 	httpClient *http.Client
 }
 
 // New creates a new SCIM connector.
-func New(config connector.Config) (connector.Connector, error) {
+func New(config model.Config) (model.Connector, error) {
 	return &Connector{
 		config: config,
 		httpClient: &http.Client{
@@ -32,7 +32,7 @@ func (c *Connector) ID() string   { return c.config.ID }
 func (c *Connector) Name() string { return c.config.Name }
 func (c *Connector) Type() string { return "scim" }
 
-func (c *Connector) Initialize(ctx context.Context, config connector.Config) error {
+func (c *Connector) Initialize(ctx context.Context, config model.Config) error {
 	c.config = config
 	return nil
 }
@@ -58,7 +58,7 @@ func (c *Connector) HealthCheck(ctx context.Context) error {
 func (c *Connector) Close() error { return nil }
 
 // User operations
-func (c *Connector) CreateUser(ctx context.Context, user connector.User) (string, error) {
+func (c *Connector) CreateUser(ctx context.Context, user model.User) (string, error) {
 	scimUser := toSCIMUser(user)
 	body, _ := json.Marshal(scimUser)
 
@@ -86,31 +86,31 @@ func (c *Connector) CreateUser(ctx context.Context, user connector.User) (string
 	return result.ID, nil
 }
 
-func (c *Connector) GetUser(ctx context.Context, id string) (connector.User, error) {
+func (c *Connector) GetUser(ctx context.Context, id string) (model.User, error) {
 	req, err := http.NewRequestWithContext(ctx, "GET", c.config.Endpoint+"/Users/"+id, nil)
 	if err != nil {
-		return connector.User{}, err
+		return model.User{}, err
 	}
 	c.setHeaders(req)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return connector.User{}, err
+		return model.User{}, err
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
-		return connector.User{}, fmt.Errorf("get user failed: %d", resp.StatusCode)
+		return model.User{}, fmt.Errorf("get user failed: %d", resp.StatusCode)
 	}
 
 	var result scimUserResource
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return connector.User{}, err
+		return model.User{}, err
 	}
 	return fromSCIMUser(result), nil
 }
 
-func (c *Connector) UpdateUser(ctx context.Context, id string, user connector.User) error {
+func (c *Connector) UpdateUser(ctx context.Context, id string, user model.User) error {
 	scimUser := toSCIMUser(user)
 	body, _ := json.Marshal(scimUser)
 
@@ -152,7 +152,7 @@ func (c *Connector) DeleteUser(ctx context.Context, id string) error {
 	return nil
 }
 
-func (c *Connector) ListUsers(ctx context.Context, filter string, limit, offset int) ([]connector.User, int, error) {
+func (c *Connector) ListUsers(ctx context.Context, filter string, limit, offset int) ([]model.User, int, error) {
 	url := fmt.Sprintf("%s/Users?startIndex=%d&count=%d", c.config.Endpoint, offset+1, limit)
 	if filter != "" {
 		url += "&filter=" + filter
@@ -175,7 +175,7 @@ func (c *Connector) ListUsers(ctx context.Context, filter string, limit, offset 
 		return nil, 0, err
 	}
 
-	users := make([]connector.User, len(result.Resources))
+	users := make([]model.User, len(result.Resources))
 	for i, r := range result.Resources {
 		users[i] = fromSCIMUser(r)
 	}
@@ -183,7 +183,7 @@ func (c *Connector) ListUsers(ctx context.Context, filter string, limit, offset 
 }
 
 // Group operations
-func (c *Connector) CreateGroup(ctx context.Context, group connector.Group) (string, error) {
+func (c *Connector) CreateGroup(ctx context.Context, group model.Group) (string, error) {
 	scimGroup := scimGroupResource{DisplayName: group.Name}
 	body, _ := json.Marshal(scimGroup)
 
@@ -208,25 +208,25 @@ func (c *Connector) CreateGroup(ctx context.Context, group connector.Group) (str
 	return result.ID, nil
 }
 
-func (c *Connector) GetGroup(ctx context.Context, id string) (connector.Group, error) {
+func (c *Connector) GetGroup(ctx context.Context, id string) (model.Group, error) {
 	req, err := http.NewRequestWithContext(ctx, "GET", c.config.Endpoint+"/Groups/"+id, nil)
 	if err != nil {
-		return connector.Group{}, err
+		return model.Group{}, err
 	}
 	c.setHeaders(req)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return connector.Group{}, err
+		return model.Group{}, err
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	var result scimGroupResource
 	_ = json.NewDecoder(resp.Body).Decode(&result)
-	return connector.Group{ExternalID: result.ID, Name: result.DisplayName}, nil
+	return model.Group{ExternalID: result.ID, Name: result.DisplayName}, nil
 }
 
-func (c *Connector) UpdateGroup(ctx context.Context, id string, group connector.Group) error {
+func (c *Connector) UpdateGroup(ctx context.Context, id string, group model.Group) error {
 	scimGroup := scimGroupResource{ID: id, DisplayName: group.Name}
 	body, _ := json.Marshal(scimGroup)
 
@@ -259,7 +259,7 @@ func (c *Connector) DeleteGroup(ctx context.Context, id string) error {
 	return nil
 }
 
-func (c *Connector) ListGroups(ctx context.Context, filter string, limit, offset int) ([]connector.Group, int, error) {
+func (c *Connector) ListGroups(ctx context.Context, filter string, limit, offset int) ([]model.Group, int, error) {
 	url := fmt.Sprintf("%s/Groups?startIndex=%d&count=%d", c.config.Endpoint, offset+1, limit)
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
@@ -279,9 +279,9 @@ func (c *Connector) ListGroups(ctx context.Context, filter string, limit, offset
 	}
 	_ = json.NewDecoder(resp.Body).Decode(&result)
 
-	groups := make([]connector.Group, len(result.Resources))
+	groups := make([]model.Group, len(result.Resources))
 	for i, r := range result.Resources {
-		groups[i] = connector.Group{ExternalID: r.ID, Name: r.DisplayName}
+		groups[i] = model.Group{ExternalID: r.ID, Name: r.DisplayName}
 	}
 	return groups, result.TotalResults, nil
 }
@@ -341,7 +341,7 @@ func (c *Connector) RemoveUserFromGroup(ctx context.Context, userID, groupID str
 	return nil
 }
 
-func (c *Connector) GetGroupMembers(ctx context.Context, groupID string) ([]connector.User, error) {
+func (c *Connector) GetGroupMembers(ctx context.Context, groupID string) ([]model.User, error) {
 	req, err := http.NewRequestWithContext(ctx, "GET", c.config.Endpoint+"/Groups/"+groupID, nil)
 	if err != nil {
 		return nil, err
@@ -363,12 +363,12 @@ func (c *Connector) GetGroupMembers(ctx context.Context, groupID string) ([]conn
 		return nil, err
 	}
 
-	members := make([]connector.User, 0, len(result.Members))
+	members := make([]model.User, 0, len(result.Members))
 	for _, member := range result.Members {
 		if member.Value == "" {
 			continue
 		}
-		members = append(members, connector.User{
+		members = append(members, model.User{
 			ExternalID: member.Value,
 			Username:   member.Value,
 			Active:     true,
@@ -378,9 +378,9 @@ func (c *Connector) GetGroupMembers(ctx context.Context, groupID string) ([]conn
 	return members, nil
 }
 
-func (c *Connector) DiscoverResources(ctx context.Context) ([]connector.Resource, error) {
+func (c *Connector) DiscoverResources(ctx context.Context) ([]model.Resource, error) {
 	// Future implementation: Discover SCIM Groups and Entitlements as resources
-	return []connector.Resource{}, nil
+	return []model.Resource{}, nil
 }
 
 func (c *Connector) setHeaders(req *http.Request) {
@@ -428,7 +428,7 @@ type scimListResponse struct {
 	Resources    []scimUserResource `json:"Resources"`
 }
 
-func toSCIMUser(u connector.User) scimUserResource {
+func toSCIMUser(u model.User) scimUserResource {
 	return scimUserResource{
 		UserName:    u.Username,
 		Active:      u.Active,
@@ -447,12 +447,12 @@ func toSCIMUser(u connector.User) scimUserResource {
 	}
 }
 
-func fromSCIMUser(r scimUserResource) connector.User {
+func fromSCIMUser(r scimUserResource) model.User {
 	email := ""
 	if len(r.Emails) > 0 {
 		email = r.Emails[0].Value
 	}
-	return connector.User{
+	return model.User{
 		ExternalID:  r.ID,
 		Username:    r.UserName,
 		Email:       email,

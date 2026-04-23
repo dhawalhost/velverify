@@ -3,7 +3,10 @@ package rbac
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
+
+	"github.com/dhawalhost/wardseal/internal/authz"
 )
 
 // Service defines RBAC service operations.
@@ -37,12 +40,16 @@ type Service interface {
 }
 
 type service struct {
-	store Repository
+	store       Repository
+	graphEngine *authz.Engine
 }
 
-// NewService creates a new RBAC service.
-func NewService(store Repository) Service {
-	return &service{store: store}
+// NewService creates a new RBAC service with hybrid authorization support.
+func NewService(store Repository, graphEngine *authz.Engine) Service {
+	return &service{
+		store:       store,
+		graphEngine: graphEngine,
+	}
 }
 
 func (s *service) CreateRole(ctx context.Context, tenantID, name, description string) (Role, error) {
@@ -144,19 +151,50 @@ func (s *service) GetUserPermissions(ctx context.Context, tenantID, userID strin
 	return s.store.GetUserPermissions(ctx, tenantID, userID)
 }
 
-// HasPermission checks if a user has a specific permission.
+// HasPermission checks if a user has a specific permission via RBAC roles or ReBAC relationships.
 func (s *service) HasPermission(ctx context.Context, tenantID, userID, resource, action string) (bool, error) {
+	// 1. RBAC Check (Traditional Roles)
 	perms, err := s.store.GetUserPermissions(ctx, tenantID, userID)
-	if err != nil {
-		return false, err
+	if err == nil {
+		for _, p := range perms {
+			if (p.Resource == resource || p.Resource == "*") &&
+				(p.Action == action || p.Action == "*" || p.Action == "admin") {
+				return true, nil
+			}
+		}
 	}
 
-	for _, p := range perms {
-		// Check for exact match or wildcard
-		if (p.Resource == resource || p.Resource == "*") &&
-			(p.Action == action || p.Action == "*" || p.Action == "admin") {
+	// 2. ReBAC Check (Graph Relationships)
+	// We map the RBAC 'resource:action' to a Graph 'namespace:resource_id' and 'relation'
+	// For example: resource='document', action='edit' => namespace='document', relation='editor'
+	if s.graphEngine != nil {
+		// We assume the resource passed in is the object_id,
+		// and we try to infer namespace from it or use a default.
+		// For WardSeal, we'll try to parse "namespace:id" if present, else use generic.
+
+		ns := "resource"
+		objID := resource
+		if parts := strings.Split(resource, ":"); len(parts) == 2 {
+			ns = parts[0]
+			objID = parts[1]
+		}
+
+		// Map actions to relations
+		relation := action
+		switch action {
+		case "read", "view":
+			relation = "viewer"
+		case "write", "edit", "update":
+			relation = "editor"
+		case "delete", "manage":
+			relation = "owner"
+		}
+
+		allowed, err := s.graphEngine.Check(ctx, tenantID, userID, "user", relation, ns, objID)
+		if err == nil && allowed {
 			return true, nil
 		}
 	}
+
 	return false, nil
 }

@@ -2,18 +2,23 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ─────────────────────────────────────────────
+   WardSeal Design Token System — Clean Modernist
+   Single source of truth for all UI tokens.
+   ───────────────────────────────────────────── */
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    /* ── shadcn base ── */
+    --background: 210 40% 99%;
+    --foreground: 222.2 47.4% 11.2%;
 
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 222.2 47.4% 11.2%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover-foreground: 222.2 47.4% 11.2%;
 
-    --primary: 216 70% 18%;
+    --primary: 243 75% 59%;
     --primary-foreground: 210 40% 98%;
 
     --secondary: 210 40% 96.1%;
@@ -30,25 +35,77 @@
 
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
-    --ring: 221.2 83.2% 53.3%;
+    --ring: 243 75% 59%;
 
-    --radius: 0.5rem;
+    /* ── radius scale ── */
+    --radius: 12px;
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --radius-lg: 16px;
+    --radius-xl: 24px;
+    --radius-2xl: 32px;
+    --radius-overlay: 40px;
+
+    /* ── semantic state colors ── */
+    --success: 152 69% 31%;
+    --success-foreground: 0 0% 100%;
+    --success-subtle: 145 60% 96%;
+
+    --warning: 37 91% 40%;
+    --warning-foreground: 0 0% 100%;
+    --warning-subtle: 48 100% 96%;
+
+    --error: 0 84% 60%;
+    --error-foreground: 0 0% 100%;
+    --error-subtle: 0 86% 97%;
+
+    --info: 217 91% 55%;
+    --info-foreground: 0 0% 100%;
+    --info-subtle: 214 100% 97%;
+
+    /* ── shadow tokens (as raw values for use with box-shadow) ── */
+    --shadow-xs:   0 1px 2px 0 rgb(0 0 0 / 0.04);
+    --shadow-sm:   0 4px 16px -4px rgb(0 0 0 / 0.06);
+    --shadow-card: 0 8px 32px -8px rgb(0 0 0 / 0.08);
+    --shadow-overlay: 0 24px 64px -12px rgb(0 0 0 / 0.14);
+
+    /* ── typography scale ── */
+    --font-display: 'Inter', system-ui, sans-serif;
+    --font-mono: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+
+    --text-label: 11px;
+    --text-detail: 10px;
+    --text-body-sm: 12px;
+    --text-body: 14px;
+    --text-heading-sm: 16px;
+    --text-heading: 20px;
+    --text-title: 24px;
+    --text-hero: 32px;
+
+    --tracking-label: -0.01em;
+    --tracking-tight: -0.02em;
+
+    /* ── spacing scale (supplement Tailwind's default) ── */
+    --space-page: 40px;      /* outer page padding */
+    --space-section: 32px;   /* between page sections */
+    --space-card: 24px;      /* card internal padding */
+    --space-row: 24px;       /* table row vertical padding */
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
+    --background: 240 12% 12%;
+    --foreground: 260 100% 99%;
 
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
+    --card: 240 12% 16%;
+    --card-foreground: 260 100% 99%;
 
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
+    --popover: 240 12% 16%;
+    --popover-foreground: 260 100% 99%;
 
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
+    --primary: 248 80% 65%;
+    --primary-foreground: 210 40% 98%;
 
-    --secondary: 217.2 32.6% 17.5%;
+    --secondary: 215 16% 47%;
     --secondary-foreground: 210 40% 98%;
 
     --muted: 217.2 32.6% 17.5%;
@@ -60,9 +117,17 @@
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
+    --border: 217.2 32.6% 20%;
+    --input: 217.2 32.6% 20%;
     --ring: 212.7 26.8% 83.9%;
+
+    --success-subtle: 145 40% 14%;
+    --warning-subtle: 48 60% 12%;
+    --error-subtle: 0 50% 14%;
+    --info-subtle: 214 60% 14%;
+
+    --shadow-card: 0 8px 32px -8px rgb(0 0 0 / 0.3);
+    --shadow-overlay: 0 24px 64px -12px rgb(0 0 0 / 0.5);
   }
 }
 
@@ -73,6 +138,58 @@
 
   body {
     @apply bg-background text-foreground;
-    font-family: 'Inter', sans-serif;
+    font-family: var(--font-display);
+  }
+}
+
+/* ─── Custom scrollbar (reusable utility class) ─── */
+@layer utilities {
+  .custom-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--border)) transparent;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background-color: hsl(var(--border));
+    border-radius: 999px;
+  }
+
+  .custom-scrollbar-dark {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255,255,255,0.1) transparent;
+  }
+
+  .custom-scrollbar-dark::-webkit-scrollbar {
+    width: 4px;
+  }
+
+  .custom-scrollbar-dark::-webkit-scrollbar-thumb {
+    background-color: rgba(255,255,255,0.12);
+    border-radius: 999px;
+  }
+
+  /* Scale-in animation for cards/modals */
+  .scale-in-center {
+    animation: scaleInCenter 0.2s ease-out;
+  }
+
+  @keyframes scaleInCenter {
+    from {
+      opacity: 0;
+      transform: scale(0.96);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
   }
 }

@@ -8,16 +8,17 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/dhawalhost/wardseal/internal/auth"
-	"github.com/dhawalhost/wardseal/internal/oauthclient"
-	"github.com/dhawalhost/wardseal/internal/saml"
-	"github.com/dhawalhost/wardseal/pkg/middleware"
 	"github.com/gin-gonic/gin"
 	"github.com/go-webauthn/webauthn/protocol"
 	"github.com/go-webauthn/webauthn/webauthn"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"gopkg.in/go-jose/go-jose.v2"
+
+	"github.com/dhawalhost/wardseal/internal/auth"
+	"github.com/dhawalhost/wardseal/internal/oauthclient"
+	"github.com/dhawalhost/wardseal/internal/saml"
+	"github.com/dhawalhost/wardseal/pkg/middleware"
 )
 
 // MockService matches auth.Service interface
