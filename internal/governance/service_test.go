@@ -13,7 +13,7 @@ var ctx = context.Background()
 
 func TestCreateOAuthClientValidatesRedirects(t *testing.T) {
 	svc := NewService(&fakeStore{}, nil, &fakeOrgStore{}, &fakeEndpointStore{}, nil, &fakeDirClient{}, &fakePolicyEngine{}, &fakeRBACSvc{}, nil, nil)
-	_, err := svc.CreateOAuthClient(ctx, "11111111-1111-1111-1111-111111111111", CreateOAuthClientInput{
+	_, err := svc.CreateOAuthClient(ctx, "admin-system", CreateOAuthClientInput{
 		ClientID:      "client-a",
 		Name:          "Client A",
 		RedirectURIs:  nil,
@@ -28,7 +28,7 @@ func TestCreateOAuthClientHashesSecret(t *testing.T) {
 	store := &fakeStore{}
 	svc := NewService(store, nil, &fakeOrgStore{}, &fakeEndpointStore{}, nil, &fakeDirClient{}, &fakePolicyEngine{}, &fakeRBACSvc{}, nil, nil)
 	secret := "super-secret"
-	client, err := svc.CreateOAuthClient(ctx, "11111111-1111-1111-1111-111111111111", CreateOAuthClientInput{
+	client, err := svc.CreateOAuthClient(ctx, "admin-system", CreateOAuthClientInput{
 		ClientID:      "client-b",
 		Name:          "Client B",
 		ClientType:    "confidential",
@@ -50,7 +50,7 @@ func TestCreateOAuthClientHashesSecret(t *testing.T) {
 func TestUpdateOAuthClientValidatesRedirects(t *testing.T) {
 	store := &fakeStore{}
 	svc := NewService(store, nil, &fakeOrgStore{}, &fakeEndpointStore{}, nil, &fakeDirClient{}, &fakePolicyEngine{}, &fakeRBACSvc{}, nil, nil)
-	_, err := svc.UpdateOAuthClient(ctx, "11111111-1111-1111-1111-111111111111", "client-x", UpdateOAuthClientInput{
+	_, err := svc.UpdateOAuthClient(ctx, "admin-system", "client-x", UpdateOAuthClientInput{
 		RedirectURIs: []string{"http://localhost:bad"},
 	})
 	if err == nil || !IsValidationError(err) {
@@ -147,6 +147,12 @@ func (f *fakeDirClient) RemoveUserFromOrganization(ctx context.Context, tenantID
 	return nil
 }
 func (f *fakeDirClient) ListUserOrganizations(ctx context.Context, tenantID, userID string) ([]string, error) {
+	return nil, nil
+}
+func (f *fakeDirClient) ListUsers(ctx context.Context, tenantID string) ([]User, error) {
+	return nil, nil
+}
+func (f *fakeDirClient) ListGroups(ctx context.Context, tenantID string) ([]Group, error) {
 	return nil, nil
 }
 

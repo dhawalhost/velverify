@@ -14,8 +14,8 @@ const Developer: React.FC = () => {
         <div className="space-y-12 animate-in fade-in duration-700">
             <PageHeader 
                 icon={<BookOpen className="w-8 h-8 text-primary" />}
-                title="Protocol Documentation"
-                description="Explore the REST architecture, integration vectors, and cryptographic handshake protocols."
+                title="API Documentation"
+                description="Explore our API documentation and integration guides."
             />
 
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-10">
@@ -36,7 +36,7 @@ const Developer: React.FC = () => {
                         </div>
                     </div>
 
-                    <GlassCard className="bg-primary text-white border-none shadow-xl shadow-primary/20 overflow-hidden relative">
+                    <GlassCard className="bg-primary text-primary-foreground border-none shadow-xl shadow-primary/20 overflow-hidden relative">
                         <div className="absolute top-0 right-0 p-4 opacity-10">
                             <Terminal className="w-24 h-24 rotate-12" />
                         </div>
@@ -45,7 +45,7 @@ const Developer: React.FC = () => {
                                 <p className="text-[10px] font-black uppercase tracking-[0.3em] opacity-60">Distribution</p>
                                 <h4 className="text-xl font-black italic tracking-tighter">WARDSEAL_GO</h4>
                             </div>
-                            <div className="bg-black/20 p-4 rounded-xl font-mono text-[11px] border border-white/10 backdrop-blur-sm">
+                            <div className="bg-black/20 p-4 rounded-xl font-mono text-[11px] border border-on-inverse/10 backdrop-blur-sm">
                                 <code>go get github.com/dhawalhost/wardseal/pkg/client</code>
                             </div>
                         </GlassCardContent>
@@ -53,15 +53,15 @@ const Developer: React.FC = () => {
                 </div>
 
                 <div className="lg:col-span-3">
-                    <GlassCard className="overflow-hidden border-none shadow-xl shadow-on-surface/5 bg-white min-h-[800px]">
+                    <GlassCard className="overflow-hidden border-none shadow-xl shadow-on-surface/5 bg-card min-h-[800px]">
                         <GlassCardHeader className="py-8 px-10 border-b border-on-surface/5">
                             <div className="flex items-center gap-4">
                                 <Code2 className="w-6 h-6 text-primary" />
-                                <GlassCardTitle className="text-2xl font-bold tracking-tight">API Infrastructure</GlassCardTitle>
+                                <GlassCardTitle className="text-2xl font-bold tracking-tight">API Reference</GlassCardTitle>
                             </div>
                         </GlassCardHeader>
                         <GlassCardContent className="p-0">
-                            <div className="redoc-wrapper bg-white">
+                            <div className="redoc-wrapper bg-card">
                                 <RedocStandalone specUrl="/openapi.yaml" />
                             </div>
                         </GlassCardContent>

@@ -9,10 +9,10 @@ const statCardVariants = cva(
     {
         variants: {
             variant: {
-                default: "shadow-xl shadow-on-surface/5 bg-white",
-                danger:  "shadow-xl shadow-red-500/5 bg-red-50",
+                default: "shadow-xl shadow-on-surface/5 bg-card",
+                danger:  "shadow-xl shadow-destructive/5 bg-destructive/10",
                 primary: "shadow-xl shadow-primary/5 bg-primary/5",
-                success: "shadow-xl shadow-emerald-500/5 bg-emerald-50",
+                success: "shadow-xl shadow-emerald-500/5 bg-success-subtle",
                 warning: "shadow-xl shadow-amber-500/5 bg-amber-50",
                 muted:   "shadow-xl shadow-on-surface/5 bg-surface-container/10",
             },
@@ -25,9 +25,9 @@ const statValueVariants = cva("text-4xl font-bold tracking-tight leading-none", 
     variants: {
         variant: {
             default: "text-on-surface",
-            danger:  "text-red-600",
+            danger:  "text-destructive",
             primary: "text-primary",
-            success: "text-emerald-600",
+            success: "text-success",
             warning: "text-amber-600",
             muted:   "text-on-surface",
         },
@@ -39,9 +39,9 @@ const statLabelVariants = cva("text-[12px] font-bold tracking-tight leading-none
     variants: {
         variant: {
             default: "text-on-surface-variant/40",
-            danger:  "text-red-600/40",
+            danger:  "text-destructive/40",
             primary: "text-primary/60",
-            success: "text-emerald-600/60",
+            success: "text-success/60",
             warning: "text-amber-600/60",
             muted:   "text-on-surface-variant/40",
         },

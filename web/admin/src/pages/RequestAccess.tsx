@@ -43,7 +43,7 @@ const RequestAccess: React.FC = () => {
             />
 
             <div className="grid grid-cols-1 lg:grid-cols-1 gap-12">
-                <GlassCard className="border-none shadow-2xl shadow-on-surface/5 bg-white overflow-hidden rounded-[32px]">
+                <GlassCard className="border-none shadow-2xl shadow-on-surface/5 bg-card overflow-hidden rounded-[32px]">
                     <GlassCardHeader className="py-10 px-10 border-b border-on-surface/5 bg-surface-container/10">
                         <div className="flex items-center gap-6">
                             <div className="p-4 bg-primary/5 rounded-2xl text-primary">
@@ -61,7 +61,7 @@ const RequestAccess: React.FC = () => {
                     <GlassCardContent className="p-10">
                         <form onSubmit={handleSubmit} className="space-y-10">
                              {error && (
-                                <Alert variant="destructive" className="rounded-2xl border-none bg-red-50 text-red-600 animate-in slide-in-from-top-2">
+                                <Alert variant="destructive" className="rounded-2xl border-none bg-destructive/10 text-destructive animate-in slide-in-from-top-2">
                                     <AlertDescription className="font-bold text-xs tracking-tight">{error}</AlertDescription>
                                 </Alert>
                             )}

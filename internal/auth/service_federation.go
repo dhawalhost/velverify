@@ -178,6 +178,21 @@ func (s *authService) SocialLogin(ctx context.Context, req SocialLoginRequest) (
 	scope := "openid profile email"
 	tokenClientID := socialTokenClientID(req.Provider, clientID)
 
+	// Check if TOTP is enabled
+	if s.totpStore != nil {
+		totpSecret, err := s.totpStore.GetByIdentity(ctx, tenantID, userID)
+		if err != nil {
+			return TokenResponse{}, fmt.Errorf("failed to check TOTP status: %w", err)
+		}
+		if totpSecret != nil && totpSecret.Verified {
+			stepUpToken, err := s.generateStepUpToken(tenantID, userID, profile.Email)
+			if err != nil {
+				return TokenResponse{}, err
+			}
+			return TokenResponse{AccessToken: stepUpToken}, ErrMFARequired
+		}
+	}
+
 	return s.issueTokensWithoutRefresh(ctx, tenantID, tokenClientID, scope, userID, "")
 }
 

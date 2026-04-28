@@ -292,7 +292,7 @@ func (h *DeveloperAPIHandler) createAPIKey(c *gin.Context) {
 	keyBytes := make([]byte, 32)
 	_, _ = rand.Read(keyBytes)
 	fullKey := "vv_live_" + hex.EncodeToString(keyBytes)
-	keyPrefix := fullKey[:16] + "..."
+	keyPrefix := fullKey[:12] // "vv_live_xxxx"
 
 	hash, _ := bcrypt.GenerateFromPassword([]byte(fullKey), bcrypt.DefaultCost)
 

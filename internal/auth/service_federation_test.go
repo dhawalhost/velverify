@@ -32,7 +32,7 @@ func TestIssueTokensWithoutRefreshIncludesIDToken(t *testing.T) {
 
 	resp, err := svc.issueTokensWithoutRefresh(
 		ctx, // Add context
-		"11111111-1111-1111-1111-111111111111",
+		"admin-system",
 		"social:google",
 		"openid profile email",
 		"user-123",
@@ -57,7 +57,7 @@ func TestIssueTokensWithoutRefreshSkipsIDTokenWithoutOpenID(t *testing.T) {
 
 	resp, err := svc.issueTokensWithoutRefresh(
 		context.Background(),
-		"11111111-1111-1111-1111-111111111111",
+		"admin-system",
 		"social:google",
 		"profile email",
 		"user-123",

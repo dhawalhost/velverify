@@ -10,10 +10,12 @@
 |--------|------------|--------|----------------|
 | Credential stuffing | Rate limiting | ✅ Implemented | `middleware.RateLimitMiddleware(20, 40)` |
 | Credential stuffing | Account lockout | ✅ Implemented | `login_attempt_store.go` - 5 failures = 15min |
-| MFA bypass | Policy enforcement | ⚠️ Partial | TOTP enforced at login if enabled |
+| MFA bypass | Policy enforcement | ✅ Implemented | Enforced for critical roles (Admin) and self-enrolled users |
 | Phishing | Passkeys (WebAuthn) | ✅ Implemented | `webauthn.go`, `webauthn_api.go` |
+| SCIM API Key Theft | Bcrypt Hashing | ✅ Implemented | `RequireSCIMBearerToken` in `scimauth.go` |
 
-**Missing:** Per-user MFA policy toggle (currently user self-enrolls)
+
+**Missing:** Dynamic per-user MFA policy toggle (currently role-based + self-enroll)
 
 ---
 
@@ -24,6 +26,8 @@
 | Token replay | Refresh rotation | ✅ Implemented | `handleRefreshTokenGrant` - deletes old, issues new |
 | Redirect abuse | Strict allowlists | ✅ Implemented | `oauth_clients.redirect_uris` validated |
 | Authorization code interception | PKCE | ✅ Implemented | S256 code challenge in `service.go` |
+| Spoofing IdP responses | OIDC validation | ✅ Implemented | `conf.Exchange` in `service_federation.go` |
+
 
 ---
 
@@ -54,11 +58,13 @@
 | Threat | Mitigation | Status | Implementation |
 |--------|------------|--------|----------------|
 | Tenant data leakage | Strict isolation | ✅ Implemented | `X-Tenant-ID` header, all queries filtered |
-| Key compromise | KMS + rotation | ❌ Not Implemented | Keys in PEM files |
+| Key compromise | KMS + rotation | ✅ Implemented | HashiCorp Vault Transit supported and enforced in Prod |
 | Abuse | Rate limits | ✅ Implemented | Token bucket per-IP |
 | Abuse | WAF | ❌ Not Implemented | No WAF integration |
+| Circular graph DoS | MaxDepth constraint | ✅ Implemented | `MaxDepth = 10` in `engine.go` |
 
-**Missing:** KMS integration (HashiCorp Vault / AWS KMS), WAF
+
+**Missing:** WAF integration
 
 ---
 
@@ -66,9 +72,9 @@
 
 | Status | Count |
 |--------|-------|
-| ✅ Fully Implemented | 14 |
-| ⚠️ Partially Implemented | 1 |
-| ❌ Not Implemented | 2 |
+| ✅ Fully Implemented | 16 |
+| ⚠️ Partially Implemented | 0 |
+| ❌ Not Implemented | 1 |
 
 ---
 

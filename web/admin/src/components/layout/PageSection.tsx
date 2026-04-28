@@ -52,7 +52,7 @@ export const PageSection: React.FC<PageSectionProps> = ({
     return (
         <GlassCard
             className={cn(
-                "border-none shadow-2xl shadow-on-surface/5 bg-white overflow-hidden rounded-[32px]",
+                "border-none shadow-2xl shadow-on-surface/5 bg-card overflow-hidden rounded-[32px]",
                 className
             )}
         >

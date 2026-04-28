@@ -115,7 +115,7 @@ const Webhooks: React.FC = () => {
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
                 <div className="lg:col-span-4 space-y-8">
-                    <GlassCard className="border-none shadow-2xl shadow-on-surface/10 bg-white overflow-hidden rounded-[32px]">
+                    <GlassCard className="border-none shadow-2xl shadow-on-surface/10 bg-card overflow-hidden rounded-[32px]">
                         <GlassCardHeader className="bg-surface-container/10 border-b border-on-surface/5 py-8 px-8">
                             <div className="flex items-center gap-4">
                                 <div className="p-3 bg-primary rounded-xl text-white shadow-lg shadow-primary/20">
@@ -146,7 +146,7 @@ const Webhooks: React.FC = () => {
                                     {availableEvents.map(ev => (
                                         <div key={ev} className="flex items-center space-x-4 group cursor-pointer select-none" onClick={() => toggleEvent(ev)}>
                                             <div
-                                                className={`w-5 h-5 rounded-lg border-2 flex items-center justify-center transition-all ${selectedEvents.includes(ev) ? 'bg-primary border-primary' : 'border-on-surface/10 bg-white group-hover:border-primary/50'}`}
+                                                className={`w-5 h-5 rounded-lg border-2 flex items-center justify-center transition-all ${selectedEvents.includes(ev) ? 'bg-primary border-primary' : 'border-on-surface/10 bg-card group-hover:border-primary/50'}`}
                                             >
                                                 {selectedEvents.includes(ev) && <Check className="h-3 w-3 text-white" />}
                                             </div>
@@ -157,7 +157,7 @@ const Webhooks: React.FC = () => {
                             </div>
 
                             {error && (
-                                <div className="bg-red-50 text-red-600 p-4 rounded-xl border border-red-100 font-bold text-[11px] tracking-tight animate-in slide-in-from-top-2">
+                                <div className="bg-destructive/10 text-destructive p-4 rounded-xl border border-destructive/20 font-bold text-[11px] tracking-tight animate-in slide-in-from-top-2">
                                     Vector crash: {error}
                                 </div>
                             )}
@@ -177,7 +177,7 @@ const Webhooks: React.FC = () => {
                         <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none transition-transform group-hover:scale-110">
                             <Binary className="w-20 h-20 -mr-4 -mt-4 text-primary" />
                         </div>
-                        <div className="p-3 bg-white rounded-2xl shadow-sm ring-1 ring-on-surface/5">
+                        <div className="p-3 bg-card rounded-2xl shadow-sm ring-1 ring-on-surface/5">
                             <Lock className="w-6 h-6 text-primary" />
                         </div>
                         <div className="space-y-2">
@@ -195,7 +195,7 @@ const Webhooks: React.FC = () => {
                         <div className="h-px flex-1 bg-on-surface/5" />
                     </div>
 
-                    <GlassCard className="border-none shadow-2xl shadow-on-surface/5 bg-white overflow-hidden rounded-[32px]">
+                    <GlassCard className="border-none shadow-2xl shadow-on-surface/5 bg-card overflow-hidden rounded-[32px]">
                         <GlassCardHeader className="py-8 px-10 border-b border-on-surface/5">
                             <div className="flex items-center gap-5">
                                 <div className="p-3.5 bg-primary/5 rounded-2xl">
@@ -231,7 +231,7 @@ const Webhooks: React.FC = () => {
                                                 <GlassTableRow key={wh.id} className="hover:bg-surface-container/10 transition-all border-b border-on-surface/5 last:border-0 group">
                                                     <TableCell className="py-8 pl-10">
                                                         <div className="flex items-center gap-6">
-                                                            <div className="w-12 h-12 rounded-xl bg-surface-container/50 text-on-surface-variant/40 flex items-center justify-center transition-all group-hover:bg-primary group-hover:text-white">
+                                                            <div className="w-12 h-12 rounded-xl bg-surface-container/50 text-on-surface-variant/40 flex items-center justify-center transition-all group-hover:bg-primary group-hover:text-primary-foreground">
                                                                 <ExternalLink className="h-5 w-5" />
                                                             </div>
                                                             <div className="flex flex-col gap-1.5">
@@ -251,8 +251,8 @@ const Webhooks: React.FC = () => {
                                                     </TableCell>
                                                     <TableCell className="py-8">
                                                         <div className="flex items-center gap-3">
-                                                            <div className={`h-2 w-2 rounded-full transition-all ${wh.active ? 'bg-emerald-500' : 'bg-on-surface/20'}`} />
-                                                            <span className={`text-[11px] font-bold tracking-tight transition-all ${wh.active ? 'text-emerald-600' : 'text-on-surface-variant/40'}`}>
+                                                            <div className={`h-2 w-2 rounded-full transition-all ${wh.active ? 'bg-success' : 'bg-on-surface/20'}`} />
+                                                            <span className={`text-[11px] font-bold tracking-tight transition-all ${wh.active ? 'text-success' : 'text-on-surface-variant/40'}`}>
                                                                 {wh.active ? 'Active' : 'Dormant'}
                                                             </span>
                                                         </div>
@@ -261,7 +261,7 @@ const Webhooks: React.FC = () => {
                                                         <Button 
                                                             variant="ghost" 
                                                             size="icon" 
-                                                            className="h-11 w-11 rounded-xl text-on-surface-variant/40 hover:text-red-500 hover:bg-red-50 transition-all"
+                                                            className="h-11 w-11 rounded-xl text-on-surface-variant/40 hover:text-destructive hover:bg-destructive/10 transition-all"
                                                             onClick={() => handleDelete(wh.id)}
                                                         >
                                                             <Trash2 className="w-5 h-5" />

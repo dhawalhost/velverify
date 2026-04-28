@@ -14,36 +14,42 @@ export default {
                 background: "hsl(var(--background))",
                 foreground: "hsl(var(--foreground))",
 
-                // ── Surface scale ──
+                // ── Surface scale (Theming enabled) ──
                 surface: {
-                    DEFAULT: "hsl(var(--background))",
-                    dim: "#dcd8e4",
-                    bright: "#fcf8ff",
+                    DEFAULT: "hsl(var(--surface))",
+                    dim: "hsl(var(--surface-dim))",
+                    bright: "hsl(var(--surface-bright))",
                     container: {
-                        lowest: "#ffffff",
-                        low: "#f6f2fe",
-                        DEFAULT: "#f0ecf8",
-                        high: "#eae6f3",
-                        highest: "#e4e1ed",
+                        lowest: "hsl(var(--surface-container-lowest))",
+                        low: "hsl(var(--surface-container-low))",
+                        DEFAULT: "hsl(var(--surface-container))",
+                        high: "hsl(var(--surface-container-high))",
+                        highest: "hsl(var(--surface-container-highest))",
                     },
                 },
                 "on-surface": {
-                    DEFAULT: "#1b1b23",
-                    variant: "#464554",
+                    DEFAULT: "hsl(var(--on-surface))",
+                    variant: "hsl(var(--on-surface-variant))",
+                },
+                inverse: "hsl(var(--surface-inverse))",
+                "on-inverse": "hsl(var(--on-surface-inverse))",
+                outline: {
+                    DEFAULT: "hsl(var(--outline))",
+                    variant: "hsl(var(--outline-variant))",
                 },
 
                 // ── Brand colors ──
                 primary: {
                     DEFAULT: "hsl(var(--primary))",
-                    foreground: "hsl(var(--primary-foreground))",
-                    container: "#4338ca",
-                    "on-container": "#c1beff",
+                    foreground: "hsl(var(--on-primary))",
+                    container: "hsl(var(--primary-container))",
+                    "on-container": "hsl(var(--on-primary-container))",
                 },
                 secondary: {
-                    DEFAULT: "#505f76",
-                    foreground: "#ffffff",
-                    container: "#d0e1fb",
-                    "on-container": "#54647a",
+                    DEFAULT: "hsl(var(--secondary))",
+                    foreground: "hsl(var(--on-secondary))",
+                    container: "hsl(var(--secondary-container))",
+                    "on-container": "hsl(var(--on-secondary-container))",
                 },
 
                 // ── Semantic state colors ──
@@ -89,9 +95,6 @@ export default {
                     DEFAULT: "hsl(var(--card))",
                     foreground: "hsl(var(--card-foreground))",
                 },
-                outline: {
-                    DEFAULT: "hsl(var(--border))",
-                },
             },
 
             // ── Border radius scale ──
@@ -101,7 +104,7 @@ export default {
                 md: "var(--radius-md)",
                 lg: "var(--radius-lg)",
                 xl: "var(--radius-xl)",
-                "2xl": "var(--radius-2xl)",
+                "2xl": "32px",
                 "3xl": "40px",
             },
 
@@ -117,7 +120,6 @@ export default {
             fontFamily: {
                 sans: ["Inter", "system-ui", "sans-serif"],
                 mono: ["JetBrains Mono", "Fira Code", "ui-monospace", "monospace"],
-                display: ["Inter", "system-ui", "sans-serif"],
             },
 
             // ── Font sizes ──

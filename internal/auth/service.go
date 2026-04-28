@@ -6,7 +6,6 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"crypto/subtle"
-	"database/sql"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -22,11 +21,13 @@ import (
 	"github.com/go-webauthn/webauthn/protocol"
 	"github.com/go-webauthn/webauthn/webauthn"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 	"github.com/pquerna/otp/totp"
 	"go.uber.org/zap"
 	"golang.org/x/crypto/bcrypt"
 	"gopkg.in/go-jose/go-jose.v2"
 
+	"github.com/dhawalhost/gokit/circuitbreaker"
 	"github.com/dhawalhost/wardseal/internal/authz"
 	"github.com/dhawalhost/wardseal/internal/oauthclient"
 	"github.com/dhawalhost/wardseal/internal/rbac"
@@ -81,6 +82,14 @@ type Service interface {
 	ResolveTenantSlug(ctx context.Context, slug string) (string, error)
 	UIURL() string
 	ValidateToken(tokenString string) (*middleware.Claims, error)
+	ValidateStepUpToken(tokenString string) (*middleware.Claims, error)
+	GetUserByID(ctx context.Context, tenantID, userID string) (UserProfile, error)
+}
+
+type UserProfile struct {
+	ID    string `json:"id"`
+	Email string `json:"email"`
+	Name  string `json:"name"`
 }
 
 type LookupResult struct {
@@ -119,9 +128,14 @@ type authService struct {
 	cipher              kms.Cipher
 	graphEngine         *authz.Engine
 	workloadStore       WorkloadRepository
+	agentAccessStore    AgentAccessStore
 	deploymentMode      string
 	baseURL             string
+	dbCB                *circuitbreaker.CircuitBreaker
+	httpCB              *circuitbreaker.CircuitBreaker
 	uiURL               string
+	loginAttemptStore   LoginAttemptRepository
+	revocationCache     sync.Map
 }
 
 // AuthorizationCodeRepository defines the interface for storing authorization codes.
@@ -142,6 +156,11 @@ type RefreshTokenRepository interface {
 type RevocationRepository interface {
 	Revoke(ctx context.Context, token string) error
 	IsRevoked(ctx context.Context, token string) (bool, error)
+}
+
+// AgentAccessStore defines the interface for checking approved workload access.
+type AgentAccessStore interface {
+	GetApprovedScopes(ctx context.Context, tenantID, workloadID string) ([]string, time.Duration, error)
 }
 
 // Config captures the settings for the auth service.
@@ -172,7 +191,9 @@ type Config struct {
 	Cipher           kms.Cipher
 	GraphEngine      *authz.Engine
 	WorkloadStore    WorkloadRepository
+	AgentAccessStore AgentAccessStore
 	UIURL            string
+	LoginAttemptStore LoginAttemptRepository
 	// KMS Signer (optional, defaults to ephemeral local signer)
 	Signer kms.Signer
 	// Deployment Mode: "saas" or "selfhost" (default)
@@ -291,10 +312,44 @@ func NewService(cfg Config) (Service, error) {
 		cipher:              cfg.Cipher,
 		graphEngine:         cfg.GraphEngine,
 		workloadStore:       cfg.WorkloadStore,
-		deploymentMode:      deploymentMode,
+		loginAttemptStore:   cfg.LoginAttemptStore,
+		agentAccessStore:    cfg.AgentAccessStore,
+		deploymentMode:      cfg.DeploymentMode,
 		baseURL:             cfg.BaseURL,
 		uiURL:               cfg.UIURL,
+		dbCB: circuitbreaker.New(circuitbreaker.Config{
+			Name:             "auth-db",
+			MaxFailures:      5,
+			ResetTimeout:     30 * time.Second,
+			ExecutionTimeout: 5 * time.Second,
+		}),
+		httpCB: circuitbreaker.New(circuitbreaker.Config{
+			Name:             "auth-http",
+			MaxFailures:      5,
+			ResetTimeout:     30 * time.Second,
+			ExecutionTimeout: 10 * time.Second,
+		}),
 	}, nil
+}
+
+func retry(attempts int, sleep time.Duration, f func() error) error {
+	var err error
+	for i := 0; i < attempts; i++ {
+		if err = f(); err == nil {
+			return nil
+		}
+		time.Sleep(sleep)
+	}
+	return err
+}
+
+func (s *authService) executeWithCBAndRetry(f func() error) error {
+	if s.dbCB == nil {
+		return retry(3, 10*time.Millisecond, f)
+	}
+	return s.dbCB.Execute(func() error {
+		return retry(3, 10*time.Millisecond, f)
+	})
 }
 
 func (s *authService) Login(ctx context.Context, username, password, deviceID, userAgent, ip, clientOSVersion string) (string, error) {
@@ -320,7 +375,12 @@ func (s *authService) Login(ctx context.Context, username, password, deviceID, u
 	if s.serviceAuthToken != "" {
 		req.Header.Set(s.serviceAuthHeader, s.serviceAuthToken)
 	}
-	resp, err := s.httpClient.Do(req)
+	var resp *http.Response
+	err = s.httpCB.Execute(func() error {
+		var doErr error
+		resp, doErr = s.httpClient.Do(req)
+		return doErr
+	})
 	if err != nil {
 		return "", err
 	}
@@ -335,8 +395,9 @@ func (s *authService) Login(ctx context.Context, username, password, deviceID, u
 
 	var userResp struct {
 		User struct {
-			ID    string `json:"id"`
-			Email string `json:"email"`
+			ID          string `json:"id"`
+			Email       string `json:"email"`
+			MFAEnforced bool   `json:"mfa_enforced"`
 		} `json:"user"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&userResp); err != nil {
@@ -376,7 +437,7 @@ func (s *authService) Login(ctx context.Context, username, password, deviceID, u
 				zap.Int("score", risk.Score),
 				zap.Strings("factors", risk.Factors))
 			// Generate a short-lived step-up token
-			stepUpToken, err := s.generateStepUpToken(tenantID, userResp.User.ID)
+			stepUpToken, err := s.generateStepUpToken(tenantID, userResp.User.ID, userResp.User.Email)
 			if err != nil {
 				return "", err
 			}
@@ -415,6 +476,69 @@ func (s *authService) Login(ctx context.Context, username, password, deviceID, u
 			Timestamp: time.Now(),
 		})
 	}
+	// 4.5 Fetch roles and permissions early for policy enforcement
+	var roleNames []string
+	var permList []string
+	if s.rbacStore != nil {
+		roles, err := s.rbacStore.GetUserRoles(ctx, tenantID, userResp.User.ID)
+		if err == nil {
+			roleNames = make([]string, len(roles))
+			for i, r := range roles {
+				roleNames[i] = r.Name
+			}
+		}
+		perms, err := s.rbacStore.GetUserPermissions(ctx, tenantID, userResp.User.ID)
+		if err == nil {
+			permList = make([]string, len(perms))
+			for i, p := range perms {
+				permList[i] = fmt.Sprintf("%s:%s", p.Resource, p.Action)
+			}
+		}
+	}
+
+	// Check if user is admin
+	isAdmin := false
+	for _, r := range roleNames {
+		if r == "admin" || r == "organization-admin" || r == "super-admin" {
+			isAdmin = true
+			break
+		}
+	}
+
+	orgMFAEnforced := false
+	if s.tenantStore != nil {
+		var err error
+		orgMFAEnforced, err = s.tenantStore.IsMFAEnforcedForUserOrganizations(ctx, tenantID, userResp.User.ID)
+		if err != nil {
+			return "", fmt.Errorf("failed to check org MFA status: %w", err)
+		}
+	}
+
+	// 4.6 Check if TOTP is enabled OR required for admins/orgs
+	if s.totpStore != nil {
+		totpSecret, err := s.totpStore.GetByIdentity(ctx, tenantID, userResp.User.ID)
+		if err != nil {
+			return "", fmt.Errorf("failed to check TOTP status: %w", err)
+		}
+		
+		// Enforce MFA if enabled OR if user is admin OR if explicitly enforced per-user OR per-org (Zero Trust)
+		if (totpSecret != nil && totpSecret.Verified) || isAdmin || userResp.User.MFAEnforced || orgMFAEnforced {
+			// If NOT set up yet, return ErrMFASetupRequired
+			if totpSecret == nil || !totpSecret.Verified {
+				stepUpToken, err := s.generateStepUpToken(tenantID, userResp.User.ID, userResp.User.Email)
+				if err != nil {
+					return "", err
+				}
+				return stepUpToken, ErrMFASetupRequired
+			}
+			
+			stepUpToken, err := s.generateStepUpToken(tenantID, userResp.User.ID, userResp.User.Email)
+			if err != nil {
+				return "", err
+			}
+			return stepUpToken, ErrMFARequired
+		}
+	}
 
 	// 5. Generate a JWT.
 	claims := jwt.MapClaims{
@@ -427,24 +551,11 @@ func (s *authService) Login(ctx context.Context, username, password, deviceID, u
 		"tenant": tenantID,
 	}
 
-	// Add RBAC claims
-	if s.rbacStore != nil {
-		roles, err := s.rbacStore.GetUserRoles(ctx, tenantID, userResp.User.ID)
-		if err == nil {
-			roleNames := make([]string, len(roles))
-			for i, r := range roles {
-				roleNames[i] = r.Name
-			}
-			claims["roles"] = roleNames
-		}
-		perms, err := s.rbacStore.GetUserPermissions(ctx, tenantID, userResp.User.ID)
-		if err == nil {
-			permList := make([]string, len(perms))
-			for i, p := range perms {
-				permList[i] = fmt.Sprintf("%s:%s", p.Resource, p.Action)
-			}
-			claims["permissions"] = permList
-		}
+	if len(roleNames) > 0 {
+		claims["roles"] = roleNames
+	}
+	if len(permList) > 0 {
+		claims["permissions"] = permList
 	}
 
 	signedToken, err := s.signer.Sign(claims)
@@ -537,7 +648,12 @@ func (s *authService) LookupUser(ctx context.Context, tenantID, email string) (L
 			req.Header.Set(s.serviceAuthHeader, s.serviceAuthToken)
 		}
 
-		resp, err := s.httpClient.Do(req)
+		var resp *http.Response
+		err = s.httpCB.Execute(func() error {
+			var doErr error
+			resp, doErr = s.httpClient.Do(req)
+			return doErr
+		})
 		if err != nil {
 			return LookupResult{}, fmt.Errorf("failed to discover tenant: %w", err)
 		}
@@ -574,7 +690,12 @@ func (s *authService) LookupUser(ctx context.Context, tenantID, email string) (L
 		req.Header.Set(s.serviceAuthHeader, s.serviceAuthToken)
 	}
 
-	resp, err := s.httpClient.Do(req)
+	var resp *http.Response
+	err = s.httpCB.Execute(func() error {
+		var doErr error
+		resp, doErr = s.httpClient.Do(req)
+		return doErr
+	})
 	if err != nil {
 		return LookupResult{}, err
 	}
@@ -741,13 +862,42 @@ func (s *authService) handleAuthorizationCodeGrant(ctx context.Context, tenantID
 	if err != nil {
 		return TokenResponse{}, err
 	}
+	if client.ClientType == "confidential" {
+		if req.ClientSecret == "" {
+			return TokenResponse{}, &Error{"invalid_request", "client_secret is required for confidential clients"}
+		}
+		if s.clientStore == nil {
+			return TokenResponse{}, &Error{"invalid_client", "client verification requires database-backed clients"}
+		}
+		var record oauthclient.Client
+		err := s.executeWithCBAndRetry(func() error {
+			var getErr error
+			record, getErr = s.clientStore.GetClient(ctx, tenantID, req.ClientID)
+			return getErr
+		})
+		if err != nil {
+			return TokenResponse{}, ErrInvalidClient
+		}
+		if len(record.ClientSecretHash) == 0 {
+			return TokenResponse{}, &Error{"invalid_client", "client has no secret configured"}
+		}
+		if err := verifyClientSecret(req.ClientSecret, record.ClientSecretHash); err != nil {
+			return TokenResponse{}, &Error{"invalid_client", "invalid client secret"}
+		}
+	}
 	if !client.allowsGrant("authorization_code") {
 		return TokenResponse{}, &Error{"unauthorized_client", "authorization_code grant is not enabled for this client"}
 	}
 	if !client.allowsRedirect(req.RedirectURI) {
 		return TokenResponse{}, ErrInvalidRedirectURI
 	}
-	code, found, err := s.codeStore.Get(ctx, req.Code)
+	var code authorizationCode
+	var found bool
+	err = s.executeWithCBAndRetry(func() error {
+		var getErr error
+		code, found, getErr = s.codeStore.Get(ctx, req.Code)
+		return getErr
+	})
 	if err != nil {
 		return TokenResponse{}, err
 	}
@@ -760,7 +910,9 @@ func (s *authService) handleAuthorizationCodeGrant(ctx context.Context, tenantID
 	if err := verifyCodeChallenge(code.CodeChallenge, code.CodeChallengeMethod, req.CodeVerifier); err != nil {
 		return TokenResponse{}, err
 	}
-	_ = s.codeStore.Delete(ctx, req.Code)
+	_ = s.executeWithCBAndRetry(func() error {
+		return s.codeStore.Delete(ctx, req.Code)
+	})
 
 	return s.issueTokens(ctx, tenantID, req.ClientID, code.Scope, code.UserID, code.Nonce)
 }
@@ -778,29 +930,7 @@ func (s *authService) handleClientCredentialsGrant(ctx context.Context, tenantID
 			if req.ClientSecret == "" {
 				return TokenResponse{}, &Error{"invalid_request", "client_secret is required for workload authentication"}
 			}
-
-			// We use the same bcrypt verification used for standard clients/users
-			if err := verifyClientSecret(req.ClientSecret, []byte(workload.ClientSecretHash)); err != nil {
-				return TokenResponse{}, &Error{"invalid_client", "invalid workload secret"}
-			}
-
-			if workload.Status != "active" {
-				return TokenResponse{}, &Error{"unauthorized_client", "workload is not active"}
-			}
-
-			// Issue token for the workload
-			// Workloads identify themselves by their service_handle (e.g. "service:payment")
-			token, err := s.generateAccessToken(ctx, tenantID, req.ClientID, req.Scope, workload.ServiceHandle)
-			if err != nil {
-				return TokenResponse{}, err
-			}
-
-			return TokenResponse{
-				AccessToken: token,
-				TokenType:   "Bearer",
-				ExpiresIn:   3600,
-				Scope:       req.Scope,
-			}, nil
+			return s.handleWorkloadAuthentication(ctx, tenantID, workload, req.Scope, req.ClientSecret)
 		}
 	}
 
@@ -864,22 +994,127 @@ func (s *authService) handleClientCredentialsGrant(ctx context.Context, tenantID
 	}, nil
 }
 
+func (s *authService) handleWorkloadAuthentication(ctx context.Context, tenantID string, workload Workload, requestedScope, secret string) (TokenResponse, error) {
+	if err := verifyClientSecret(secret, []byte(workload.ClientSecretHash)); err != nil {
+		return TokenResponse{}, &Error{"invalid_client", "invalid workload secret"}
+	}
+
+	if workload.Status != "active" {
+		return TokenResponse{}, &Error{"unauthorized_client", "workload is not active"}
+	}
+
+	// AGENTIC GOVERNANCE: Check for approved access requests
+	finalScope := requestedScope
+	ttl := 1 * time.Hour
+
+	if s.agentAccessStore != nil {
+		approvedScopes, approvedTTL, err := s.agentAccessStore.GetApprovedScopes(ctx, tenantID, workload.ClientID)
+		if err == nil && len(approvedScopes) > 0 {
+			// If we have an approved request, it overrides the standard requested scope
+			finalScope = strings.Join(approvedScopes, " ")
+			if approvedTTL > 0 {
+				ttl = approvedTTL
+			}
+			zap.L().Info("Issued agentic token via approved access request",
+				zap.String("workload", workload.ClientID),
+				zap.String("scopes", finalScope),
+				zap.Duration("ttl", ttl))
+		}
+	}
+
+	// Default to workload metadata if no active access request exists
+	if finalScope == "" {
+		// Use workload's own default scopes if any
+		if val, ok := workload.Metadata["default_scopes"].(string); ok {
+			finalScope = val
+		}
+	}
+
+	// Determine TTL from metadata if not explicitly set by governance
+	if ttl == 1*time.Hour {
+		if val, ok := workload.Metadata["token_ttl"].(float64); ok {
+			ttl = time.Duration(val) * time.Second
+		}
+	}
+
+	// Generate token with specific TTL
+	token, err := s.generateAccessTokenWithTTL(ctx, tenantID, workload.ClientID, finalScope, workload.ServiceHandle, ttl)
+	if err != nil {
+		return TokenResponse{}, err
+	}
+
+	// Async update of last used timestamp
+	go func() {
+		now := time.Now()
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		_ = s.workloadStore.Update(ctx, workload.ID, map[string]interface{}{"last_used_at": now})
+	}()
+
+	return TokenResponse{
+		AccessToken: token,
+		TokenType:   "Bearer",
+		ExpiresIn:   int(ttl.Seconds()),
+		Scope:       finalScope,
+	}, nil
+}
+
 func (s *authService) handleRefreshTokenGrant(ctx context.Context, tenantID string, req TokenRequest) (TokenResponse, error) {
 	if req.RefreshToken == "" {
 		return TokenResponse{}, &Error{"invalid_request", "refresh_token is required"}
 	}
 
+	// Parse familyID and tokenID
+	parts := strings.Split(req.RefreshToken, ".")
+	var familyID string
+	if len(parts) == 2 {
+		familyID = parts[0]
+	}
+
+	// Check if family is revoked
+	if s.revokedTokens != nil && familyID != "" {
+		var familyRevoked bool
+		err := s.executeWithCBAndRetry(func() error {
+			var getErr error
+			familyRevoked, getErr = s.revokedTokens.IsRevoked(ctx, "family-"+familyID)
+			return getErr
+		})
+		if err != nil {
+			return TokenResponse{}, err
+		}
+		if familyRevoked {
+			return TokenResponse{}, &Error{"invalid_grant", "refresh token family has been revoked"}
+		}
+	}
+
 	// Check if refresh token is revoked
-	revoked, err := s.revokedTokens.IsRevoked(ctx, req.RefreshToken)
+	var revoked bool
+	err := s.executeWithCBAndRetry(func() error {
+		var getErr error
+		revoked, getErr = s.revokedTokens.IsRevoked(ctx, req.RefreshToken)
+		return getErr
+	})
 	if err != nil {
 		return TokenResponse{}, err
 	}
 	if revoked {
-		return TokenResponse{}, &Error{"invalid_grant", "refresh token has been revoked"}
+		// REUSE DETECTED!
+		if s.revokedTokens != nil && familyID != "" {
+			_ = s.executeWithCBAndRetry(func() error {
+				return s.revokedTokens.Revoke(ctx, "family-"+familyID)
+			})
+		}
+		return TokenResponse{}, &Error{"invalid_grant", "refresh token has been revoked (reuse detected)"}
 	}
 
 	// Retrieve stored refresh token
-	stored, found, err := s.refreshTokenStore.Get(ctx, req.RefreshToken)
+	var stored refreshTokenEntry
+	var found bool
+	err = s.executeWithCBAndRetry(func() error {
+		var getErr error
+		stored, found, getErr = s.refreshTokenStore.Get(ctx, req.RefreshToken)
+		return getErr
+	})
 	if err != nil {
 		return TokenResponse{}, err
 	}
@@ -896,13 +1131,47 @@ func (s *authService) handleRefreshTokenGrant(ctx context.Context, tenantID stri
 	if err != nil {
 		return TokenResponse{}, err
 	}
+	if client.ClientType == "confidential" {
+		if req.ClientSecret == "" {
+			return TokenResponse{}, &Error{"invalid_request", "client_secret is required for confidential clients"}
+		}
+		if s.clientStore == nil {
+			return TokenResponse{}, &Error{"invalid_client", "client verification requires database-backed clients"}
+		}
+		var record oauthclient.Client
+		err := s.executeWithCBAndRetry(func() error {
+			var getErr error
+			record, getErr = s.clientStore.GetClient(ctx, tenantID, stored.ClientID)
+			return getErr
+		})
+		if err != nil {
+			return TokenResponse{}, ErrInvalidClient
+		}
+		if len(record.ClientSecretHash) == 0 {
+			return TokenResponse{}, &Error{"invalid_client", "client has no secret configured"}
+		}
+		if err := verifyClientSecret(req.ClientSecret, record.ClientSecretHash); err != nil {
+			return TokenResponse{}, &Error{"invalid_client", "invalid client secret"}
+		}
+	}
 	if !client.allowsGrant("refresh_token") {
 		return TokenResponse{}, &Error{"unauthorized_client", "refresh_token grant is not enabled for this client"}
 	}
 
 	// Rotate refresh token - delete old and issue new
-	_ = s.refreshTokenStore.Delete(ctx, req.RefreshToken)
+	_ = s.executeWithCBAndRetry(func() error {
+		return s.refreshTokenStore.Delete(ctx, req.RefreshToken)
+	})
+	if s.revokedTokens != nil {
+		_ = s.executeWithCBAndRetry(func() error {
+			return s.revokedTokens.Revoke(ctx, req.RefreshToken)
+		})
+	}
 
+	if familyID == "" {
+		familyID = uuid.New().String()
+	}
+	ctx = context.WithValue(ctx, familyIDKey, familyID)
 	return s.issueTokens(ctx, tenantID, stored.ClientID, stored.Scope, stored.SubjectType, "")
 }
 
@@ -961,11 +1230,19 @@ func (s *authService) issueTokensWithoutRefresh(ctx context.Context, tenantID, c
 }
 
 func (s *authService) generateAccessToken(ctx context.Context, tenantID, clientID, scope, userID string) (string, error) {
+	return s.generateAccessTokenWithTTL(ctx, tenantID, clientID, scope, userID, time.Hour*1)
+}
+
+func (s *authService) generateAccessTokenWithTTL(ctx context.Context, tenantID, clientID, scope, userID string, ttl time.Duration) (string, error) {
+	subject := clientID
+	if userID != "" {
+		subject = userID
+	}
 	claims := jwt.MapClaims{
-		"sub":    clientID,
+		"sub":    subject,
 		"iss":    "identity-platform",
-		"aud":    "client-app",
-		"exp":    time.Now().Add(time.Hour * 1).Unix(),
+		"aud":    []string{"client-app", clientID},
+		"exp":    time.Now().Add(ttl).Unix(),
 		"iat":    time.Now().Unix(),
 		"scope":  scope,
 		"tenant": tenantID,
@@ -1041,21 +1318,32 @@ func hasScope(scope, target string) bool {
 	return false
 }
 
+type contextKey string
+const familyIDKey contextKey = "family_id"
+
 func (s *authService) generateRefreshToken(ctx context.Context, tenantID, clientID, scope, subjectType string) (string, error) {
+	familyID, _ := ctx.Value(familyIDKey).(string)
+	if familyID == "" {
+		familyID = uuid.New().String()
+	}
+
 	tokenBytes := make([]byte, 32)
 	if _, err := rand.Read(tokenBytes); err != nil {
 		return "", err
 	}
-	refreshToken := base64.RawURLEncoding.EncodeToString(tokenBytes)
+	tokenID := base64.RawURLEncoding.EncodeToString(tokenBytes)
+	refreshToken := familyID + "." + tokenID
 
 	// Store refresh token with 7-day expiry
-	err := s.refreshTokenStore.Save(ctx, refreshTokenEntry{
-		Token:       refreshToken,
-		ClientID:    clientID,
-		TenantID:    tenantID,
-		Scope:       scope,
-		SubjectType: subjectType,
-		ExpiresAt:   time.Now().Add(7 * 24 * time.Hour),
+	err := s.executeWithCBAndRetry(func() error {
+		return s.refreshTokenStore.Save(ctx, refreshTokenEntry{
+			Token:       refreshToken,
+			ClientID:    clientID,
+			TenantID:    tenantID,
+			Scope:       scope,
+			SubjectType: subjectType,
+			ExpiresAt:   time.Now().Add(7 * 24 * time.Hour),
+		})
 	})
 	if err != nil {
 		return "", err
@@ -1066,7 +1354,12 @@ func (s *authService) generateRefreshToken(ctx context.Context, tenantID, client
 
 func (s *authService) Introspect(ctx context.Context, req IntrospectRequest) (IntrospectResponse, error) {
 	// Check if token is revoked
-	revoked, err := s.revokedTokens.IsRevoked(ctx, req.Token)
+	var revoked bool
+	err := s.executeWithCBAndRetry(func() error {
+		var getErr error
+		revoked, getErr = s.revokedTokens.IsRevoked(ctx, req.Token)
+		return getErr
+	})
 	if err != nil {
 		return IntrospectResponse{}, err
 	}
@@ -1084,7 +1377,13 @@ func (s *authService) Introspect(ctx context.Context, req IntrospectRequest) (In
 
 	if err != nil || !token.Valid {
 		// Not a valid access token, check if it's a refresh token
-		stored, found, getErr := s.refreshTokenStore.Get(ctx, req.Token)
+		var stored refreshTokenEntry
+		var found bool
+		getErr := s.executeWithCBAndRetry(func() error {
+			var err error
+			stored, found, err = s.refreshTokenStore.Get(ctx, req.Token)
+			return err
+		})
 		if getErr == nil && found && time.Now().Before(stored.ExpiresAt) {
 			return IntrospectResponse{
 				Active:    true,
@@ -1173,12 +1472,13 @@ func (s *authService) TOTP() TOTPRepository {
 
 // ErrMFARequired is returned when login requires a second factor.
 var ErrMFARequired = &Error{"mfa_required", "additional authentication required"}
+var ErrMFASetupRequired = &Error{"mfa_setup_required", "mfa setup required"}
 
 // ErrInvalidCredentials is returned when login fails.
 var ErrInvalidCredentials = &Error{"invalid_credentials", "invalid username or password"}
 
 const (
-	SystemTenantID  = "11111111-1111-1111-1111-111111111111"
+	SystemTenantID  = "admin-system"
 	AnonymousUserID = "00000000-0000-0000-0000-000000000000"
 )
 
@@ -1287,7 +1587,12 @@ func (s *authService) UIURL() string {
 
 func (s *authService) resolveClient(ctx context.Context, tenantID, clientID string) (ClientConfig, error) {
 	if s.clientStore != nil {
-		record, err := s.clientStore.GetClient(ctx, tenantID, clientID)
+		var record oauthclient.Client
+		err := s.executeWithCBAndRetry(func() error {
+			var getErr error
+			record, getErr = s.clientStore.GetClient(ctx, tenantID, clientID)
+			return getErr
+		})
 		if err == nil {
 			cfg := clientConfigFromRecord(record)
 			if err := cfg.validate(); err == nil {
@@ -1298,7 +1603,12 @@ func (s *authService) resolveClient(ctx context.Context, tenantID, clientID stri
 
 	// Fallback to Developer Portal apps
 	if s.appStore != nil {
-		app, err := s.appStore.GetByClientID(ctx, clientID)
+		var app *DeveloperApp
+		err := s.executeWithCBAndRetry(func() error {
+			var getErr error
+			app, getErr = s.appStore.GetByClientID(ctx, clientID)
+			return getErr
+		})
 		if err == nil && app != nil {
 			// Ensure tenant mismatch is caught if needed, though for public/developer apps
 			// we might allow it depending on policy.
@@ -1543,6 +1853,14 @@ func (s *authService) SignUp(ctx context.Context, email, password, companyName, 
 		return "", "", "", errors.New("public signup is disabled in this deployment mode")
 	}
 
+	if strings.TrimSpace(email) == "" || strings.TrimSpace(password) == "" {
+		return "", "", "", errors.New("email and password are required")
+	}
+	if len(password) < 8 {
+		return "", "", "", errors.New("password must be at least 8 characters long")
+	}
+
+
 	// 0.1 Check if email already exists globally
 	respDisc, err := s.httpClient.Get(fmt.Sprintf("%s/internal/discover?email=%s", s.directoryServiceURL, url.QueryEscape(email)))
 	if err == nil {
@@ -1689,7 +2007,7 @@ TenantCreated:
 		"iat":    time.Now().Unix(),
 		"scope":  "openid profile email",
 		"tenant": tenantID,
-		"roles":  []string{"admin"},
+		"roles":  []string{"super-admin"},
 	}
 
 	signedToken, err := s.signer.Sign(claims)
@@ -1831,35 +2149,101 @@ func (s *authService) PerformSystemSetup(ctx context.Context, email, password st
 		"iat":    time.Now().Unix(),
 		"scope":  "openid profile email",
 		"tenant": systemTenantID,
-		"roles":  []string{"admin"},
+		"roles":  []string{"super-admin"},
 	}
 
 	return s.signer.Sign(claims)
 }
 
 func (s *authService) ensureTenantAdminRoleAssignment(ctx context.Context, tenantID, userID string) error {
-	if s.rbacStore == nil || tenantID == "" || userID == "" {
+	if s.rbacStore == nil || tenantID == "" {
 		return nil
 	}
 
-	role, err := s.rbacStore.GetRoleByName(ctx, tenantID, "admin")
-	if err != nil {
-		if !errors.Is(err, sql.ErrNoRows) {
-			return err
-		}
-
-		roleID, createErr := s.rbacStore.CreateRole(ctx, rbac.Role{
-			TenantID:    tenantID,
-			Name:        "admin",
-			Description: "Default tenant administrator role",
-		})
-		if createErr != nil {
-			return createErr
-		}
-		role.ID = roleID
+	type permDef struct {
+		resource    string
+		action      string
+		description string
+	}
+	type roleDef struct {
+		name        string
+		description string
+		perms       []string
 	}
 
-	return s.rbacStore.AssignRoleToUser(ctx, tenantID, userID, role.ID, nil)
+	defaultPerms := []permDef{
+		{"*", "*", "Full administrative access to all resources"},
+		{"users", "read", "Read user profiles"},
+		{"users", "write", "Create and edit user profiles"},
+		{"users", "delete", "Delete user profiles"},
+		{"groups", "read", "Read access groups"},
+		{"groups", "write", "Create and edit access groups"},
+		{"groups", "delete", "Delete access groups"},
+		{"roles", "read", "Read roles and permission mappings"},
+		{"roles", "write", "Create and edit roles and permission mappings"},
+		{"roles", "delete", "Delete roles"},
+		{"policies", "read", "Read zero-trust access policies"},
+		{"policies", "write", "Create and edit zero-trust access policies"},
+		{"policies", "delete", "Delete zero-trust access policies"},
+		{"audit", "read", "Read system audit logs"},
+		{"applications", "read", "View application mappings"},
+		{"applications", "write", "Create and edit application mappings"},
+		{"applications", "delete", "Delete application mappings"},
+	}
+
+	defaultRoles := []roleDef{
+		{"super-admin", "Full access to all system administrative tasks and configurations", []string{"*:*"}},
+		{"security-admin", "Manage and configure security parameters and policies", []string{
+			"users:read", "groups:read", "roles:read", "policies:read", "audit:read", "applications:read",
+		}},
+		{"user-admin", "Create, manage, and configure user profiles and access groups", []string{
+			"users:read", "users:write", "users:delete", "groups:read", "groups:write", "groups:delete",
+		}},
+		{"standard-user", "Basic access privileges assigned to normal organizational members", []string{
+			"applications:read",
+		}},
+	}
+
+	permIDs := make(map[string]string)
+	for _, pd := range defaultPerms {
+		pid, err := s.rbacStore.CreatePermission(ctx, rbac.Permission{
+			TenantID:    tenantID,
+			Resource:    pd.resource,
+			Action:      pd.action,
+			Description: pd.description,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to seed permission %s:%s: %w", pd.resource, pd.action, err)
+		}
+		permIDs[fmt.Sprintf("%s:%s", pd.resource, pd.action)] = pid
+	}
+
+	var adminRoleID string
+	for _, rd := range defaultRoles {
+		rid, err := s.rbacStore.CreateRole(ctx, rbac.Role{
+			TenantID:    tenantID,
+			Name:        rd.name,
+			Description: rd.description,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to seed role %s: %w", rd.name, err)
+		}
+		if rd.name == "super-admin" {
+			adminRoleID = rid
+		}
+
+		for _, pkey := range rd.perms {
+			if pid, ok := permIDs[pkey]; ok {
+				_ = s.rbacStore.AssignPermissionToRole(ctx, rid, pid)
+			}
+		}
+	}
+
+	if adminRoleID != "" && userID != "" {
+		return s.rbacStore.AssignRoleToUser(ctx, tenantID, userID, adminRoleID, nil)
+	}
+
+	return nil
 }
 
 func (s *authService) ListClients(ctx context.Context, tenantID string) ([]oauthclient.Client, error) {
@@ -2012,6 +2396,11 @@ func (s *authService) setPasswordWithSetupToken(ctx context.Context, tokenString
 	return nil
 }
 
+type cacheEntry struct {
+	value     bool
+	expiresAt time.Time
+}
+
 func (s *authService) ValidateToken(tokenString string) (*middleware.Claims, error) {
 	// If the signer is a LocalSigner or VaultSigner, we can use its PublicKey to verify
 	// But the signer interface doesn't have a generic verify yet in a way that returns Claims.
@@ -2030,15 +2419,74 @@ func (s *authService) ValidateToken(tokenString string) (*middleware.Claims, err
 	}
 
 	if claims, ok := token.Claims.(*middleware.Claims); ok && token.Valid {
+		// Enforce that this is not a step-up token
+		for _, aud := range claims.Audience {
+			if aud == "wardseal-mfa-stepup" {
+				return nil, fmt.Errorf("step-up token cannot be used for API access")
+			}
+		}
+
+		// Validate audience
+		validAudience := false
+		for _, aud := range claims.Audience {
+			if aud == "client-app" {
+				validAudience = true
+				break
+			}
+		}
+		if !validAudience {
+			return nil, fmt.Errorf("invalid token audience")
+		}
+
+		if s.revokedTokens != nil {
+			// 1. Check Cache
+			if val, ok := s.revocationCache.Load(tokenString); ok {
+				if entry, ok := val.(cacheEntry); ok && time.Now().Before(entry.expiresAt) {
+					if entry.value {
+						return nil, fmt.Errorf("token revoked (cached)")
+					}
+					return claims, nil
+				}
+			}
+
+			// 2. Fallback to DB with Timeout
+			ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+			revoked, err := s.revokedTokens.IsRevoked(ctx, tokenString)
+			cancel()
+
+			if err != nil {
+				// Graceful Degradation: If DB fails/timeouts, rely on Cache even if expired
+				if val, ok := s.revocationCache.Load(tokenString); ok {
+					if entry, ok := val.(cacheEntry); ok {
+						if entry.value {
+							return nil, fmt.Errorf("token revoked (cached fallback)")
+						}
+						return claims, nil
+					}
+				}
+				return nil, fmt.Errorf("failed to check token revocation: %w", err)
+			}
+
+			// 3. Update Cache
+			s.revocationCache.Store(tokenString, cacheEntry{
+				value:     revoked,
+				expiresAt: time.Now().Add(5 * time.Minute),
+			})
+
+			if revoked {
+				return nil, fmt.Errorf("token revoked")
+			}
+		}
 		return claims, nil
 	}
 
 	return nil, fmt.Errorf("invalid token")
 }
 
-func (s *authService) generateStepUpToken(tenantID, userID string) (string, error) {
+func (s *authService) generateStepUpToken(tenantID, userID, email string) (string, error) {
 	claims := jwt.MapClaims{
 		"sub":     userID,
+		"email":   email,
 		"iss":     s.baseURL,
 		"aud":     "wardseal-mfa-stepup",
 		"tenant":  tenantID,
@@ -2047,6 +2495,35 @@ func (s *authService) generateStepUpToken(tenantID, userID string) (string, erro
 		"exp":     time.Now().Add(5 * time.Minute).Unix(),
 	}
 	return s.signer.Sign(claims)
+}
+
+func (s *authService) ValidateStepUpToken(tokenString string) (*middleware.Claims, error) {
+	token, err := jwt.ParseWithClaims(tokenString, &middleware.Claims{}, func(token *jwt.Token) (interface{}, error) {
+		if token.Method.Alg() != s.signer.Algorithm() {
+			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+		}
+		return s.signer.PublicKey(), nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	if claims, ok := token.Claims.(*middleware.Claims); ok && token.Valid {
+		validAudience := false
+		for _, aud := range claims.Audience {
+			if aud == "wardseal-mfa-stepup" {
+				validAudience = true
+				break
+			}
+		}
+		if !validAudience {
+			return nil, fmt.Errorf("invalid token audience")
+		}
+		return claims, nil
+	}
+
+	return nil, fmt.Errorf("invalid token")
 }
 
 func (s *authService) LoginWithMFAStepUp(ctx context.Context, stepUpToken, totpCode string) (string, error) {
@@ -2065,15 +2542,27 @@ func (s *authService) LoginWithMFAStepUp(ctx context.Context, stepUpToken, totpC
 		return "", fmt.Errorf("invalid token claims")
 	}
 
+	if aud, _ := claims["aud"].(string); aud != "wardseal-mfa-stepup" {
+		return "", fmt.Errorf("invalid token audience")
+	}
+
 	if purpose, _ := claims["purpose"].(string); purpose != "mfa_stepup" {
 		return "", fmt.Errorf("invalid token purpose")
 	}
 
 	userID, _ := claims["sub"].(string)
 	tenantID, _ := claims["tenant"].(string)
+	email, _ := claims["email"].(string)
 
 	if userID == "" || tenantID == "" {
 		return "", fmt.Errorf("missing user or tenant in token")
+	}
+
+	if email != "" && s.loginAttemptStore != nil {
+		locked, lockedUntil, _ := s.loginAttemptStore.IsLocked(ctx, tenantID, email)
+		if locked {
+			return "", fmt.Errorf("account locked due to too many failed MFA attempts. Try again after %s", lockedUntil.Format(time.RFC3339))
+		}
 	}
 
 	// Verify TOTP
@@ -2086,8 +2575,60 @@ func (s *authService) LoginWithMFAStepUp(ctx context.Context, stepUpToken, totpC
 	}
 
 	if !totp.Validate(totpCode, secret.Secret) {
+		if email != "" && s.loginAttemptStore != nil {
+			_ = s.loginAttemptStore.RecordAttempt(ctx, tenantID, email, "", false)
+			failures, _ := s.loginAttemptStore.GetRecentFailures(ctx, tenantID, email)
+			if failures >= MaxFailedAttempts {
+				_ = s.loginAttemptStore.LockAccount(ctx, tenantID, email)
+			}
+		}
 		return "", fmt.Errorf("invalid TOTP code")
 	}
 
+	if email != "" && s.loginAttemptStore != nil {
+		_ = s.loginAttemptStore.RecordAttempt(ctx, tenantID, email, "", true)
+		_ = s.loginAttemptStore.UnlockAccount(ctx, tenantID, email)
+	}
+
 	return s.generateAccessToken(ctx, tenantID, "", "openid profile email", userID)
+}
+
+func (s *authService) GetUserByID(ctx context.Context, tenantID, userID string) (UserProfile, error) {
+	u := fmt.Sprintf("%s/scim/v2/Users/%s", s.directoryServiceURL, userID)
+
+	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
+	if err != nil {
+		return UserProfile{}, err
+	}
+	req.Header.Set(middleware.DefaultTenantHeader, tenantID)
+	if s.serviceAuthToken != "" {
+		req.Header.Set("Authorization", "Bearer "+s.serviceAuthToken)
+	}
+
+	resp, err := s.httpClient.Do(req)
+	if err != nil {
+		return UserProfile{}, err
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		return UserProfile{}, fmt.Errorf("directory service returned status %d", resp.StatusCode)
+	}
+
+	var scimUser struct {
+		ID       string `json:"id"`
+		UserName string `json:"userName"`
+		Name     struct {
+			Formatted string `json:"formatted"`
+		} `json:"name"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&scimUser); err != nil {
+		return UserProfile{}, err
+	}
+
+	return UserProfile{
+		ID:    scimUser.ID,
+		Email: scimUser.UserName,
+		Name:  scimUser.Name.Formatted,
+	}, nil
 }

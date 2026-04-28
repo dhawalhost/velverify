@@ -64,13 +64,13 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
     };
 
     const confirmButtonClass = {
-        danger:  "bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-600/20",
+        danger:  "bg-destructive hover:bg-red-700 text-white shadow-lg shadow-destructive/20",
         warning: "bg-amber-500 hover:bg-amber-600 text-white shadow-lg shadow-amber-500/20",
         default: "bg-primary hover:bg-primary/90 text-white shadow-lg shadow-primary/20",
     }[variant];
 
     const iconColor = {
-        danger:  "text-red-500",
+        danger:  "text-destructive",
         warning: "text-amber-500",
         default: "text-primary",
     }[variant];
@@ -94,7 +94,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
                     </div>
                 </DialogHeader>
 
-                <div className="p-10 bg-white space-y-8">
+                <div className="p-10 bg-card space-y-8">
                     <p className="text-sm font-medium text-on-surface-variant/70 leading-relaxed">
                         {description}
                     </p>
@@ -117,7 +117,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
                         >
                             {loading ? (
                                 <span className="flex items-center gap-2">
-                                    <span className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                    <span className="h-4 w-4 border-2 border-on-inverse/30 border-t-white rounded-full animate-spin" />
                                     Processing…
                                 </span>
                             ) : confirmLabel}

@@ -71,7 +71,7 @@ export const Overlay: React.FC<OverlayProps> = ({
             {/* Card */}
             <div
                 className={cn(
-                    "relative w-full bg-white rounded-[32px] shadow-overlay overflow-hidden flex flex-col animate-scale-in",
+                    "relative w-full bg-card rounded-[32px] shadow-overlay overflow-hidden flex flex-col animate-scale-in",
                     maxWidth,
                     className
                 )}

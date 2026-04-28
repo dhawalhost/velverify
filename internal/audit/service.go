@@ -89,10 +89,12 @@ func (s *service) Query(ctx context.Context, params QueryParams) ([]Event, int, 
 }
 
 func (s *service) Export(ctx context.Context, params QueryParams) ([]Event, error) {
-	// For export, we want a larger limit or no limit.
-	// For MVP, set a high limit like 10,000.
-	params.Limit = 10000
-	params.Offset = 0
+	if params.Limit == 0 {
+		params.Limit = 10000
+	}
+	if params.Limit > 50000 {
+		params.Limit = 50000
+	}
 	events, _, err := s.store.Query(ctx, params)
 	return events, err
 }

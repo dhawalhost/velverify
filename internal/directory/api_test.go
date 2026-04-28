@@ -31,6 +31,7 @@ func TestCreateUserUsesTenantHeader(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/users", body)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set(middleware.DefaultTenantHeader, "22222222-2222-2222-2222-222222222222")
+	req.Header.Set(middleware.DefaultServiceAuthHeader, testServiceToken)
 	resp := httptest.NewRecorder()
 
 	r.ServeHTTP(resp, req)
@@ -276,5 +277,9 @@ func (m *mockDirectoryService) ListUserOrganizations(ctx context.Context, tenant
 }
 
 func (m *mockDirectoryService) ListGroupMembers(ctx context.Context, tenantID, groupID string) ([]User, error) {
+	return nil, nil
+}
+
+func (m *mockDirectoryService) ListUserGroups(ctx context.Context, tenantID, userID string) ([]Group, error) {
 	return nil, nil
 }

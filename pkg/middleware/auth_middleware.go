@@ -34,23 +34,61 @@ func RequireUserAuth(validator TokenValidator) gin.HandlerFunc {
 		tokenString := strings.TrimPrefix(authHeader, "Bearer ")
 		claims, err := validator(tokenString)
 		if err != nil {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid or expired token"})
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": fmt.Sprintf("invalid or expired token: %v", err)})
 			return
 		}
 
 		// Use 'sub' as user_id and 'roles' for RBAC
 		c.Set("user_id", claims.Subject)
 		c.Set("roles", claims.Roles)
+		c.Set("claims", claims)
+
+		// Enforce tenant isolation
+		tenantID, _ := TenantIDFromGinContext(c)
+		if tenantID == "" {
+			// Detect missing TenantExtractor on tenant routes
+			pathTenant := c.Param("tenant")
+			if pathTenant == "" {
+				pathTenant = c.Param("tenant_id")
+			}
+			if pathTenant == "" {
+				pathTenant = c.Query("tenant_id")
+			}
+			if pathTenant == "" {
+				pathTenant = c.Query("tenant")
+			}
+			if pathTenant == "" {
+				pathTenant = c.GetHeader("X-Tenant-ID")
+			}
+			if pathTenant == "" {
+				pathTenant = c.GetHeader("Tenant-ID")
+			}
+			
+			if pathTenant != "" {
+				c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "tenant context unverified"})
+				return
+			}
+		} else {
+			if claims.Tenant == "" || claims.Tenant != tenantID {
+				c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "tenant context mismatch"})
+				return
+			}
+		}
 
 		c.Next()
+
 	}
 }
 
 // Claims represents the JWT claims we care about.
 type Claims struct {
 	jwt.RegisteredClaims
-	Roles []string `json:"roles"`
+	Roles  []string               `json:"roles,omitempty"`
+	Tenant string                 `json:"tenant,omitempty"`
+	Scope  string                 `json:"scope,omitempty"`
+	CNF    map[string]interface{} `json:"cnf,omitempty"`
 }
+
 
 // ValidateToken parses and validates a JWT token string.
 func ValidateToken(tokenString, secret string) (*Claims, error) {
@@ -70,4 +108,35 @@ func ValidateToken(tokenString, secret string) (*Claims, error) {
 	}
 
 	return nil, fmt.Errorf("invalid token")
+}
+
+// RequireScope enforces that the token has the required scope.
+func RequireScope(requiredScope string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		claimsObj, exists := c.Get("claims")
+		if !exists {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "authentication required"})
+			return
+		}
+		claims, ok := claimsObj.(*Claims)
+		if !ok {
+			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "invalid claims type"})
+			return
+		}
+		if !HasScope(claims.Scope, requiredScope) {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "insufficient_scope"})
+			return
+		}
+		c.Next()
+	}
+}
+
+// HasScope checks if the scope string contains the target scope.
+func HasScope(scope, target string) bool {
+	for _, value := range strings.Fields(scope) {
+		if value == target {
+			return true
+		}
+	}
+	return false
 }

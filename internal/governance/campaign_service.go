@@ -23,8 +23,8 @@ type CampaignService interface {
 	AddReviewItem(ctx context.Context, tenantID, campaignID string, item CertificationItem) (CertificationItem, error)
 	ListPendingItems(ctx context.Context, campaignID string) ([]CertificationItem, error)
 	ListReviewItems(ctx context.Context, tenantID, reviewerID string) ([]CertificationItem, error)
-	ApproveItem(ctx context.Context, itemID, comment string) error
-	RevokeItem(ctx context.Context, itemID, comment string) error
+	ApproveItem(ctx context.Context, tenantID, itemID, comment string) error
+	RevokeItem(ctx context.Context, tenantID, itemID, comment string) error
 
 	// Automation
 	GenerateRecertificationCampaign(ctx context.Context, tenantID, name string) error
@@ -137,6 +137,10 @@ func (s *campaignService) CompleteCampaign(ctx context.Context, tenantID, id str
 }
 
 func (s *campaignService) CancelCampaign(ctx context.Context, tenantID, id string) error {
+	_, err := s.store.GetCampaign(ctx, tenantID, id)
+	if err != nil {
+		return err
+	}
 	return s.store.UpdateCampaignStatus(ctx, id, "cancelled")
 }
 
@@ -164,14 +168,24 @@ func (s *campaignService) ListReviewItems(ctx context.Context, tenantID, reviewe
 	return s.store.ListItemsByReviewer(ctx, tenantID, reviewerID)
 }
 
-func (s *campaignService) ApproveItem(ctx context.Context, itemID, comment string) error {
+func (s *campaignService) ApproveItem(ctx context.Context, tenantID, itemID, comment string) error {
+	item, err := s.store.GetItem(ctx, itemID)
+	if err != nil {
+		return fmt.Errorf("failed to get item for approval: %w", err)
+	}
+	if item.TenantID != tenantID {
+		return fmt.Errorf("item does not belong to tenant")
+	}
 	return s.store.UpdateItemDecision(ctx, itemID, "approve", comment)
 }
 
-func (s *campaignService) RevokeItem(ctx context.Context, itemID, comment string) error {
+func (s *campaignService) RevokeItem(ctx context.Context, tenantID, itemID, comment string) error {
 	item, err := s.store.GetItem(ctx, itemID)
 	if err != nil {
 		return fmt.Errorf("failed to get item for revocation: %w", err)
+	}
+	if item.TenantID != tenantID {
+		return fmt.Errorf("item does not belong to tenant")
 	}
 
 	if item.ResourceType == "group" && s.dirClient != nil {
@@ -199,9 +213,23 @@ func (s *campaignService) GenerateRecertificationCampaign(ctx context.Context, t
 		return err
 	}
 
-	// 2. Fetch list of something to review (e.g. all users in the organization)
-	// For MVP, we'll just log and assume items are added via other event hooks
-	// or we could query dirClient here.
+	users, err := s.dirClient.ListUsers(ctx, tenantID)
+	if err != nil {
+		return fmt.Errorf("failed to fetch users for campaign: %w", err)
+	}
+
+	for _, user := range users {
+		item := CertificationItem{
+			UserID:       user.ID,
+			ResourceType: "user_access",
+			ResourceID:   user.ID,
+			ResourceName: user.Email,
+		}
+		_, err := s.AddReviewItem(ctx, tenantID, campaign.ID, item)
+		if err != nil {
+			return fmt.Errorf("failed to add review item for user %s: %w", user.ID, err)
+		}
+	}
 
 	return s.StartCampaign(ctx, tenantID, campaign.ID)
 }

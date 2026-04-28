@@ -15,14 +15,12 @@ WardSeal provides comprehensive authentication capabilities including password-b
 
 ## Password Login
 
-### Basic Login
-
 **Endpoint:** `POST /login`
 
 ```bash
-curl -X POST http://localhost:8080/login \
+curl -X POST http://auth.wardseal.local/login \
   -H "Content-Type: application/json" \
-  -H "X-Tenant-ID: 11111111-1111-1111-1111-111111111111" \
+  -H "X-Tenant-ID: admin-system" \
   -d '{
     "username": "admin@wardseal.com",
     "password": "password123"
@@ -51,9 +49,9 @@ If the user has TOTP enabled, you'll receive:
 Complete the login with the TOTP code:
 
 ```bash
-curl -X POST http://localhost:8080/login/mfa \
+curl -X POST http://auth.wardseal.local/login/mfa \
   -H "Content-Type: application/json" \
-  -H "X-Tenant-ID: 11111111-1111-1111-1111-111111111111" \
+  -H "X-Tenant-ID: admin-system" \
   -d '{
     "pending_token": "eyJhbGciOi...",
     "totp_code": "123456",
@@ -114,39 +112,54 @@ Support for hardware security keys and biometric authentication.
 
 ---
 
-## Social Login
+## Social Login & Identity Federation
 
-WardSeal supports OAuth-based social login providers.
+WardSeal supports Identity Federation, allowing users to sign in via external Identity Providers (IdPs) using standard OIDC/OAuth2.
 
-### Supported Providers
-
-- Google
-- GitHub
-- Microsoft
-- Apple
+### Features
+- **JIT Provisioning**: Automatically creates new user profiles upon first successful external authentication.
+- **Auto-Linking**: Maps external identities to existing local accounts via email verification.
 
 ### Configuration
 
-Configure social providers in the Admin UI under **SSO Config** or via API:
+SSO providers are configured per tenant. Ensure the `X-Tenant-ID` header is provided in all requests.
 
-```bash
-curl -X POST http://localhost:8080/api/v1/social-providers \
-  -H "Content-Type: application/json" \
-  -H "X-Tenant-ID: YOUR_TENANT_ID" \
-  -d '{
-    "provider": "google",
-    "client_id": "YOUR_GOOGLE_CLIENT_ID",
-    "client_secret": "YOUR_GOOGLE_CLIENT_SECRET",
-    "enabled": true
-  }'
+### Authentication Endpoint
+
+`POST /social/login`
+
+Exchanges an authorization code from an external provider for a WardSeal JWT.
+
+#### Request Payload
+
+```json
+{
+  "provider": "google",
+  "code": "auth_code_from_provider",
+  "redirect_uri": "https://app.wardseal.com/callback"
+}
 ```
 
-### Usage
+#### Response Payload (Success)
 
-```javascript
-// Redirect user to:
-window.location = '/oauth2/authorize?provider=google&redirect_uri=...';
+```json
+{
+  "access_token": "eyJhbGci...",
+  "token_type": "Bearer",
+  "expires_in": 3600
+}
 ```
+
+#### Response Payload (MFA Required)
+
+```json
+{
+  "pending_token": "step_up_token_jwt",
+  "error": "mfa_required",
+  "message": "Additional authentication required"
+}
+```
+
 
 ---
 

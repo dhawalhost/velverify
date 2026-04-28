@@ -10,7 +10,7 @@ export const GlassCard = React.forwardRef<HTMLDivElement, React.HTMLAttributes<H
         <Card
             ref={ref}
             className={cn(
-                "border-none bg-white rounded-[32px] overflow-hidden transition-all duration-200 shadow-card",
+                "border-none bg-card/80 backdrop-blur-xl rounded-[32px] overflow-hidden transition-all duration-200 shadow-card ring-1 ring-on-surface/5",
                 className
             )}
             {...props}

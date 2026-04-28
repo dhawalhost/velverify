@@ -8,10 +8,10 @@ const statusBadgeVariants = cva(
   {
     variants: {
       status: {
-        active: "bg-emerald-50 text-emerald-600",
-        suspended: "bg-red-50 text-red-600",
-        pending: "bg-amber-50 text-amber-600",
-        inactive: "bg-gray-100 text-gray-600",
+        active: "bg-success-subtle text-success",
+        suspended: "bg-destructive/10 text-destructive",
+        pending: "bg-warning/10 text-warning",
+        inactive: "bg-surface-container text-on-surface-variant",
         premium: "bg-primary/5 text-primary",
       },
     },

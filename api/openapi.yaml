@@ -7,6 +7,9 @@ info:
     It is used by the admin UI and other internal services to manage
     tenants, users, groups, and other resources.
 
+security:
+  - BearerAuth: []
+
 paths:
   /users:
     post:
@@ -480,7 +483,7 @@ paths:
             application/json:
                 $ref: '#/components/schemas/ErrorResponse'
 
-  /governance/requests:
+  /api/v1/governance/requests:
     get:
       summary: List access requests
       operationId: listAccessRequests
@@ -519,7 +522,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/AccessRequest'
 
-  /governance/requests/{id}/approve:
+  /api/v1/governance/requests/{id}/approve:
     post:
       summary: Approve access request
       operationId: approveAccessRequest
@@ -544,7 +547,7 @@ paths:
         '200':
           description: Request approved
 
-  /governance/requests/{id}/reject:
+  /api/v1/governance/requests/{id}/reject:
     post:
       summary: Reject access request
       operationId: rejectAccessRequest
@@ -569,7 +572,100 @@ paths:
         '200':
           description: Request rejected
 
+  /api/v1/governance/stats:
+    get:
+      summary: Get Governance Stats
+      operationId: getGovStats
+      tags: [Governance]
+      parameters:
+        - $ref: '#/components/parameters/TenantHeader'
+      responses:
+        '200':
+          description: Stats returned
+
+  /api/v1/governance/ip-policies:
+    get:
+      summary: List IP Policies
+      operationId: listIPPolicies
+      tags: [Governance]
+      parameters:
+        - $ref: '#/components/parameters/TenantHeader'
+      responses:
+        '200':
+          description: List of policies
+    post:
+      summary: Create IP Policy
+      operationId: createIPPolicy
+      tags: [Governance]
+      parameters:
+        - $ref: '#/components/parameters/TenantHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                type:
+                  type: string
+                  enum: [allow, block]
+                cidr:
+                  type: string
+                reason:
+                  type: string
+      responses:
+        '201':
+          description: Policy created
+
+  /api/v1/governance/workloads:
+    get:
+      summary: List Workloads
+      operationId: listWorkloads
+      tags: [Governance]
+      parameters:
+        - $ref: '#/components/parameters/TenantHeader'
+      responses:
+        '200':
+          description: List of workloads
+
+  /api/v1/governance/ask:
+    post:
+      summary: Ask AI Copilot
+      operationId: askAI
+      tags: [Governance]
+      parameters:
+        - $ref: '#/components/parameters/TenantHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [question]
+              properties:
+                question:
+                  type: string
+      responses:
+        '200':
+          description: AI response
+
+  /api/v1/campaigns:
+    get:
+      summary: List Campaigns
+      operationId: listCampaigns
+      tags: [Campaigns]
+      parameters:
+        - $ref: '#/components/parameters/TenantHeader'
+      responses:
+        '200':
+          description: List of campaigns
+
 components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
   parameters:
     TenantHeader:
       name: X-Tenant-ID

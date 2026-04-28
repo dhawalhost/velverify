@@ -290,7 +290,7 @@ export const getIPPolicies = async () => {
 
 export const createIPPolicy = async (policy: {
     type: 'allow' | 'block';
-    cidr: string;
+    cidr?: string;
     country?: string;
     reason?: string;
 }) => {
@@ -853,6 +853,12 @@ export const getRelationships = async (query?: {
 }) => {
     const response = await govApi.get('/api/v1/governance/relationships', { params: query });
     return response.data.relationships;
+};
+
+// Security Copilot
+export const askAI = async (question: string) => {
+    const response = await govApi.post('/api/v1/governance/ask', { question });
+    return response.data;
 };
 
 export default api;

@@ -6,15 +6,23 @@ Complete API documentation for WardSeal services.
 
 | Service | Port | Base URL |
 |---------|------|----------|
-| Auth (authsvc) | 8080 | `http://localhost:8080` |
-| Directory (dirsvc) | 8081 | `http://localhost:8081` |
-| Governance (govsvc) | 8082 | `http://localhost:8082` |
+| **Auth Hub** | 8080 | `http://auth.wardseal.local` |
+| **Directory** | 8081 | `http://api.wardseal.local` (via Gateway) |
+| **Governance** | 8082 | `http://api.wardseal.local` (via Gateway) |
 
 ## Authentication
 
 All API requests require:
-- `X-Tenant-ID` header: Your tenant UUID
-- `Authorization` header: `Bearer {token}` or API key
+- `X-Tenant-ID` header: Your tenant UUID (Required for isolation).
+- `Authorization` header: `Bearer {token}`.
+
+### SCIM Bearer Token Strategies
+
+For SCIM and Directory endpoints, WardSeal accepts three token tiers:
+1. **Internal Service Token**: Pre-shared secret for intra-cluster communication.
+2. **JWT Access Tokens**: Decoded via the platform's RSA public key.
+3. **API Keys**: Long-lived secrets verified via prefix lookup and Bcrypt comparison.
+
 
 ---
 

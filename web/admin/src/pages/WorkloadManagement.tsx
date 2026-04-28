@@ -1,39 +1,40 @@
 import React, { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { 
-    Plus, 
-    Server, 
-    Key, 
-    Activity, 
-    Trash2, 
-    Cpu, 
-    Loader2, 
-    ShieldCheck, 
-    Zap, 
+import {
+    Plus,
+    Server,
+    Key,
+    Activity,
+    Trash2,
+    Cpu,
+    Loader2,
+    ShieldCheck,
+    Zap,
     MoreHorizontal,
     Box,
     Terminal,
     Fingerprint,
     X,
-    Database
+    Database,
+    RefreshCcw
 } from 'lucide-react';
 import { getWorkloads, createWorkload } from '../api';
-import { 
-    PageHeader, 
-    GlassCard, 
-    GlassCardHeader, 
-    GlassCardTitle, 
-    GlassCardContent, 
-    GlassTable, 
-    GlassTableHeader, 
-    GlassTableHead, 
+import {
+    PageHeader,
+    GlassCard,
+    GlassCardHeader,
+    GlassCardTitle,
+    GlassCardContent,
+    GlassTable,
+    GlassTableHeader,
+    GlassTableHead,
     GlassTableRow,
-    GlassCardDescription 
+    GlassCardDescription
 } from '@/components/layout';
-import { 
-    TableBody, 
-    TableCell 
+import {
+    TableBody,
+    TableCell
 } from "@/components/ui/table";
 import {
     DropdownMenu,
@@ -56,7 +57,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 const WorkloadManagement: React.FC = () => {
     const [workloads, setWorkloads] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
-    
+
     // Create state
     const [showCreate, setShowCreate] = useState(false);
     const [newName, setNewName] = useState('');
@@ -106,12 +107,12 @@ const WorkloadManagement: React.FC = () => {
     return (
         <div className="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
             <PageHeader
-                icon={<Server className="w-10 h-10 text-primary" />}
-                title="Service node registry"
-                description="Orchestrate non-human identities, machine vectors, and automated agent authentication clusters."
+                icon={<Database className="w-10 h-10 text-primary" />}
+                title="Machine Accounts"
+                description="Manage accounts for services, scripts, and automated systems. Control how machine identities access your infrastructure."
                 actions={
-                    <Button onClick={() => setShowCreate(true)} className="h-11 rounded-xl px-8 font-bold text-sm shadow-sm transition-all hover:scale-[1.02] active:scale-[0.98]">
-                        <Plus className="w-4 h-4 mr-2" /> Initialize workload
+                    <Button onClick={() => setShowCreate(true)} className="h-11 rounded-xl bg-primary text-primary-foreground font-bold tracking-tight text-[11px] px-8 shadow-xl shadow-primary/20 transition-all hover:scale-[1.02] active:scale-[0.98]">
+                        <Plus className="w-4 h-4 mr-3" /> Add Machine Account
                     </Button>
                 }
             />
@@ -119,10 +120,10 @@ const WorkloadManagement: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                 {[
                     { label: 'Cluster capacity', value: workloads.length, icon: <Cpu className="w-5 h-5" />, color: 'bg-primary/5 text-primary' },
-                    { label: 'Active vectors', value: workloads.filter(w => w.status === 'active').length, icon: <Activity className="w-5 h-5" />, color: 'bg-emerald-50 text-emerald-600' },
-                    { label: 'Pending rotations', value: '2', icon: <Zap className="w-5 h-5" />, color: 'bg-amber-50 text-amber-600' },
+                    { label: 'Active vectors', value: workloads.filter(w => w.status === 'active').length, icon: <Activity className="w-5 h-5" />, color: 'bg-success-subtle text-success' },
+                    { label: 'Pending rotations', value: workloads.filter(w => w.status === 'rotated').length, icon: <Zap className="w-5 h-5" />, color: 'bg-amber-50 text-amber-600' },
                 ].map((stat) => (
-                    <GlassCard key={stat.label} className="border-none shadow-xl shadow-on-surface/5 bg-white overflow-hidden rounded-[24px]">
+                    <GlassCard key={stat.label} className="border-none shadow-xl shadow-on-surface/5 bg-card overflow-hidden rounded-[24px]">
                         <GlassCardContent className="p-8">
                             <div className="flex items-center justify-between">
                                 <div className="space-y-3">
@@ -138,16 +139,16 @@ const WorkloadManagement: React.FC = () => {
                 ))}
             </div>
 
-            <GlassCard className="overflow-hidden border-none shadow-2xl shadow-on-surface/5 bg-white rounded-[32px]">
+            <GlassCard className="overflow-hidden border-none shadow-2xl shadow-on-surface/5 bg-card rounded-[32px]">
                 <GlassCardHeader className="py-10 px-10 border-b border-on-surface/5 bg-surface-container/5">
                     <div className="flex items-center gap-6">
                         <div className="p-4 bg-primary/5 rounded-2xl text-primary">
                             <ShieldCheck className="w-7 h-7" />
                         </div>
                         <div>
-                            <GlassCardTitle className="text-2xl font-bold tracking-tight text-on-surface">Workload inventory</GlassCardTitle>
-                            <p className="text-on-surface-variant/60 font-medium text-[11px] mt-1.5 italic">
-                                Deterministic identities in active execution
+                            <GlassCardTitle className="text-2xl font-bold tracking-tight text-on-surface">Account List</GlassCardTitle>
+                            <p className="text-on-surface-variant/40 font-bold text-[12px] mt-1 tracking-tight">
+                                {workloads.length} Managed Accounts
                             </p>
                         </div>
                     </div>
@@ -157,10 +158,10 @@ const WorkloadManagement: React.FC = () => {
                         <GlassTable>
                             <GlassTableHeader>
                                 <GlassTableRow className="hover:bg-transparent border-b border-on-surface/5">
-                                    <GlassTableHead className="py-6 pl-10 font-bold text-[12px] tracking-tight text-on-surface-variant/40">Node identity</GlassTableHead>
-                                    <GlassTableHead className="font-bold text-[12px] tracking-tight text-on-surface-variant/40">Service handle</GlassTableHead>
-                                    <GlassTableHead className="font-bold text-[12px] tracking-tight text-on-surface-variant/40">Status</GlassTableHead>
-                                    <GlassTableHead className="font-bold text-[12px] tracking-tight text-on-surface-variant/40">Telemetry</GlassTableHead>
+                                    <GlassTableHead className="py-6 pl-10 font-bold text-[12px] tracking-tight text-on-surface-variant/40">Name</GlassTableHead>
+                                    <GlassTableHead className="font-bold text-[12px] tracking-tight text-on-surface-variant/40">Account ID</GlassTableHead>
+                                    <GlassTableHead className="font-bold text-[12px] tracking-tight text-on-surface-variant/40">Created</GlassTableHead>
+                                    <GlassTableHead className="text-right font-bold text-[12px] tracking-tight text-on-surface-variant/40 pr-10">Actions</GlassTableHead>
                                     <GlassTableHead className="text-right pr-10 font-bold text-[12px] tracking-tight text-on-surface-variant/40">Directives</GlassTableHead>
                                 </GlassTableRow>
                             </GlassTableHeader>
@@ -193,14 +194,14 @@ const WorkloadManagement: React.FC = () => {
                                                 </div>
                                             </TableCell>
                                             <TableCell className="py-8">
-                                                <Badge className="bg-white ring-1 ring-on-surface/5 text-on-surface-variant border-none rounded-xl text-[10px] font-bold py-1.5 px-4 group-hover:ring-primary/20 transition-all tracking-tight italic">
+                                                <Badge className="bg-card ring-1 ring-on-surface/5 text-on-surface-variant border-none rounded-xl text-[10px] font-bold py-1.5 px-4 group-hover:ring-primary/20 transition-all tracking-tight italic">
                                                     {w.service_handle}
                                                 </Badge>
                                             </TableCell>
                                             <TableCell className="py-8">
                                                 <div className="flex items-center gap-3">
-                                                    <div className={`h-2 w-2 rounded-full ${w.status === 'active' ? 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.4)]' : 'bg-on-surface-variant/20'}`} />
-                                                    <span className={`text-[11px] font-bold tracking-tight ${w.status === 'active' ? 'text-emerald-600' : 'text-on-surface-variant/40'}`}>
+                                                    <div className={`h-2 w-2 rounded-full ${w.status === 'active' ? 'bg-success shadow-[0_0_10px_rgba(16,185,129,0.4)]' : 'bg-on-surface-variant/20'}`} />
+                                                    <span className={`text-[11px] font-bold tracking-tight ${w.status === 'active' ? 'text-success' : 'text-on-surface-variant/40'}`}>
                                                         {w.status === 'active' ? 'Operational' : 'Dormant'}
                                                     </span>
                                                 </div>
@@ -218,16 +219,15 @@ const WorkloadManagement: React.FC = () => {
                                                             <MoreHorizontal className="h-5 w-5 text-on-surface-variant/60" />
                                                         </Button>
                                                     </DropdownMenuTrigger>
-                                                    <DropdownMenuContent align="end" className="w-[200px] rounded-2xl border-none shadow-2xl shadow-on-surface/10 p-2 bg-white">
-                                                        <DropdownMenuItem className="font-bold text-xs gap-3 py-3.5 px-4 cursor-pointer rounded-xl focus:bg-primary/5 focus:text-primary transition-colors">
-                                                            <Key className="w-4 h-4 opacity-50" />
-                                                            Rotate secret
+                                                    <DropdownMenuContent align="end" className="w-[200px] rounded-2xl border-none shadow-2xl shadow-on-surface/10 p-2 bg-card">
+                                                        <DropdownMenuItem className="font-bold text-[11px] tracking-tight gap-3 py-3 px-4 rounded-lg focus:bg-primary/5 focus:text-primary cursor-pointer transition-colors">
+                                                            <RefreshCcw className="w-3.5 h-3.5 opacity-40" /> Reset Key
                                                         </DropdownMenuItem>
                                                         <DropdownMenuItem className="font-bold text-xs gap-3 py-3.5 px-4 cursor-pointer rounded-xl focus:bg-primary/5 focus:text-primary transition-colors">
                                                             <Activity className="w-4 h-4 opacity-50" />
                                                             View insights
                                                         </DropdownMenuItem>
-                                                        <DropdownMenuItem className="text-red-500 font-bold text-xs gap-3 py-3.5 px-4 cursor-pointer rounded-xl focus:bg-red-50 focus:text-red-600 transition-colors">
+                                                        <DropdownMenuItem className="text-destructive font-bold text-xs gap-3 py-3.5 px-4 cursor-pointer rounded-xl focus:bg-destructive/10 focus:text-destructive transition-colors">
                                                             <Trash2 className="w-4 h-4" />
                                                             Decommission
                                                         </DropdownMenuItem>
@@ -251,25 +251,25 @@ const WorkloadManagement: React.FC = () => {
                                 <Plus className="w-7 h-7" />
                             </div>
                             <div>
-                                <DialogTitle className="text-3xl font-bold tracking-tight text-on-surface">Initialize workload</DialogTitle>
-                                <DialogDescription className="text-on-surface-variant/60 font-medium text-[11px] mt-2 italic">
-                                    Specializing machine identity for cluster operations
+                                <DialogTitle className="text-3xl font-bold tracking-tight">Create Machine Account</DialogTitle>
+                                <DialogDescription className="text-on-surface-variant/60 font-medium text-[11px] mt-2">
+                                    Add a new identity for an automated service or workload.
                                 </DialogDescription>
                             </div>
                         </div>
                     </DialogHeader>
-                    <form onSubmit={handleCreateWorkload} className="p-10 space-y-8 bg-white">
+                    <form onSubmit={handleCreateWorkload} className="p-10 space-y-8 bg-card">
                         {error && (
-                            <Alert variant="destructive" className="rounded-2xl border-none bg-red-50 text-red-600 animate-in slide-in-from-top-2">
+                            <Alert variant="destructive" className="rounded-2xl border-none bg-destructive/10 text-destructive animate-in slide-in-from-top-2">
                                 <AlertDescription className="font-bold text-xs tracking-tight flex items-center gap-3">
                                     <Fingerprint className="w-4 h-4" />
                                     Collision alert: {error}
                                 </AlertDescription>
                             </Alert>
                         )}
-                        
-                        <div className="space-y-4">
-                            <Label className="text-[12px] font-bold tracking-tight text-on-surface-variant/40 ml-1">Workload designation</Label>
+
+                        <div className="space-y-2.5">
+                            <Label className="text-[12px] font-bold tracking-tight text-on-surface-variant/40 ml-1">Name</Label>
                             <Input
                                 value={newName}
                                 onChange={e => setNewName(e.target.value)}
@@ -294,8 +294,8 @@ const WorkloadManagement: React.FC = () => {
                             <Button type="button" variant="ghost" onClick={() => setShowCreate(false)} className="h-14 px-8 rounded-2xl font-bold text-[12px] hover:bg-surface-container/20">
                                 Abort
                             </Button>
-                            <Button type="submit" disabled={isCreating} className="flex-1 h-14 rounded-2xl font-bold tracking-tight text-[12px] shadow-xl shadow-primary/20 transition-all">
-                                {isCreating ? <Loader2 className="h-5 w-5 animate-spin" /> : 'Finalize initialization'}
+                            <Button type="submit" disabled={isCreating} className="w-full h-12 rounded-xl font-bold text-sm shadow-md shadow-primary/10">
+                                {isCreating ? <Loader2 className="h-5 w-5 animate-spin" /> : 'Create Account'}
                             </Button>
                         </DialogFooter>
                     </form>

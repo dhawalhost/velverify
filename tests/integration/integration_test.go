@@ -75,7 +75,7 @@ func SetupTestEnv(t *testing.T) *TestEnv {
 	env := &TestEnv{
 		DB:            db,
 		Logger:        logger,
-		TestTenantID:  "11111111-1111-1111-1111-111111111111",
+		TestTenantID:  "admin-system",
 		TestUserEmail: "test@wardseal.com",
 	}
 

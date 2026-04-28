@@ -97,6 +97,7 @@ func (s *Service) CreateUser(ctx context.Context, tenantID string, req User) (Us
 		})
 	}
 
+	req.Password = ""
 	return req, nil
 }
 
@@ -115,6 +116,15 @@ func (s *Service) GetUser(ctx context.Context, tenantID, id string) (User, error
 		return User{}, fmt.Errorf("failed to get user: %w", err)
 	}
 
+	groups, _ := s.dirSvc.ListUserGroups(ctx, tenantID, id)
+	scimGroups := make([]GroupRef, 0, len(groups))
+	for _, g := range groups {
+		scimGroups = append(scimGroups, GroupRef{
+			Value:   g.ID,
+			Display: g.Name,
+		})
+	}
+
 	return User{
 		Schemas:  []string{UserSchema},
 		ID:       u.ID,
@@ -123,6 +133,7 @@ func (s *Service) GetUser(ctx context.Context, tenantID, id string) (User, error
 		Emails: []Email{
 			{Value: u.Email, Type: "work", Primary: true},
 		},
+		Groups: scimGroups,
 		Meta: Meta{
 			ResourceType: "User",
 			Created:      u.CreatedAt.Format(time.RFC3339),
@@ -156,7 +167,7 @@ func (s *Service) ListUsers(ctx context.Context, tenantID, filter string, startI
 					Resources:    []interface{}{},
 				}, err
 			}
-			scimUser := s.mapToSCIMUser(u)
+			scimUser := s.mapToSCIMUser(ctx, tenantID, u)
 			return ListResponse{
 				Schemas:      []string{ListSchema},
 				TotalResults: 1,
@@ -175,7 +186,7 @@ func (s *Service) ListUsers(ctx context.Context, tenantID, filter string, startI
 	// Convert to SCIM Users
 	resources := make([]interface{}, 0, len(users))
 	for _, u := range users {
-		resources = append(resources, s.mapToSCIMUser(u))
+		resources = append(resources, s.mapToSCIMUser(ctx, tenantID, u))
 	}
 
 	return ListResponse{
@@ -197,7 +208,16 @@ func parseFilter(filter string) (string, string, bool) {
 	return "", "", false
 }
 
-func (s *Service) mapToSCIMUser(u directory.User) User {
+func (s *Service) mapToSCIMUser(ctx context.Context, tenantID string, u directory.User) User {
+	groups, _ := s.dirSvc.ListUserGroups(ctx, tenantID, u.ID)
+	scimGroups := make([]GroupRef, 0, len(groups))
+	for _, g := range groups {
+		scimGroups = append(scimGroups, GroupRef{
+			Value:   g.ID,
+			Display: g.Name,
+		})
+	}
+
 	return User{
 		Schemas:  []string{UserSchema},
 		ID:       u.ID,
@@ -206,6 +226,7 @@ func (s *Service) mapToSCIMUser(u directory.User) User {
 		Emails: []Email{
 			{Value: u.Email, Type: "work", Primary: true},
 		},
+		Groups: scimGroups,
 		Meta: Meta{
 			ResourceType: "User",
 			Created:      u.CreatedAt.Format(time.RFC3339),

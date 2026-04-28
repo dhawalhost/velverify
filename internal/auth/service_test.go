@@ -23,7 +23,7 @@ func TestAuthorizationCodePkceFlow(t *testing.T) {
 	verifier := "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNO1234567890abcd"
 	challenge := pkceChallenge(verifier)
 
-	ctx := contextWithTenant(t, "11111111-1111-1111-1111-111111111111")
+	ctx := contextWithTenant(t, "admin-system")
 
 	authResp, err := as.Authorize(ctx, "", AuthorizeRequest{
 		ResponseType:        "code",
@@ -60,7 +60,7 @@ func TestTokenFailsWithInvalidVerifier(t *testing.T) {
 
 	verifier := "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNO1234567890abcd"
 	challenge := pkceChallenge(verifier)
-	ctx := contextWithTenant(t, "11111111-1111-1111-1111-111111111111")
+	ctx := contextWithTenant(t, "admin-system")
 
 	authResp, err := as.Authorize(ctx, "", AuthorizeRequest{
 		ResponseType:        "code",
@@ -89,7 +89,7 @@ func TestTokenFailsWithInvalidVerifier(t *testing.T) {
 
 func TestAuthorizeRejectsUnknownClient(t *testing.T) {
 	as := newTestService(t)
-	ctx := contextWithTenant(t, "11111111-1111-1111-1111-111111111111")
+	ctx := contextWithTenant(t, "admin-system")
 	_, err := as.Authorize(ctx, "", AuthorizeRequest{
 		ResponseType:        "code",
 		ClientID:            "unknown",
@@ -105,7 +105,7 @@ func TestAuthorizeRejectsUnknownClient(t *testing.T) {
 
 func TestAuthorizeRejectsInvalidRedirect(t *testing.T) {
 	as := newTestService(t)
-	ctx := contextWithTenant(t, "11111111-1111-1111-1111-111111111111")
+	ctx := contextWithTenant(t, "admin-system")
 	_, err := as.Authorize(ctx, "", AuthorizeRequest{
 		ResponseType:        "code",
 		ClientID:            "test-client",
@@ -121,7 +121,7 @@ func TestAuthorizeRejectsInvalidRedirect(t *testing.T) {
 
 func TestAuthorizeRejectsInvalidScope(t *testing.T) {
 	as := newTestService(t)
-	ctx := contextWithTenant(t, "11111111-1111-1111-1111-111111111111")
+	ctx := contextWithTenant(t, "admin-system")
 	_, err := as.Authorize(ctx, "", AuthorizeRequest{
 		ResponseType:        "code",
 		ClientID:            "test-client",
@@ -164,7 +164,11 @@ func contextWithTenant(t *testing.T, tenant string) context.Context {
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set(middleware.DefaultTenantHeader, tenant)
 	c.Request = req
-	middleware.TenantExtractor(middleware.TenantConfig{})(c)
+	middleware.TenantExtractor(middleware.TenantConfig{
+		SlugResolver: func(ctx context.Context, slug string) (string, error) {
+			return slug, nil
+		},
+	})(c)
 	if c.IsAborted() {
 		t.Fatalf("tenant extractor aborted request")
 	}
@@ -180,7 +184,7 @@ func newTestService(t *testing.T) *authService {
 		Clients: []ClientConfig{
 			{
 				ID:            "test-client",
-				TenantID:      "11111111-1111-1111-1111-111111111111",
+				TenantID:      "admin-system",
 				Name:          "Test Client",
 				RedirectURIs:  []string{"https://app.wardseal.com/callback"},
 				AllowedScopes: []string{"openid", "profile"},

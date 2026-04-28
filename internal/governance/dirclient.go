@@ -23,11 +23,20 @@ type DirectoryClient interface {
 	AddUserToOrganization(ctx context.Context, tenantID, userID, orgID, role string) error
 	RemoveUserFromOrganization(ctx context.Context, tenantID, userID, orgID string) error
 	ListUserOrganizations(ctx context.Context, tenantID, userID string) ([]string, error)
+
+	// List methods
+	ListUsers(ctx context.Context, tenantID string) ([]User, error)
+	ListGroups(ctx context.Context, tenantID string) ([]Group, error)
 }
 
 type User struct {
 	ID    string `json:"id"`
 	Email string `json:"email"`
+}
+
+type Group struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
 }
 
 type directoryHTTPClient struct {
@@ -263,4 +272,60 @@ func (c *directoryHTTPClient) GetUserByID(ctx context.Context, tenantID, userID 
 	})
 
 	return user, err
+}
+
+func (c *directoryHTTPClient) ListUsers(ctx context.Context, tenantID string) ([]User, error) {
+	url := fmt.Sprintf("%s/users", c.baseURL)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("X-Tenant-ID", tenantID)
+	if c.authToken != "" {
+		req.Header.Set(c.authHeader, c.authToken)
+	}
+
+	var res struct {
+		Users []User `json:"users"`
+	}
+	err = c.cb.Execute(func() error {
+		resp, err := c.httpClient.Do(req)
+		if err != nil {
+			return err
+		}
+		defer func() { _ = resp.Body.Close() }()
+		if resp.StatusCode != http.StatusOK {
+			return fmt.Errorf("dirsvc returned status %d", resp.StatusCode)
+		}
+		return json.NewDecoder(resp.Body).Decode(&res)
+	})
+	return res.Users, err
+}
+
+func (c *directoryHTTPClient) ListGroups(ctx context.Context, tenantID string) ([]Group, error) {
+	url := fmt.Sprintf("%s/groups", c.baseURL)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("X-Tenant-ID", tenantID)
+	if c.authToken != "" {
+		req.Header.Set(c.authHeader, c.authToken)
+	}
+
+	var res struct {
+		Groups []Group `json:"groups"`
+	}
+	err = c.cb.Execute(func() error {
+		resp, err := c.httpClient.Do(req)
+		if err != nil {
+			return err
+		}
+		defer func() { _ = resp.Body.Close() }()
+		if resp.StatusCode != http.StatusOK {
+			return fmt.Errorf("dirsvc returned status %d", resp.StatusCode)
+		}
+		return json.NewDecoder(resp.Body).Decode(&res)
+	})
+	return res.Groups, err
 }

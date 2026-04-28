@@ -8,43 +8,60 @@
    ───────────────────────────────────────────── */
 @layer base {
   :root {
-    /* ── shadcn base ── */
-    --background: 210 40% 99%;
-    --foreground: 222.2 47.4% 11.2%;
+    /* ── Surface system (based on DESIGN.md) ── */
+    --background: 255 60% 99%;
+    --foreground: 240 12% 12%;
 
+    --surface: 255 60% 99%;
+    --surface-dim: 255 12% 87%;
+    --surface-bright: 255 60% 99%;
+
+    --surface-container-lowest: 0 0% 100%;
+    --surface-container-low: 255 80% 97%;
+    --surface-container: 255 35% 95%;
+    --surface-container-high: 255 25% 93%;
+    --surface-container-highest: 255 18% 91%;
+
+    --on-surface: 240 12% 12%;
+    --on-surface-variant: 245 10% 30%;
+
+    --outline: 248 6% 50%;
+    --outline-variant: 250 15% 81%;
+
+    /* ── Brand colors ── */
+    --primary: 248 80% 39%;
+    --on-primary: 0 0% 100%;
+    --primary-container: 243 56% 51%;
+    --on-primary-container: 242 100% 87%;
+
+    --secondary: 217 19% 39%;
+    --on-secondary: 0 0% 100%;
+    --secondary-container: 215 88% 90%;
+    --on-secondary-container: 215 18% 41%;
+
+    /* ── shadcn & common tokens ── */
     --card: 0 0% 100%;
-    --card-foreground: 222.2 47.4% 11.2%;
+    --card-foreground: 240 12% 12%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 47.4% 11.2%;
-
-    --primary: 243 75% 59%;
-    --primary-foreground: 210 40% 98%;
-
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    --popover-foreground: 240 12% 12%;
 
     --muted: 210 40% 96.1%;
     --muted-foreground: 215.4 16.3% 46.9%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --accent: 255 35% 95%;
+    --accent-foreground: 240 12% 12%;
 
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 243 75% 59%;
+    --border: 250 15% 81%;
+    /* matches outline-variant */
+    --input: 250 15% 81%;
+    --ring: 248 80% 39%;
 
-    /* ── radius scale ── */
-    --radius: 12px;
-    --radius-sm: 8px;
-    --radius-md: 12px;
-    --radius-lg: 16px;
-    --radius-xl: 24px;
-    --radius-2xl: 32px;
-    --radius-overlay: 40px;
+    --surface-inverse: 240 12% 12%;
+    --on-surface-inverse: 0 0% 100%;
 
     /* ── semantic state colors ── */
     --success: 152 69% 31%;
@@ -55,79 +72,85 @@
     --warning-foreground: 0 0% 100%;
     --warning-subtle: 48 100% 96%;
 
-    --error: 0 84% 60%;
+    --error: 0 75% 41%;
     --error-foreground: 0 0% 100%;
     --error-subtle: 0 86% 97%;
 
-    --info: 217 91% 55%;
-    --info-foreground: 0 0% 100%;
-    --info-subtle: 214 100% 97%;
-
-    /* ── shadow tokens (as raw values for use with box-shadow) ── */
-    --shadow-xs:   0 1px 2px 0 rgb(0 0 0 / 0.04);
-    --shadow-sm:   0 4px 16px -4px rgb(0 0 0 / 0.06);
+    /* ── shadow tokens ── */
+    --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.04);
+    --shadow-sm: 0 4px 16px -4px rgb(0 0 0 / 0.06);
     --shadow-card: 0 8px 32px -8px rgb(0 0 0 / 0.08);
     --shadow-overlay: 0 24px 64px -12px rgb(0 0 0 / 0.14);
 
-    /* ── typography scale ── */
+    /* ── scale ── */
+    --radius: 12px;
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --radius-lg: 16px;
+    --radius-xl: 24px;
+
+    --space-page: 40px;
+    --space-section: 32px;
+    --space-card: 24px;
+
     --font-display: 'Inter', system-ui, sans-serif;
-    --font-mono: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
-
-    --text-label: 11px;
-    --text-detail: 10px;
-    --text-body-sm: 12px;
-    --text-body: 14px;
-    --text-heading-sm: 16px;
-    --text-heading: 20px;
-    --text-title: 24px;
-    --text-hero: 32px;
-
-    --tracking-label: -0.01em;
-    --tracking-tight: -0.02em;
-
-    /* ── spacing scale (supplement Tailwind's default) ── */
-    --space-page: 40px;      /* outer page padding */
-    --space-section: 32px;   /* between page sections */
-    --space-card: 24px;      /* card internal padding */
-    --space-row: 24px;       /* table row vertical padding */
   }
 
   .dark {
-    --background: 240 12% 12%;
-    --foreground: 260 100% 99%;
+    /* ── Surface system (Dark Modernist) ── */
+    --background: 240 12% 10%;
+    --foreground: 255 60% 99%;
+
+    --surface: 240 12% 10%;
+    --surface-dim: 240 12% 6%;
+    --surface-bright: 240 12% 15%;
+
+    --surface-container-lowest: 240 25% 4%;
+    --surface-container-low: 240 12% 8%;
+    --surface-container: 240 12% 10%;
+    --surface-container-high: 240 11% 14%;
+    --surface-container-highest: 240 10% 18%;
+
+    --on-surface: 255 60% 99%;
+    --on-surface-variant: 250 15% 81%;
+
+    --outline: 245 10% 25%;
+    --outline-variant: 245 10% 20%;
+
+    /* ── Dark Brand colors ── */
+    --primary: 243 100% 88%;
+    --on-primary: 249 100% 21%;
+    --primary-container: 243 56% 41%;
+    --on-primary-container: 242 100% 92%;
+
+    --secondary: 217 19% 75%;
+    --on-secondary: 217 19% 15%;
 
     --card: 240 12% 16%;
-    --card-foreground: 260 100% 99%;
+    --card-foreground: 255 60% 99%;
 
-    --popover: 240 12% 16%;
-    --popover-foreground: 260 100% 99%;
+    --popover: 240 12% 12%;
+    --popover-foreground: 255 60% 99%;
 
-    --primary: 248 80% 65%;
-    --primary-foreground: 210 40% 98%;
+    --muted: 240 12% 18%;
+    --muted-foreground: 240 10% 65%;
 
-    --secondary: 215 16% 47%;
-    --secondary-foreground: 210 40% 98%;
+    --accent: 240 12% 18%;
+    --accent-foreground: 255 60% 99%;
 
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
+    --border: 245 10% 20%;
+    --input: 245 10% 20%;
+    --ring: 243 100% 88%;
 
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-
-    --border: 217.2 32.6% 20%;
-    --input: 217.2 32.6% 20%;
-    --ring: 212.7 26.8% 83.9%;
+    --surface-inverse: 255 100% 100%;
+    --on-surface-inverse: 240 12% 10%;
 
     --success-subtle: 145 40% 14%;
     --warning-subtle: 48 60% 12%;
     --error-subtle: 0 50% 14%;
-    --info-subtle: 214 60% 14%;
 
-    --shadow-card: 0 8px 32px -8px rgb(0 0 0 / 0.3);
-    --shadow-overlay: 0 24px 64px -12px rgb(0 0 0 / 0.5);
+    --shadow-card: 0 8px 32px -8px rgb(0 0 0 / 0.4);
+    --shadow-overlay: 0 24px 64px -12px rgb(0 0 0 / 0.6);
   }
 }
 
@@ -139,10 +162,11 @@
   body {
     @apply bg-background text-foreground;
     font-family: var(--font-display);
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    -webkit-font-smoothing: antialiased;
   }
 }
 
-/* ─── Custom scrollbar (reusable utility class) ─── */
 @layer utilities {
   .custom-scrollbar {
     scrollbar-width: thin;
@@ -154,42 +178,16 @@
     height: 4px;
   }
 
-  .custom-scrollbar::-webkit-scrollbar-track {
-    background: transparent;
-  }
-
   .custom-scrollbar::-webkit-scrollbar-thumb {
     background-color: hsl(var(--border));
     border-radius: 999px;
   }
 
-  .custom-scrollbar-dark {
-    scrollbar-width: thin;
-    scrollbar-color: rgba(255,255,255,0.1) transparent;
+  .glass-card {
+    @apply relative overflow-hidden rounded-[var(--radius)] border bg-white/70 backdrop-blur-xl dark:bg-black/40 dark:border-white/5;
   }
 
-  .custom-scrollbar-dark::-webkit-scrollbar {
-    width: 4px;
-  }
-
-  .custom-scrollbar-dark::-webkit-scrollbar-thumb {
-    background-color: rgba(255,255,255,0.12);
-    border-radius: 999px;
-  }
-
-  /* Scale-in animation for cards/modals */
-  .scale-in-center {
-    animation: scaleInCenter 0.2s ease-out;
-  }
-
-  @keyframes scaleInCenter {
-    from {
-      opacity: 0;
-      transform: scale(0.96);
-    }
-    to {
-      opacity: 1;
-      transform: scale(1);
-    }
+  .glass-header {
+    @apply bg-white/40 backdrop-blur-md dark:bg-black/20;
   }
 }

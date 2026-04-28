@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { getPolicies, createPolicy, Policy } from '../api';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -19,7 +20,8 @@ import {
     Zap,
     ExternalLink,
     Terminal,
-    Binary
+    Binary,
+    ArrowUpRight
 } from 'lucide-react';
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
@@ -29,6 +31,7 @@ import { PageHeader, GlassCard, GlassCardHeader, GlassCardTitle, GlassCardConten
 import { TableBody, TableCell } from '@/components/ui/table';
 
 const Policies: React.FC = () => {
+    const navigate = useNavigate();
     const [policies, setPolicies] = useState<Policy[]>([]);
     const [loading, setLoading] = useState(true);
     const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -93,32 +96,27 @@ const Policies: React.FC = () => {
     return (
         <div className="max-w-6xl mx-auto space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-700 py-12">
             <PageHeader
-                icon={<ShieldCheck className="w-12 h-12 text-primary" />}
+                icon={<ShieldCheck className="w-10 h-10 text-primary" />}
                 title="Security Policies"
-                description="Configure granular access control and governance constraints. Orchestrate enforcement logic across the organizational perimeter."
+                description="Define security rules for your organization. Control access to resources and data."
                 actions={
-                    !isCreateOpen && (
-                        <Button 
-                            onClick={() => setIsCreateOpen(true)}
-                            className="h-14 rounded-2xl font-bold text-sm shadow-2xl shadow-primary/30 transition-all hover:scale-[1.02] active:scale-[0.98] px-10"
-                        >
-                            <Plus className="w-4 h-4 mr-3" /> Initialize policy rule
-                        </Button>
-                    )
+                    <Button onClick={() => setIsCreateOpen(true)} className="h-11 rounded-xl bg-primary text-primary-foreground font-bold tracking-tight text-[11px] px-8 shadow-xl shadow-primary/20 transition-all hover:scale-[1.02] active:scale-[0.98]">
+                        <Plus className="w-4 h-4 mr-3" /> Create Policy
+                    </Button>
                 }
             />
 
             {message && (
                 <Alert variant={message.type === 'error' ? 'destructive' : 'default'} className="rounded-2xl border-none bg-surface-container/50 backdrop-blur-md">
                     <AlertDescription className="font-bold text-xs tracking-tight flex items-center gap-3">
-                        {message.type === 'error' ? <ShieldAlert className="w-4 h-4 text-red-500" /> : <ShieldCheck className="w-4 h-4 text-emerald-500" />}
+                        {message.type === 'error' ? <ShieldAlert className="w-4 h-4 text-destructive" /> : <ShieldCheck className="w-4 h-4 text-success" />}
                         {message.text}
                     </AlertDescription>
                 </Alert>
             )}
 
             {isCreateOpen && (
-                <GlassCard className="border-none shadow-2xl shadow-on-surface/10 bg-white overflow-hidden rounded-[40px] animate-in slide-in-from-top-12 duration-700">
+                <GlassCard className="border-none shadow-2xl shadow-on-surface/10 bg-card overflow-hidden rounded-[40px] animate-in slide-in-from-top-12 duration-700">
                     <GlassCardHeader className="py-12 px-10 border-b border-on-surface/5 bg-surface-container/10">
                         <div className="flex justify-between items-center">
                             <div className="flex items-center gap-8">
@@ -130,7 +128,7 @@ const Policies: React.FC = () => {
                                     <p className="text-on-surface-variant/40 font-bold text-[12px] mt-1 tracking-tight italic">Architectural perimeter definition protocol</p>
                                 </div>
                             </div>
-                            <Button variant="ghost" size="icon" onClick={() => setIsCreateOpen(false)} className="rounded-[20px] h-12 w-12 hover:bg-red-50 hover:text-red-500 transition-all">
+                            <Button variant="ghost" size="icon" onClick={() => setIsCreateOpen(false)} className="rounded-[20px] h-12 w-12 hover:bg-destructive/10 hover:text-destructive transition-all">
                                 <X className="w-6 h-6" />
                             </Button>
                         </div>
@@ -181,15 +179,17 @@ const Policies: React.FC = () => {
                 </GlassCard>
             )}
 
-            <GlassCard className="border-none shadow-2xl shadow-on-surface/5 bg-white overflow-hidden rounded-[40px]">
+            <GlassCard className="border-none shadow-2xl shadow-on-surface/5 bg-card overflow-hidden rounded-[40px]">
                 <GlassCardHeader className="py-10 px-10 border-b border-on-surface/5 bg-surface-container/5">
                     <div className="flex items-center gap-6">
                         <div className="p-4 bg-primary/10 rounded-2xl text-primary">
                             <Zap className="w-7 h-7" />
                         </div>
                         <div>
-                            <GlassCardTitle className="text-3xl font-bold tracking-tight text-on-surface">Policy registry</GlassCardTitle>
-                            <p className="text-on-surface-variant/40 font-bold text-[12px] mt-1 tracking-tight italic">Verified structural constraints ({policies.length}) enforcing organizational security</p>
+                            <GlassCardTitle className="text-2xl font-bold tracking-tight text-on-surface">Policy List</GlassCardTitle>
+                            <p className="text-on-surface-variant/40 font-bold text-[12px] mt-1 tracking-tight">
+                                {policies.length} Active Policies
+                            </p>
                         </div>
                     </div>
                 </GlassCardHeader>
@@ -198,11 +198,11 @@ const Policies: React.FC = () => {
                         <GlassTable>
                             <GlassTableHeader>
                                 <GlassTableRow className="hover:bg-transparent border-b border-on-surface/5">
-                                    <GlassTableHead className="py-8 pl-10 font-bold text-[12px] tracking-tight text-on-surface-variant/40">Rule identity</GlassTableHead>
-                                    <GlassTableHead className="font-bold text-[12px] tracking-tight text-on-surface-variant/40">Engine kernel</GlassTableHead>
+                                    <GlassTableHead className="py-6 pl-10 font-bold text-[12px] tracking-tight text-on-surface-variant/40">Policy Name</GlassTableHead>
+                                    <GlassTableHead className="font-bold text-[12px] tracking-tight text-on-surface-variant/40">Rules</GlassTableHead>
                                     <GlassTableHead className="text-center font-bold text-[12px] tracking-tight text-on-surface-variant/40">Enforcement state</GlassTableHead>
-                                    <GlassTableHead className="font-bold text-[12px] tracking-tight text-on-surface-variant/40">Sync stamp</GlassTableHead>
-                                    <GlassTableHead className="text-right font-bold text-[12px] tracking-tight text-on-surface-variant/40 pr-10">Directives</GlassTableHead>
+                                    <GlassTableHead className="font-bold text-[12px] tracking-tight text-on-surface-variant/40">Created</GlassTableHead>
+                                    <GlassTableHead className="text-right font-bold text-[12px] tracking-tight text-on-surface-variant/40 pr-10">Actions</GlassTableHead>
                                 </GlassTableRow>
                             </GlassTableHeader>
                             <TableBody>
@@ -236,7 +236,7 @@ const Policies: React.FC = () => {
                                             </TableCell>
                                             <TableCell className="text-center py-10">
                                                 {policy.is_enabled ? 
-                                                    <Badge className="bg-emerald-500/10 text-emerald-600 border-none rounded-xl font-bold text-[10px] tracking-tight px-6 py-2 italic">Enforcement active</Badge> : 
+                                                    <Badge className="bg-success/10 text-success border-none rounded-xl font-bold text-[10px] tracking-tight px-6 py-2 italic">Enforcement active</Badge> : 
                                                     <Badge className="bg-surface-container text-on-surface-variant/40 border-none rounded-xl font-bold text-[10px] tracking-tight px-6 py-2 italic">Rules halted</Badge>
                                                 }
                                             </TableCell>
@@ -248,10 +248,14 @@ const Policies: React.FC = () => {
                                             </TableCell>
                                             <TableCell className="py-10 text-right pr-10">
                                                 <div className="flex justify-end gap-3 opacity-20 group-hover:opacity-100 transition-opacity">
-                                                    <Button size="icon" variant="ghost" className="h-10 w-10 border border-on-surface/5 hover:border-primary/20 hover:bg-primary/5 rounded-xl transition-all">
-                                                        <Settings2 className="w-4 h-4" />
+                                                    <Button 
+                                                        variant="ghost" 
+                                                        onClick={() => navigate(`/policies/${policy.id}`)}
+                                                        className="h-10 rounded-xl px-4 font-bold text-[11px] tracking-tight text-primary border border-primary/10 hover:bg-primary/5 hover:border-primary/20 transition-all"
+                                                    >
+                                                        <ArrowUpRight className="w-4 h-4 mr-2" /> View Policy
                                                     </Button>
-                                                    <Button size="icon" variant="ghost" className="h-10 w-10 border border-transparent hover:border-red-100 hover:bg-red-50 hover:text-red-500 rounded-xl transition-all">
+                                                    <Button size="icon" variant="ghost" className="h-10 w-10 border border-transparent hover:border-destructive/20 hover:bg-destructive/10 hover:text-destructive rounded-xl transition-all">
                                                         <Trash2 className="w-4 h-4" />
                                                     </Button>
                                                 </div>
@@ -265,13 +269,13 @@ const Policies: React.FC = () => {
                 </GlassCardContent>
             </GlassCard>
 
-            <div className="bg-on-surface text-white p-12 rounded-[48px] shadow-2xl shadow-on-surface/10 relative overflow-hidden group">
+            <div className="bg-inverse text-on-inverse p-12 rounded-[48px] shadow-2xl shadow-on-surface/10 relative overflow-hidden group">
                 <div className="absolute top-0 right-0 p-8 opacity-5 pointer-events-none group-hover:scale-110 transition-transform duration-700">
-                    <Command className="w-40 h-40 -mr-12 -mt-12 text-primary" />
+                    <Command className="w-40 h-40 -mr-12 -mt-12 text-primary-foreground" />
                 </div>
                 <div className="flex flex-col lg:flex-row items-center gap-12 relative z-10">
-                    <div className="p-6 bg-white/5 rounded-[32px] backdrop-blur-xl border border-white/10 shadow-inner">
-                        <Terminal className="w-10 h-10 text-primary animate-pulse" />
+                    <div className="p-6 bg-card/5 rounded-[32px] backdrop-blur-xl border border-on-inverse/10 shadow-inner">
+                        <Terminal className="w-10 h-10 text-primary-foreground animate-pulse" />
                     </div>
                     <div className="space-y-4 flex-1 text-center lg:text-left">
                         <h3 className="text-3xl font-bold tracking-tight">Post-login policy engine</h3>
@@ -280,11 +284,11 @@ const Policies: React.FC = () => {
                         </p>
                     </div>
                     <div className="flex gap-4">
-                        <Button variant="outline" className="h-14 px-10 rounded-2xl border-white/10 bg-white/5 hover:bg-white/10 text-white font-bold tracking-tight text-[11px]">
-                            Logic manifest
+                        <Button variant="outline" onClick={() => navigate('/policies')} className="h-14 px-10 rounded-2xl border-on-inverse/10 bg-card/5 hover:bg-card/10 text-white font-bold tracking-tight text-[11px]">
+                            View Policies
                         </Button>
-                        <Button className="h-14 px-10 rounded-2xl font-bold tracking-tight text-[11px] shadow-2xl shadow-primary/20">
-                            Audit stream
+                        <Button onClick={() => navigate('/audit')} className="h-14 px-10 rounded-2xl font-bold tracking-tight text-[11px] shadow-2xl shadow-primary/20">
+                            Audit Logs
                         </Button>
                     </div>
                 </div>

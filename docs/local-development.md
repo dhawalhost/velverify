@@ -12,24 +12,24 @@ This method runs all services, the database, the public landing/help site, and t
 ### Kubernetes prerequisites
 
 * Docker & Docker Compose
+* Go 1.24+
+* Make
 
-### Kubernetes start
-
+### Launch
 ```bash
-./scripts/setup_docker_dev.sh
+# Full orchestration including frontend
+make dev
 ```
 
 This will:
+1. Initialize infrastructure (Postgres, Redis).
+2. Apply migrations automatically.
+3. Build and launch the multi-service backend.
+4. Launch the Traefik Gateway and Admin Console.
 
-1. Start Postgres and Redis.
-2. Run database migrations.
-3. Build and start all microservices sequentially.
-4. Start Traefik, the landing site, and the Admin Console.
-
-Add this line to `/etc/hosts`:
-
+Add these entries to `/etc/hosts`:
 ```text
-127.0.0.1 wardseal.local help.wardseal.local manage.wardseal.local auth.wardseal.local api.wardseal.local
+127.0.0.1 wardseal.local manage.wardseal.local auth.wardseal.local api.wardseal.local
 ```
 
 Then access:

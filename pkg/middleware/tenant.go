@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"regexp"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -16,7 +17,9 @@ const DefaultTenantHeader = "X-Tenant-ID"
 // tenantContextKey is an unexported key type to avoid collisions in the Gin context store.
 type tenantContextKey string
 
-const tenantIDContextKey tenantContextKey = "tenantID"
+const tenantIDContextKey tenantContextKey = "wardseal.tenantID"
+
+var tenantIDRegex = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
 
 // TenantConfig captures the knobs for tenant extraction.
 type TenantConfig struct {
@@ -81,6 +84,14 @@ func TenantExtractor(cfg TenantConfig) gin.HandlerFunc {
 				})
 				return
 			}
+		}
+
+		// Verify character whitelist against generic injection vectors
+		if !tenantIDRegex.MatchString(tenantID) {
+			c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{
+				"error": "invalid tenant identifier format",
+			})
+			return
 		}
 
 		c.Set(string(tenantIDContextKey), tenantID)

@@ -174,9 +174,21 @@ func Load(cfgFile string) (*Config, error) {
 	_ = v.BindEnv("governance.directory_service_url")
 	_ = v.BindEnv("governance.webhook_secret")
 	_ = v.BindEnv("governance.cors_allowed_origins")
+	_ = v.BindEnv("kms.provider")
 	_ = v.BindEnv("kms.master_key")
+	_ = v.BindEnv("kms.private_key_path")
+	_ = v.BindEnv("kms.public_key_path")
 	_ = v.BindEnv("kms.vault_addr")
 	_ = v.BindEnv("kms.vault_token")
+	_ = v.BindEnv("kms.vault_key_name")
+	_ = v.BindEnv("kms.vault_key_path")
+	_ = v.BindEnv("kms.vault_namespace")
+	_ = v.BindEnv("kms.vault_role_id")
+	_ = v.BindEnv("kms.vault_secret_id")
+	_ = v.BindEnv("observability.otel_endpoint")
+	_ = v.BindEnv("observability.service_name")
+	_ = v.BindEnv("observability.service_version")
+	_ = v.BindEnv("observability.log_level")
 
 	// Optional config file
 	if cfgFile != "" {
@@ -263,6 +275,9 @@ func (c *Config) Validate() error {
 		hasAuth := !c.KMS.VaultToken.IsEmpty() || (c.KMS.VaultRoleID != "" && !c.KMS.VaultSecretID.IsEmpty())
 		if !hasAuth {
 			problems = append(problems, fmt.Sprintf("Vault authentication is required in %s", c.Environment))
+		}
+		if c.Database.SSLMode == "disable" {
+			problems = append(problems, fmt.Sprintf("database.sslmode cannot be 'disable' in %s environment", c.Environment))
 		}
 	} else {
 		// In development/local mode, ensure master key is 32 bytes for AES-256

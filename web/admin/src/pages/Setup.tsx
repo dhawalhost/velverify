@@ -69,7 +69,7 @@ const Setup: React.FC = () => {
 
     if (checking) {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-slate-50">
+            <div className="min-h-screen flex items-center justify-center bg-background">
                 <div className="animate-in fade-in duration-1000 flex flex-col items-center gap-6">
                     <div className="h-16 w-16 bg-primary/5 rounded-[2rem] flex items-center justify-center border border-primary/20 animate-pulse">
                         <Command className="w-8 h-8 text-primary/40" />
@@ -81,7 +81,7 @@ const Setup: React.FC = () => {
     }
 
     return (
-        <div className="flex items-center justify-center min-h-screen bg-slate-50 px-6 py-12 transition-all duration-700">
+        <div className="flex items-center justify-center min-h-screen bg-background px-6 py-12 transition-all duration-700">
             <div className="w-full max-w-[420px] space-y-12 animate-in fade-in zoom-in-95 duration-700">
                 <div className="text-center space-y-6">
                     <div className="flex justify-center">
@@ -91,7 +91,7 @@ const Setup: React.FC = () => {
                     </div>
                 </div>
 
-                <GlassCard className="border-none shadow-2xl bg-white overflow-hidden">
+                <GlassCard className="border-none shadow-2xl bg-card overflow-hidden">
                     <GlassCardHeader className="pt-12 pb-6 px-10 text-center">
                         <GlassCardTitle className="text-4xl font-black italic tracking-tighter leading-none">SYSTEM_GENESIS</GlassCardTitle>
                         <div className="h-1 w-12 bg-primary mx-auto mt-6 mb-4 rounded-full" />
@@ -100,7 +100,7 @@ const Setup: React.FC = () => {
                     <form onSubmit={handleSubmit}>
                         <GlassCardContent className="px-10 pb-12 space-y-8">
                             {error && (
-                                <div className="p-4 bg-red-50 text-red-600 rounded-xl flex items-center gap-3 border border-red-100 animate-in fade-in slide-in-from-top-2">
+                                <div className="p-4 bg-destructive/10 text-destructive rounded-xl flex items-center gap-3 border border-destructive/20 animate-in fade-in slide-in-from-top-2">
                                     <AlertCircle className="h-5 w-5 shrink-0" />
                                     <span className="text-xs font-bold uppercase tracking-tight">{error}</span>
                                 </div>
@@ -152,14 +152,14 @@ const Setup: React.FC = () => {
                             </div>
 
                             <div className="pt-4 space-y-6">
-                                <Button type="submit" className="w-full h-14 rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-on-surface/10 bg-on-surface text-white hover:opacity-90 transition-all" disabled={loading}>
+                                <Button type="submit" className="w-full h-14 rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-on-surface/10 bg-inverse text-on-inverse hover:opacity-90 transition-all" disabled={loading}>
                                     {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : "COMPLETE_PROVISIONING"}
                                 </Button>
                                 
                                 <div className="flex flex-col items-center gap-4 text-center">
-                                     <div className="flex items-center gap-2 px-3 py-1 bg-emerald-50 rounded-full border border-emerald-100">
-                                         <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
-                                         <span className="text-[9px] font-black uppercase tracking-widest text-emerald-600">PROVISION_LEVEL_0</span>
+                                     <div className="flex items-center gap-2 px-3 py-1 bg-success-subtle rounded-full border border-success/10">
+                                         <div className="w-1.5 h-1.5 bg-success rounded-full animate-pulse" />
+                                         <span className="text-[9px] font-black uppercase tracking-widest text-success">PROVISION_LEVEL_0</span>
                                      </div>
                                      <p className="text-[10px] font-bold text-on-surface-variant/30 uppercase tracking-[0.2em] leading-relaxed max-w-[200px]">
                                         Full administrative authority will be committed to this node.

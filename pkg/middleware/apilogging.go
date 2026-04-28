@@ -79,6 +79,9 @@ func APILogger(db *sqlx.DB, logger *zap.Logger) gin.HandlerFunc {
 }
 
 func logToDB(db *sqlx.DB, logger *zap.Logger, tenantID, clientID, method, path string, statusCode int, latency int64, ip string, reqPayload, resPayload []byte) {
+	reqPayload = sanitizeJSONPayload(reqPayload)
+	resPayload = sanitizeJSONPayload(resPayload)
+
 	query := `INSERT INTO api_logs 
 		(tenant_id, client_id, method, path, status_code, latency_ms, ip_address, request_payload, response_payload) 
 		VALUES ($1, $2, $3, $4, $5, $6, $7, CAST($8 AS JSONB), CAST($9 AS JSONB))`
@@ -102,3 +105,42 @@ func logToDB(db *sqlx.DB, logger *zap.Logger, tenantID, clientID, method, path s
 		logger.Warn("Failed to insert API log", zap.Error(err), zap.String("tenant", tenantID), zap.String("path", path))
 	}
 }
+
+func sanitizeJSONPayload(payload []byte) []byte {
+	if !json.Valid(payload) {
+		return payload
+	}
+	var data interface{}
+	if err := json.Unmarshal(payload, &data); err != nil {
+		return payload
+	}
+	sanitizeNode(data)
+	sanitized, err := json.Marshal(data)
+	if err != nil {
+		return payload
+	}
+	return sanitized
+}
+
+func sanitizeNode(node interface{}) {
+	switch n := node.(type) {
+	case map[string]interface{}:
+		for k, v := range n {
+			if isSensitiveKey(k) {
+				n[k] = "[REDACTED]"
+			} else {
+				sanitizeNode(v)
+			}
+		}
+	case []interface{}:
+		for _, v := range n {
+			sanitizeNode(v)
+		}
+	}
+}
+
+func isSensitiveKey(key string) bool {
+	k := strings.ToLower(key)
+	return k == "password" || k == "token" || k == "access_token" || k == "refresh_token" || k == "secret" || k == "client_secret"
+}
+

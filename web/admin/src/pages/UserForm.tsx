@@ -57,7 +57,7 @@ export default function UserForm() {
                     getGroups(),
                     getOrganizations()
                 ]);
-                setGroups(groupsData.Resources || []);
+                setGroups(groupsData.groups || groupsData.Resources || []);
                 setOrgs(orgsData.organizations || []);
 
                 if (isEdit) {
@@ -129,40 +129,40 @@ export default function UserForm() {
         <div className="max-w-5xl mx-auto space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-700 py-12">
             <PageHeader
                 icon={<User className="w-10 h-10 text-primary" />}
-                title={isEdit ? "Reconfigure Identity" : "Initialize Identity"}
-                description={isEdit ? "Modify established authentication primitives and cluster assignments." : "Provision a new subject into the organizational identity matrix."}
+                title={isEdit ? "Edit User" : "Add User"}
+                description={isEdit ? "Update user details and their group memberships." : "Add a new user to your organization."}
                 actions={
                     <Button 
                         variant="outline" 
                         onClick={() => navigate('/users')}
-                        className="h-11 rounded-xl bg-white ring-1 ring-on-surface/5 font-semibold text-sm px-8 shadow-sm transition-all hover:bg-surface-container"
+                        className="h-11 rounded-xl bg-card ring-1 ring-on-surface/5 font-semibold text-sm px-8 shadow-sm transition-all hover:bg-surface-container"
                     >
-                        <ArrowLeft className="mr-3 h-4 w-4" /> Cancel Operation
+                        <ArrowLeft className="mr-3 h-4 w-4" /> Cancel
                     </Button>
                 }
             />
 
             <form onSubmit={handleSubmit} className="space-y-12">
                 {error && (
-                    <Alert variant="destructive" className="rounded-2xl border-none bg-red-50 text-red-600 animate-in slide-in-from-top-2">
+                    <Alert variant="destructive" className="rounded-2xl border-none bg-destructive/10 text-destructive animate-in slide-in-from-top-2">
                         <AlertDescription className="font-semibold text-sm flex items-center gap-3">
                             <ShieldCheck className="w-4 h-4" />
-                            Security Alert: {error}
+                            Error: {error}
                         </AlertDescription>
                     </Alert>
                 )}
 
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
                     <div className="lg:col-span-12 space-y-10">
-                        <GlassCard className="border-none shadow-2xl shadow-on-surface/5 bg-white overflow-hidden rounded-[32px]">
+                        <GlassCard className="border-none shadow-2xl shadow-on-surface/5 bg-card overflow-hidden rounded-[32px]">
                             <GlassCardHeader className="py-10 px-10 border-b border-on-surface/5 bg-surface-container/10">
                                 <div className="flex items-center gap-6">
                                     <div className="p-4 bg-primary/5 rounded-2xl text-primary">
                                         <Layout className="w-7 h-7" />
                                     </div>
                                     <div>
-                                        <GlassCardTitle className="text-3xl font-bold tracking-tight text-on-surface">Base Metadata</GlassCardTitle>
-                                        <p className="text-on-surface-variant/60 font-medium text-[12px] tracking-tight mt-2">Core transactional primitives</p>
+                                        <GlassCardTitle className="text-3xl font-bold tracking-tight text-on-surface">Core Information</GlassCardTitle>
+                                        <p className="text-on-surface-variant/60 font-medium text-[12px] tracking-tight mt-2">Basic user details.</p>
                                     </div>
                                 </div>
                             </GlassCardHeader>
@@ -171,7 +171,7 @@ export default function UserForm() {
                                     <div className="space-y-4">
                                         <Label className="text-[12px] font-bold tracking-tight text-on-surface-variant/40 ml-1 flex items-center gap-2">
                                             <Mail className="w-3.5 h-3.5" />
-                                            Primary Handle (Username)
+                                            Username (Email)
                                         </Label>
                                         <Input
                                             value={formData.userName}
@@ -184,7 +184,7 @@ export default function UserForm() {
                                     <div className="space-y-4">
                                         <Label className="text-[12px] font-bold tracking-tight text-on-surface-variant/40 ml-1 flex items-center gap-2">
                                             <User className="w-3.5 h-3.5" />
-                                            Legible Persona (Display Name)
+                                            Display Name
                                         </Label>
                                         <Input
                                             value={formData.displayName}
@@ -197,7 +197,7 @@ export default function UserForm() {
                                     <div className="space-y-4">
                                         <Label className="text-[12px] font-bold tracking-tight text-on-surface-variant/40 ml-1 flex items-center gap-2">
                                             <Globe className="w-3.5 h-3.5" />
-                                            Verifiable Email
+                                            Contact Email
                                         </Label>
                                         <Input
                                             type="email"
@@ -211,14 +211,14 @@ export default function UserForm() {
                                     <div className="space-y-4">
                                         <Label className="text-[12px] font-bold tracking-tight text-on-surface-variant/40 ml-1 flex items-center gap-2">
                                             <ShieldCheck className="w-3.5 h-3.5" />
-                                            Transmission State
+                                            Account Status
                                         </Label>
                                         <div className="h-14 rounded-2xl bg-surface-container/50 ring-1 ring-on-surface/5 px-6 flex items-center justify-between group cursor-pointer" onClick={() => setFormData({ ...formData, active: !formData.active })}>
-                                            <span className="text-sm font-bold tracking-tight text-on-surface-variant/60">Active Vector</span>
+                                            <span className="text-sm font-bold tracking-tight text-on-surface-variant/60">Active Account</span>
                                             <Switch
                                                 checked={formData.active}
                                                 onCheckedChange={checked => setFormData({ ...formData, active: checked })}
-                                                className="data-[state=checked]:bg-emerald-500"
+                                                className="data-[state=checked]:bg-success"
                                             />
                                         </div>
                                     </div>
@@ -227,15 +227,15 @@ export default function UserForm() {
                         </GlassCard>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
-                            <GlassCard className="border-none shadow-2xl shadow-on-surface/5 bg-white overflow-hidden rounded-[32px]">
+                            <GlassCard className="border-none shadow-2xl shadow-on-surface/5 bg-card overflow-hidden rounded-[32px]">
                                 <GlassCardHeader className="py-8 px-10 border-b border-on-surface/5">
                                     <div className="flex items-center gap-5">
                                         <div className="p-3 bg-primary/5 rounded-xl text-primary">
                                             <Building2 className="w-6 h-6" />
                                         </div>
                                         <div>
-                                            <GlassCardTitle className="text-xl font-bold tracking-tight text-on-surface">Tenant Affiliation</GlassCardTitle>
-                                            <p className="text-on-surface-variant/60 font-medium text-[11px] tracking-tight mt-1">Logical Boundary Assignment</p>
+                                            <GlassCardTitle className="text-xl font-bold tracking-tight text-on-surface">Organization</GlassCardTitle>
+                                            <p className="text-on-surface-variant/60 font-medium text-[11px] tracking-tight mt-1">Assign user to an organization.</p>
                                         </div>
                                     </div>
                                 </GlassCardHeader>
@@ -246,7 +246,7 @@ export default function UserForm() {
                                             onClick={() => setFormData({ ...formData, organizationId: org.id })}
                                             className={`p-6 rounded-2xl cursor-pointer transition-all border flex items-center justify-between group ${formData.organizationId === org.id 
                                                 ? 'bg-primary/5 border-primary/20 shadow-lg shadow-primary/5' 
-                                                : 'bg-white border-on-surface/5 hover:border-primary/10'}`}
+                                                : 'bg-card border-on-surface/5 hover:border-primary/10'}`}
                                         >
                                             <div className="flex items-center gap-4">
                                                 <div className={`w-3 h-3 rounded-full transition-all ${formData.organizationId === org.id ? 'bg-primary scale-110' : 'bg-on-surface/10'}`} />
@@ -264,15 +264,15 @@ export default function UserForm() {
                                 </GlassCardContent>
                             </GlassCard>
 
-                            <GlassCard className="border-none shadow-2xl shadow-on-surface/5 bg-white overflow-hidden rounded-[32px]">
+                            <GlassCard className="border-none shadow-2xl shadow-on-surface/5 bg-card overflow-hidden rounded-[32px]">
                                 <GlassCardHeader className="py-8 px-10 border-b border-on-surface/5">
                                     <div className="flex items-center gap-5">
                                         <div className="p-3 bg-primary/5 rounded-xl text-primary">
                                             <Users className="w-6 h-6" />
                                         </div>
                                         <div>
-                                            <GlassCardTitle className="text-xl font-bold tracking-tight text-on-surface">Cluster Authorization</GlassCardTitle>
-                                            <p className="text-on-surface-variant/60 font-medium text-[11px] tracking-tight mt-1">Resource group entitlement</p>
+                                            <GlassCardTitle className="text-xl font-bold tracking-tight text-on-surface">Group Memberships</GlassCardTitle>
+                                            <p className="text-on-surface-variant/60 font-medium text-[11px] tracking-tight mt-1">Assign user to security groups.</p>
                                         </div>
                                     </div>
                                 </GlassCardHeader>
@@ -284,15 +284,15 @@ export default function UserForm() {
                                                 onClick={() => toggleGroup(group.id)}
                                                 className={`p-5 rounded-2xl cursor-pointer transition-all border flex items-center justify-between group ${formData.groups.includes(group.id) 
                                                     ? 'bg-primary/5 border-primary/20 shadow-lg shadow-primary/5' 
-                                                    : 'bg-white border-on-surface/5 hover:border-primary/10'}`}
+                                                    : 'bg-card border-on-surface/5 hover:border-primary/10'}`}
                                             >
                                                 <div className="flex flex-col">
                                                     <span className={`text-sm font-bold tracking-tight transition-colors ${formData.groups.includes(group.id) ? 'text-primary' : 'text-on-surface'}`}>{group.displayName}</span>
-                                                    <span className="text-[10px] font-medium text-on-surface-variant/40 tracking-tight mt-0.5">{group.members?.length || 0} active subjects</span>
+                                                    <span className="text-[10px] font-medium text-on-surface-variant/40 tracking-tight mt-0.5">{group.members?.length || 0} members</span>
                                                 </div>
                                                 <div className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all ${formData.groups.includes(group.id) 
                                                     ? 'bg-primary border-primary text-white' 
-                                                    : 'bg-white border-on-surface/10 group-hover:border-primary/30'}`}>
+                                                    : 'bg-card border-on-surface/10 group-hover:border-primary/30'}`}>
                                                     {formData.groups.includes(group.id) && <CheckCircle2 className="w-4 h-4" />}
                                                 </div>
                                             </div>
@@ -312,7 +312,7 @@ export default function UserForm() {
                                 className="flex-1 h-16 rounded-[24px] font-bold text-sm shadow-2xl shadow-primary/30 hover:scale-[1.01] active:scale-[0.99] transition-all"
                             >
                                 {submitting ? <Loader2 className="mr-3 h-5 w-5 animate-spin" /> : <ShieldCheck className="mr-3 h-4 w-4" />}
-                                {isEdit ? "Persist Identity State" : "Commit New Identity"}
+                                {isEdit ? "Save Changes" : "Create User"}
                             </Button>
                             <Button 
                                 type="button" 

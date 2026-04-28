@@ -58,16 +58,16 @@ func (s *redisWebAuthnSessionRepository) key(userID string) string {
 	return s.keyPrefix + userID
 }
 
-func (s *redisWebAuthnSessionRepository) Set(userID string, session webauthn.SessionData) {
+func (s *redisWebAuthnSessionRepository) Set(ctx context.Context, userID string, session webauthn.SessionData) {
 	payload, err := json.Marshal(session)
 	if err != nil {
 		return
 	}
-	_ = s.client.Set(context.Background(), s.key(userID), payload, s.ttl).Err()
+	_ = s.client.Set(ctx, s.key(userID), payload, s.ttl).Err()
 }
 
-func (s *redisWebAuthnSessionRepository) Get(userID string) (webauthn.SessionData, bool) {
-	value, err := s.client.Get(context.Background(), s.key(userID)).Bytes()
+func (s *redisWebAuthnSessionRepository) Get(ctx context.Context, userID string) (webauthn.SessionData, bool) {
+	value, err := s.client.Get(ctx, s.key(userID)).Bytes()
 	if err != nil {
 		return webauthn.SessionData{}, false
 	}
@@ -80,6 +80,6 @@ func (s *redisWebAuthnSessionRepository) Get(userID string) (webauthn.SessionDat
 	return session, true
 }
 
-func (s *redisWebAuthnSessionRepository) Delete(userID string) {
-	_ = s.client.Del(context.Background(), s.key(userID)).Err()
+func (s *redisWebAuthnSessionRepository) Delete(ctx context.Context, userID string) {
+	_ = s.client.Del(ctx, s.key(userID)).Err()
 }

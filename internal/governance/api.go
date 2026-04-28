@@ -1,7 +1,10 @@
 package governance
 
 import (
+	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -13,8 +16,18 @@ import (
 	"github.com/dhawalhost/wardseal/internal/authz"
 	"github.com/dhawalhost/wardseal/internal/oauthclient"
 	"github.com/dhawalhost/wardseal/internal/webhook"
+	"github.com/dhawalhost/wardseal/pkg/llm"
 	"github.com/dhawalhost/wardseal/pkg/middleware"
 )
+
+const maxToolIterations = 5
+
+// ToolCaller defines the interface for executing AI tools.
+// This helps avoid import cycles with the mcp package.
+type ToolCaller interface {
+	ListTools(ctx context.Context) ([]llm.Tool, error)
+	CallTool(ctx context.Context, name string, args map[string]interface{}) (interface{}, error)
+}
 
 // HTTPHandler represents the HTTP API handlers for the governance service.
 type HTTPHandler struct {
@@ -24,6 +37,9 @@ type HTTPHandler struct {
 	orgHandler      *OrganizationHandler
 	safetyHandler   *SafetyHandler
 	endpointHandler *EndpointHandler
+	llm             llm.Provider
+	tools           ToolCaller
+	validator       middleware.TokenValidator
 	logger          *zap.Logger
 }
 
@@ -32,7 +48,7 @@ type HealthCheckResponse struct {
 }
 
 // NewHTTPHandler creates a new HTTPHandler.
-func NewHTTPHandler(svc Service, campaignSvc CampaignService, webhookSvc webhook.Service, logger *zap.Logger) *HTTPHandler {
+func NewHTTPHandler(svc Service, campaignSvc CampaignService, webhookSvc webhook.Service, llmProvider llm.Provider, tools ToolCaller, validator middleware.TokenValidator, logger *zap.Logger) *HTTPHandler {
 	return &HTTPHandler{
 		svc:             svc,
 		campaignHandler: NewCampaignHTTPHandler(campaignSvc, logger),
@@ -40,6 +56,9 @@ func NewHTTPHandler(svc Service, campaignSvc CampaignService, webhookSvc webhook
 		orgHandler:      NewOrganizationHandler(svc, logger),
 		safetyHandler:   NewSafetyHandler(svc, logger),
 		endpointHandler: NewEndpointHandler(svc, logger),
+		llm:             llmProvider,
+		tools:           tools,
+		validator:       validator,
 		logger:          logger,
 	}
 }
@@ -52,6 +71,7 @@ func (h *HTTPHandler) RegisterRoutes(router *gin.Engine) {
 	tenantGroup.Use(middleware.TenantExtractor(middleware.TenantConfig{
 		SlugResolver: h.svc.ResolveTenantSlug,
 	}))
+	tenantGroup.Use(middleware.RequireUserAuth(h.validator))
 	clients := tenantGroup.Group("/oauth/clients")
 	{
 		clients.GET("", h.listOAuthClients)
@@ -92,6 +112,8 @@ func (h *HTTPHandler) RegisterRoutes(router *gin.Engine) {
 	{
 		graph.GET("/traverse", h.traverseGraph)
 	}
+
+	tenantGroup.POST("/governance/ask", h.askAI)
 
 	// Registered combined routes
 	h.orgHandler.RegisterRoutes(tenantGroup)
@@ -453,4 +475,116 @@ func (h *HTTPHandler) traverseGraph(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, results)
+}
+
+func (h *HTTPHandler) askAI(c *gin.Context) {
+	tenantID, err := middleware.TenantIDFromGinContext(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "tenant_id missing from context"})
+		return
+	}
+
+	if h.llm == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "AI Copilot is not enabled in this environment"})
+		return
+	}
+
+	var req struct {
+		Question string `json:"question" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// 1. Gather Initial Context (Lightweight)
+	// We no longer need to gather ALL audit context upfront if we have tools.
+	// But some basic context helps.
+	systemPrompt := fmt.Sprintf(`
+You are WardSeal Security Copilot, an elite Identity Governance & Administration (IGA) auditor.
+Your mission is to analyze the governance state for tenant "%s" and provide actionable security insights.
+
+CORE PRINCIPLES:
+1. LEAST PRIVILEGE: Always recommend the most restrictive access necessary.
+2. ZERO TRUST: Flag anomalies like over-privileged workloads or unusual relationship paths.
+3. DATA ISOLATION: You ONLY have visibility into the provided data for tenant "%s".
+4. AGENTIC CAPABILITY: Use YOUR TOOLS to fetch data or perform actions. Don't speculate if you can verify.
+
+CRITICAL SAFETY RULES:
+- SECRET PROTECTION: NEVER disclose passwords, secrets, or tokens.
+- NO HALLUCINATION: If tools return no data, be honest.
+`, tenantID, tenantID)
+
+	// 2. Prepare Tools
+	var llmTools []llm.Tool
+	if h.tools != nil {
+		tools, _ := h.tools.ListTools(c.Request.Context())
+		llmTools = tools
+	}
+
+	// 3. Conversation Loop
+	messages := []llm.Message{
+		{Role: "system", Content: systemPrompt},
+		{Role: "user", Content: req.Question},
+	}
+
+	for i := 0; i < maxToolIterations; i++ {
+		resp, err := h.llm.Chat(c.Request.Context(), messages, llmTools)
+		if err != nil {
+			h.logger.Error("AI chat failed", zap.Error(err))
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "I encountered an error while processing your request"})
+			return
+		}
+
+		messages = append(messages, resp)
+
+		if len(resp.ToolCalls) == 0 {
+			// No more tool calls, we're done
+			c.JSON(http.StatusOK, gin.H{
+				"answer":    resp.Content,
+				"timestamp": time.Now(),
+			})
+			return
+		}
+
+		// Handle tool calls
+		for _, tc := range resp.ToolCalls {
+			var args map[string]interface{}
+			_ = json.Unmarshal([]byte(tc.Arguments), &args)
+
+			// Force tenant_id to the current context for security
+			args["tenant_id"] = tenantID
+
+			h.logger.Info("executing AI tool call", zap.String("tool", tc.Name), zap.Any("args", args))
+			if h.tools == nil {
+				messages = append(messages, llm.Message{
+					Role:       "tool",
+					Content:    "Error: tool execution is not enabled",
+					ToolCallID: tc.ID,
+				})
+				continue
+			}
+
+			result, err := h.tools.CallTool(c.Request.Context(), tc.Name, args)
+			if err != nil {
+				h.logger.Error("tool execution failed", zap.String("tool", tc.Name), zap.Error(err))
+				messages = append(messages, llm.Message{
+					Role:       "tool",
+					Content:    fmt.Sprintf("Error: %v", err),
+					ToolCallID: tc.ID,
+				})
+				continue
+			}
+
+			// Map MCP response to string
+			resultJSON, _ := json.Marshal(result)
+			messages = append(messages, llm.Message{
+				Role:       "tool",
+				Content:    string(resultJSON),
+				ToolCallID: tc.ID,
+			})
+		}
+	}
+
+	c.JSON(http.StatusInternalServerError, gin.H{"error": "AI reached maximum reasoning steps"})
 }

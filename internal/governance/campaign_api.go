@@ -223,13 +223,18 @@ func (h *CampaignHTTPHandler) listReviewItems(c *gin.Context) {
 }
 
 func (h *CampaignHTTPHandler) approveItem(c *gin.Context) {
+	tenantID, ok := h.tenantID(c)
+	if !ok {
+		return
+	}
+
 	itemID := c.Param("itemId")
 	var body struct {
 		Comment string `json:"comment"`
 	}
 	_ = c.ShouldBindJSON(&body)
 
-	if err := h.svc.ApproveItem(c.Request.Context(), itemID, body.Comment); err != nil {
+	if err := h.svc.ApproveItem(c.Request.Context(), tenantID, itemID, body.Comment); err != nil {
 		h.logger.Error("Failed to approve item", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -238,13 +243,18 @@ func (h *CampaignHTTPHandler) approveItem(c *gin.Context) {
 }
 
 func (h *CampaignHTTPHandler) revokeItem(c *gin.Context) {
+	tenantID, ok := h.tenantID(c)
+	if !ok {
+		return
+	}
+
 	itemID := c.Param("itemId")
 	var body struct {
 		Comment string `json:"comment"`
 	}
 	_ = c.ShouldBindJSON(&body)
 
-	if err := h.svc.RevokeItem(c.Request.Context(), itemID, body.Comment); err != nil {
+	if err := h.svc.RevokeItem(c.Request.Context(), tenantID, itemID, body.Comment); err != nil {
 		h.logger.Error("Failed to revoke item", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

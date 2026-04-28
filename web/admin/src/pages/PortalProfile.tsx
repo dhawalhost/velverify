@@ -1,18 +1,36 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { User, Mail, Shield, Key, Save, Loader2, Fingerprint, Lock, Activity } from "lucide-react";
-import { useAuth } from '../hooks/useAuth';
 import { api } from '../api';
 import { GlassCard, GlassCardHeader, GlassCardTitle, GlassCardContent, GlassCardDescription } from '@/components/layout';
 
 const PortalProfile = () => {
-    const { user } = useAuth();
     const [isSaving, setIsSaving] = useState(false);
     const [newPassword, setNewPassword] = useState('');
     const [saveMessage, setSaveMessage] = useState('');
+    const [userProfile, setUserProfile] = useState<any>(null);
+
+    useEffect(() => {
+        const fetchProfile = async () => {
+            try {
+                const res = await api.get('/api/v1/user/profile');
+                const nameParts = (res.data.name || "").split(" ");
+                const firstName = nameParts[0] || "";
+                const lastName = nameParts.slice(1).join(" ") || "";
+                setUserProfile({
+                    email: res.data.email || "",
+                    firstName,
+                    lastName
+                });
+            } catch (error) {
+                console.error("Failed to fetch profile", error);
+            }
+        };
+        fetchProfile();
+    }, []);
 
     const handleSaveProfile = async () => {
         setSaveMessage('');
@@ -51,7 +69,7 @@ const PortalProfile = () => {
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start">
                 <div className="lg:col-span-12 space-y-10">
-                    <GlassCard className="border-none shadow-2xl shadow-on-surface/5 overflow-hidden rounded-[32px] bg-white">
+                    <GlassCard className="border-none shadow-2xl shadow-on-surface/5 overflow-hidden rounded-[32px] bg-card">
                         <GlassCardHeader className="bg-surface-container/50 border-b border-on-surface/5 py-10 px-10">
                             <div className="flex items-center gap-6">
                                 <div className="p-4 bg-primary rounded-2xl text-white shadow-lg shadow-primary/20">
@@ -63,20 +81,20 @@ const PortalProfile = () => {
                                 </div>
                             </div>
                         </GlassCardHeader>
-                        <GlassCardContent className="p-10 space-y-12">
+                        <GlassCardContent key={userProfile?.email || 'loading'} className="p-10 space-y-12">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
                                 <div className="space-y-3">
                                     <Label className="text-[12px] font-bold tracking-tight text-on-surface-variant/40 ml-1">Given Name</Label>
-                                    <Input 
-                                        defaultValue={user?.firstName || ''} 
+                                    <Input
+                                        defaultValue={userProfile?.firstName || ''}
                                         className="h-14 border-none rounded-2xl font-semibold text-sm bg-surface-container/30 ring-1 ring-on-surface/5 focus-visible:ring-2 focus-visible:ring-primary/20"
                                         placeholder="Given Name"
                                     />
                                 </div>
                                 <div className="space-y-3">
                                     <Label className="text-[12px] font-bold tracking-tight text-on-surface-variant/40 ml-1">Family Name</Label>
-                                    <Input 
-                                        defaultValue={user?.lastName || ''} 
+                                    <Input
+                                        defaultValue={userProfile?.lastName || ''}
                                         className="h-14 border-none rounded-2xl font-semibold text-sm bg-surface-container/30 ring-1 ring-on-surface/5 focus-visible:ring-2 focus-visible:ring-primary/20"
                                         placeholder="Family Name"
                                     />
@@ -90,7 +108,7 @@ const PortalProfile = () => {
                                     <Input
                                         type="email"
                                         className="h-14 pl-14 border-none rounded-2xl font-semibold text-sm bg-surface-container/30 ring-1 ring-on-surface/5 text-on-surface opacity-50 cursor-not-allowed"
-                                        defaultValue={user?.email || ''}
+                                        defaultValue={userProfile?.email || ''}
                                         disabled
                                     />
                                 </div>
@@ -99,13 +117,13 @@ const PortalProfile = () => {
                         </GlassCardContent>
                     </GlassCard>
 
-                    <GlassCard className="border-none shadow-2xl shadow-on-surface/5 overflow-hidden rounded-[32px] bg-white">
-                        <GlassCardHeader className="bg-on-surface text-white py-10 px-10 relative overflow-hidden">
+                    <GlassCard className="border-none shadow-2xl shadow-on-surface/5 overflow-hidden rounded-[32px] bg-card">
+                        <GlassCardHeader className="bg-inverse text-on-inverse py-10 px-10 relative overflow-hidden">
                             <div className="absolute top-0 right-0 p-8 opacity-10 rotate-12">
                                 <Shield className="w-32 h-32" />
                             </div>
                             <div className="relative z-10 flex items-center gap-6">
-                                <div className="p-4 bg-primary text-white rounded-2xl shadow-lg shadow-white/10">
+                                <div className="p-4 bg-primary text-primary-foreground rounded-2xl shadow-lg shadow-on-inverse/10">
                                     <Lock className="w-8 h-8" />
                                 </div>
                                 <div>
@@ -125,14 +143,14 @@ const PortalProfile = () => {
                                             placeholder="Enter new entropy string..."
                                             value={newPassword}
                                             onChange={(e) => setNewPassword(e.target.value)}
-                                            className="h-14 pl-14 border-none rounded-2xl font-mono text-sm bg-white ring-1 ring-on-surface/5 focus-visible:ring-2 focus-visible:ring-primary/20"
+                                            className="h-14 pl-14 border-none rounded-2xl font-mono text-sm bg-card ring-1 ring-on-surface/5 focus-visible:ring-2 focus-visible:ring-primary/20"
                                         />
                                     </div>
                                 </div>
-                                <Button 
-                                    onClick={handleSaveProfile} 
+                                <Button
+                                    onClick={handleSaveProfile}
                                     disabled={isSaving}
-                                    className="h-14 bg-primary text-white hover:opacity-90 rounded-2xl px-12 font-bold text-[14px] tracking-tight shadow-xl shadow-primary/20 transition-all font-semibold"
+                                    className="h-14 bg-primary text-primary-foreground hover:opacity-90 rounded-2xl px-12 font-bold text-[14px] tracking-tight shadow-xl shadow-primary/20 transition-all font-semibold"
                                 >
                                     {isSaving ? <Loader2 className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5 mr-3" />}
                                     Commit Rotation
@@ -140,7 +158,7 @@ const PortalProfile = () => {
                             </div>
 
                             {saveMessage && (
-                                <div className={`p-6 rounded-2xl font-bold text-[11px] tracking-tight flex items-center gap-4 animate-in slide-in-from-bottom-4 duration-500 ${saveMessage.includes('successful') ? 'bg-emerald-50 text-emerald-600 ring-1 ring-emerald-100' : 'bg-red-50 text-red-600 ring-1 ring-red-100'}`}>
+                                <div className={`p-6 rounded-2xl font-bold text-[11px] tracking-tight flex items-center gap-4 animate-in slide-in-from-bottom-4 duration-500 ${saveMessage.includes('successful') ? 'bg-success-subtle text-success ring-1 ring-emerald-100' : 'bg-destructive/10 text-destructive ring-1 ring-red-100'}`}>
                                     <Activity className="h-4 w-4 animate-pulse" />
                                     {saveMessage.toUpperCase()}
                                 </div>

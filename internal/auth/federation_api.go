@@ -27,6 +27,14 @@ func (h *HTTPHandler) socialLogin(c *gin.Context) {
 
 	resp, err := h.svc.SocialLogin(c.Request.Context(), req)
 	if err != nil {
+		if errors.Is(err, ErrMFARequired) {
+			c.JSON(http.StatusOK, gin.H{
+				"pending_token": resp.AccessToken,
+				"error":         "mfa_required",
+				"message":       "Additional authentication required",
+			})
+			return
+		}
 		h.logger.Error("Social login failed", zap.Error(err))
 		svcErr := &Error{}
 		if errors.As(err, &svcErr) {

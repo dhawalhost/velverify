@@ -115,7 +115,7 @@ const SlackIntegration: React.FC = () => {
                 description="Orchestrate organizational identity lifecycle through real-time enterprise messaging clusters."
                 actions={
                     isConfigured && (
-                        <Badge className="bg-emerald-500/10 text-emerald-600 border-none rounded-xl font-bold text-[11px] tracking-tight px-6 py-2.5 flex items-center gap-3">
+                        <Badge className="bg-success/10 text-success border-none rounded-xl font-bold text-[11px] tracking-tight px-6 py-2.5 flex items-center gap-3">
                             <ShieldCheck className="w-4 h-4" />
                             Core link active
                         </Badge>
@@ -126,7 +126,7 @@ const SlackIntegration: React.FC = () => {
              {(error || success) && (
                 <div className="space-y-6">
                     {error && (
-                        <Alert variant="destructive" className="rounded-2xl border-none bg-red-50 text-red-600">
+                        <Alert variant="destructive" className="rounded-2xl border-none bg-destructive/10 text-destructive">
                             <AlertDescription className="font-bold text-xs tracking-tight flex items-center gap-3">
                                 <ShieldAlert className="w-4 h-4" />
                                 Configuration alert: {error}
@@ -134,7 +134,7 @@ const SlackIntegration: React.FC = () => {
                         </Alert>
                     )}
                     {success && (
-                        <Alert className="rounded-2xl border-none bg-emerald-50 text-emerald-600">
+                        <Alert className="rounded-2xl border-none bg-success-subtle text-success">
                             <AlertDescription className="font-bold text-xs tracking-tight flex items-center gap-3">
                                 <ShieldCheck className="w-4 h-4" />
                                 Event success: {success}
@@ -146,7 +146,7 @@ const SlackIntegration: React.FC = () => {
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
                 <div className="lg:col-span-4 space-y-10">
-                    <GlassCard className="border-none shadow-2xl shadow-on-surface/5 bg-white overflow-hidden rounded-[32px]">
+                    <GlassCard className="border-none shadow-2xl shadow-on-surface/5 bg-card overflow-hidden rounded-[32px]">
                         <GlassCardHeader className="py-10 px-10 border-b border-on-surface/5 bg-surface-container/10">
                             <div className="flex items-center gap-6">
                                 <div className="p-4 bg-primary/5 rounded-2xl text-primary">
@@ -165,8 +165,8 @@ const SlackIntegration: React.FC = () => {
                                         <div className="w-28 h-28 rounded-[28px] bg-[#4A154B]/5 flex items-center justify-center transition-all group-hover:scale-105 duration-500">
                                             <Slack className="w-14 h-14 text-[#4A154B]" />
                                         </div>
-                                        <div className="absolute -bottom-2 -right-2 w-10 h-10 bg-white border border-on-surface/5 rounded-2xl shadow-lg flex items-center justify-center">
-                                            <Activity className="w-5 h-5 text-emerald-500 animate-pulse" />
+                                        <div className="absolute -bottom-2 -right-2 w-10 h-10 bg-card border border-on-surface/5 rounded-2xl shadow-lg flex items-center justify-center">
+                                            <Activity className="w-5 h-5 text-success animate-pulse" />
                                         </div>
                                     </div>
                                     <div className="space-y-3">
@@ -186,7 +186,7 @@ const SlackIntegration: React.FC = () => {
                                         </Button>
                                         <Button 
                                             variant="ghost" 
-                                            className="w-full h-12 text-red-500 font-bold tracking-tight text-[11px] hover:bg-red-50 hover:text-red-600 rounded-2xl transition-all" 
+                                            className="w-full h-12 text-destructive font-bold tracking-tight text-[11px] hover:bg-destructive/10 hover:text-destructive rounded-2xl transition-all" 
                                             onClick={handleDisconnect}
                                         >
                                             <Trash2 className="w-4 h-4 mr-2.5" /> Terminate link
@@ -213,19 +213,19 @@ const SlackIntegration: React.FC = () => {
                         </GlassCardContent>
                     </GlassCard>
 
-                    <div className="bg-on-surface text-white p-10 rounded-[40px] flex items-start gap-6 shadow-2xl shadow-on-surface/10 relative overflow-hidden group">
+                    <div className="bg-inverse text-on-inverse p-10 rounded-[40px] flex items-start gap-6 shadow-2xl shadow-on-surface/10 relative overflow-hidden group">
                         <div className="absolute top-0 right-0 p-6 opacity-5 pointer-events-none group-hover:scale-110 transition-transform">
                             <Binary className="w-24 h-24 -mr-4 -mt-4 text-primary" />
                         </div>
                         <Activity className="w-8 h-8 text-primary flex-shrink-0 opacity-80" />
-                        <p className="text-[12px] font-bold leading-relaxed tracking-tight text-white/40">
+                        <p className="text-[12px] font-bold leading-relaxed tracking-tight text-on-inverse/40">
                             Telemetry: Event propagation is handled via structural WebSocket clusters, ensuring latency-free identity auditing.
                         </p>
                     </div>
                 </div>
 
                 <div className="lg:col-span-8">
-                    <GlassCard className="border-none shadow-2xl shadow-on-surface/5 bg-white overflow-hidden rounded-[32px]">
+                    <GlassCard className="border-none shadow-2xl shadow-on-surface/5 bg-card overflow-hidden rounded-[32px]">
                         <GlassCardHeader className="py-10 px-10 border-b border-on-surface/5 bg-surface-container/10">
                             <div className="flex items-center gap-6">
                                 <div className="p-4 bg-primary/10 text-primary rounded-2xl">
@@ -316,7 +316,7 @@ const SlackIntegration: React.FC = () => {
                             </GlassCardContent>
                             <GlassCardFooter className="py-10 px-10 border-t border-on-surface/5 bg-surface-container/5 flex flex-col md:flex-row items-center justify-between gap-6">
                                 <div className="flex items-center gap-6">
-                                    <div className={`w-3 h-3 rounded-full transition-all ${form.enabled ? 'bg-emerald-500 shadow-[0_0_12px_rgba(16,185,129,0.5)]' : 'bg-on-surface/10'}`} />
+                                    <div className={`w-3 h-3 rounded-full transition-all ${form.enabled ? 'bg-success shadow-[0_0_12px_rgba(16,185,129,0.5)]' : 'bg-on-surface/10'}`} />
                                     <div className="flex flex-col">
                                         <span className="text-[12px] font-bold tracking-tight text-on-surface italic">State: {form.enabled ? 'Active Enforcement' : 'Dormant'}</span>
                                         <span className="text-[10px] font-bold tracking-tight text-on-surface-variant/20 mt-0.5">Deterministic clusters synchronized</span>
@@ -331,9 +331,9 @@ const SlackIntegration: React.FC = () => {
                 </div>
             </div>
 
-            <GlassCard className="border-none shadow-2xl shadow-on-surface/5 bg-on-surface text-white overflow-hidden rounded-[40px] p-12">
+            <GlassCard className="border-none shadow-2xl shadow-on-surface/5 bg-inverse text-on-inverse overflow-hidden rounded-[40px] p-12">
                 <div className="flex flex-col lg:flex-row items-start gap-12">
-                    <div className="p-5 bg-white/5 rounded-3xl backdrop-blur-xl border border-white/5">
+                    <div className="p-5 bg-card/5 rounded-3xl backdrop-blur-xl border border-on-inverse/5">
                         <MessageSquare className="w-10 h-10 text-primary" />
                     </div>
                     <div className="space-y-10 flex-1">
@@ -344,12 +344,12 @@ const SlackIntegration: React.FC = () => {
                             </p>
                         </div>
                         
-                        <div className="bg-white/5 p-8 rounded-3xl border border-white/5 backdrop-blur-md group transition-all hover:bg-white/[0.07] cursor-pointer">
+                        <div className="bg-card/5 p-8 rounded-3xl border border-on-inverse/5 backdrop-blur-md group transition-all hover:bg-card/[0.07] cursor-pointer">
                             <div className="flex items-center gap-6">
                                 <div className="p-2 bg-primary/10 rounded-xl">
-                                    <Terminal className="h-5 w-5 text-primary" />
+                                    <Terminal className="h-5 w-5 text-primary-foreground" />
                                 </div>
-                                <code className="font-mono text-base font-bold text-primary select-all">
+                                <code className="font-mono text-base font-bold text-primary-foreground select-all">
                                     {window.location.origin}/integrations/slack/commands
                                 </code>
                             </div>
@@ -357,9 +357,9 @@ const SlackIntegration: React.FC = () => {
 
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-2">
                             {['/wardseal-whoami', '/wardseal-lock', '/wardseal-audit'].map(cmd => (
-                                <div key={cmd} className="flex items-center gap-4 py-4 px-6 rounded-2xl bg-white/[0.03] border border-white/5 transition-all hover:bg-white/[0.08] hover:border-white/10 group cursor-default">
-                                    <Command className="h-4 w-4 opacity-20 group-hover:opacity-100 group-hover:text-primary transition-all" />
-                                    <span className="font-mono text-[11px] font-bold tracking-tight text-primary/40 group-hover:text-primary transition-all">{cmd}</span>
+                                <div key={cmd} className="flex items-center gap-4 py-4 px-6 rounded-2xl bg-card/[0.03] border border-on-inverse/5 transition-all hover:bg-card/[0.08] hover:border-on-inverse/10 group cursor-default">
+                                    <Command className="h-4 w-4 opacity-20 group-hover:opacity-100 group-hover:text-primary-foreground transition-all" />
+                                    <span className="font-mono text-[11px] font-bold tracking-tight text-primary-foreground/40 group-hover:text-primary-foreground transition-all">{cmd}</span>
                                 </div>
                             ))}
                         </div>

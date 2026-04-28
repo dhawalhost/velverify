@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
+	"github.com/dhawalhost/wardseal/pkg/database"
 )
 
 // Device represents a user's device.
@@ -55,71 +56,105 @@ func (r *sqlDeviceRepository) Register(ctx context.Context, device *Device) erro
 	device.UpdatedAt = time.Now()
 	device.LastSeenAt = time.Now()
 
-	query := `
-		INSERT INTO devices (id, tenant_id, user_id, device_identifier, os, os_version, is_managed, is_compliant, last_seen_at, risk_score, created_at, updated_at)
-		VALUES (:id, :tenant_id, :user_id, :device_identifier, :os, :os_version, :is_managed, :is_compliant, :last_seen_at, :risk_score, :created_at, :updated_at)
-		ON CONFLICT (tenant_id, device_identifier) DO UPDATE SET
-			last_seen_at = EXCLUDED.last_seen_at,
-			updated_at = EXCLUDED.updated_at,
-			os_version = EXCLUDED.os_version,
-			is_managed = EXCLUDED.is_managed -- Allow re-registration to update status
-	`
-	_, err := r.db.NamedExecContext(ctx, query, device)
-	return err
+	return database.RunInTenantTx(ctx, r.db, func(tx *sqlx.Tx) error {
+		query := `
+			INSERT INTO devices (id, tenant_id, user_id, device_identifier, os, os_version, is_managed, is_compliant, last_seen_at, risk_score, created_at, updated_at)
+			VALUES (:id, :tenant_id, :user_id, :device_identifier, :os, :os_version, :is_managed, :is_compliant, :last_seen_at, :risk_score, :created_at, :updated_at)
+			ON CONFLICT (tenant_id, device_identifier) DO UPDATE SET
+				last_seen_at = EXCLUDED.last_seen_at,
+				updated_at = EXCLUDED.updated_at,
+				os_version = EXCLUDED.os_version,
+				is_managed = EXCLUDED.is_managed -- Allow re-registration to update status
+		`
+		_, err := tx.NamedExecContext(ctx, query, device)
+		return err
+	})
 }
 
 func (r *sqlDeviceRepository) GetByID(ctx context.Context, id string) (*Device, error) {
 	var device Device
-	query := `SELECT * FROM devices WHERE id = $1`
-	err := r.db.GetContext(ctx, &device, query, id)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, nil
+	var found bool
+	err := database.RunInTenantTx(ctx, r.db, func(tx *sqlx.Tx) error {
+		query := `SELECT * FROM devices WHERE id = $1`
+		err := tx.GetContext(ctx, &device, query, id)
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				found = false
+				return nil
+			}
+			return err
 		}
+		found = true
+		return nil
+	})
+	if err != nil {
 		return nil, err
+	}
+	if !found {
+		return nil, nil
 	}
 	return &device, nil
 }
 
 func (r *sqlDeviceRepository) GetByIdentifier(ctx context.Context, tenantID, identifier string) (*Device, error) {
 	var device Device
-	query := `SELECT * FROM devices WHERE tenant_id = $1 AND device_identifier = $2`
-	err := r.db.GetContext(ctx, &device, query, tenantID, identifier)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, nil
+	var found bool
+	err := database.RunInTenantTx(ctx, r.db, func(tx *sqlx.Tx) error {
+		query := `SELECT * FROM devices WHERE tenant_id = $1 AND device_identifier = $2`
+		err := tx.GetContext(ctx, &device, query, tenantID, identifier)
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				found = false
+				return nil
+			}
+			return err
 		}
+		found = true
+		return nil
+	})
+	if err != nil {
 		return nil, err
+	}
+	if !found {
+		return nil, nil
 	}
 	return &device, nil
 }
 
 func (r *sqlDeviceRepository) UpdatePosture(ctx context.Context, id string, isCompliant bool, riskScore int) error {
-	query := `
-		UPDATE devices 
-		SET is_compliant = $1, risk_score = $2, updated_at = $3 
-		WHERE id = $4
-	`
-	_, err := r.db.ExecContext(ctx, query, isCompliant, riskScore, time.Now(), id)
-	return err
+	return database.RunInTenantTx(ctx, r.db, func(tx *sqlx.Tx) error {
+		query := `
+			UPDATE devices 
+			SET is_compliant = $1, risk_score = $2, updated_at = $3 
+			WHERE id = $4
+		`
+		_, err := tx.ExecContext(ctx, query, isCompliant, riskScore, time.Now(), id)
+		return err
+	})
 }
 
 func (r *sqlDeviceRepository) ListByUser(ctx context.Context, userID string) ([]Device, error) {
-	devices := []Device{}
-	query := `SELECT * FROM devices WHERE user_id = $1`
-	err := r.db.SelectContext(ctx, &devices, query, userID)
+	var devices []Device
+	err := database.RunInTenantTx(ctx, r.db, func(tx *sqlx.Tx) error {
+		query := `SELECT * FROM devices WHERE user_id = $1`
+		return tx.SelectContext(ctx, &devices, query, userID)
+	})
 	return devices, err
 }
 
 func (r *sqlDeviceRepository) List(ctx context.Context, tenantID string) ([]Device, error) {
-	devices := []Device{}
-	query := `SELECT * FROM devices WHERE tenant_id = $1 ORDER BY last_seen_at DESC`
-	err := r.db.SelectContext(ctx, &devices, query, tenantID)
+	var devices []Device
+	err := database.RunInTenantTx(ctx, r.db, func(tx *sqlx.Tx) error {
+		query := `SELECT * FROM devices WHERE tenant_id = $1 ORDER BY last_seen_at DESC`
+		return tx.SelectContext(ctx, &devices, query, tenantID)
+	})
 	return devices, err
 }
 
 func (r *sqlDeviceRepository) Delete(ctx context.Context, id string) error {
-	query := `DELETE FROM devices WHERE id = $1`
-	_, err := r.db.ExecContext(ctx, query, id)
-	return err
+	return database.RunInTenantTx(ctx, r.db, func(tx *sqlx.Tx) error {
+		query := `DELETE FROM devices WHERE id = $1`
+		_, err := tx.ExecContext(ctx, query, id)
+		return err
+	})
 }

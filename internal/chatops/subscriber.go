@@ -35,7 +35,29 @@ func (s *ChatOpsSubscriber) RegisterSubscribers(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to subscribe to ProposedRevocation: %w", err)
 	}
+
+	err = s.bus.Subscribe(ctx, "AccessRequestCreated", func(ctx context.Context, payload []byte) error {
+		return s.handleAccessRequestCreated(ctx, payload)
+	})
+	if err != nil {
+		return fmt.Errorf("failed to subscribe to AccessRequestCreated: %w", err)
+	}
+
 	return nil
+}
+
+func (s *ChatOpsSubscriber) handleAccessRequestCreated(ctx context.Context, payload []byte) error {
+	var req governance.AccessRequest
+	if err := json.Unmarshal(payload, &req); err != nil {
+		return err
+	}
+
+	s.log.Info("notifying slack about new access request",
+		zap.String("tenant_id", req.TenantID),
+		zap.String("request_id", req.ID),
+	)
+
+	return s.slack.NotifyAccessRequest(ctx, req)
 }
 
 func (s *ChatOpsSubscriber) handleProposedRevocation(ctx context.Context, payload []byte) error {

@@ -302,7 +302,7 @@ X-Tenant-ID: acme-prod
 
 #### Tooling
 
-- `cmd/admincli` provides a lightweight CLI: `go run ./cmd/admincli list -tenant 11111111-1111-1111-1111-111111111111` or `create` with flags for redirects/scopes/secret. Use this until the Admin UI wires the same APIs.
+- `cmd/admincli` provides a lightweight CLI: `go run ./cmd/admincli list -tenant admin-system` or `create` with flags for redirects/scopes/secret. Use this until the Admin UI wires the same APIs.
 
 ---
 

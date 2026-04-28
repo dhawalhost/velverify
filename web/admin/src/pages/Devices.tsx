@@ -44,7 +44,7 @@ const Devices: React.FC = () => {
             setDevices(data || []);
         } catch (err) {
             console.error(err);
-            setError('Failed to load organizational endpoints.');
+            setError('Failed to load devices.');
         } finally {
             setLoading(false);
         }
@@ -60,16 +60,16 @@ const Devices: React.FC = () => {
             fetchDevices();
         } catch (err) {
             console.error(err);
-            setError('Failed to synchronize trust state.');
+            setError('Failed to update security status.');
         }
     };
 
     const getStatusBadge = (status: string) => {
         switch (status) {
              case 'trusted':
-                return <Badge className="bg-emerald-500/10 text-emerald-600 border-none gap-2 rounded-xl font-bold text-[10px] tracking-tight px-4 py-1.5"><ShieldCheck className="w-3.5 h-3.5" /> Verified</Badge>;
+                return <Badge className="bg-success/10 text-success border-none gap-2 rounded-xl font-bold text-[10px] tracking-tight px-4 py-1.5"><ShieldCheck className="w-3.5 h-3.5" /> Verified</Badge>;
             case 'untrusted':
-                return <Badge className="bg-red-500/10 text-red-600 border-none gap-2 rounded-xl font-bold text-[10px] tracking-tight px-4 py-1.5"><ShieldAlert className="w-3.5 h-3.5" /> Blocked</Badge>;
+                return <Badge className="bg-destructive/100/10 text-destructive border-none gap-2 rounded-xl font-bold text-[10px] tracking-tight px-4 py-1.5"><ShieldAlert className="w-3.5 h-3.5" /> Blocked</Badge>;
             default:
                 return <Badge className="bg-amber-500/10 text-amber-600 border-none gap-2 rounded-xl font-bold text-[10px] tracking-tight px-4 py-1.5"><Activity className="w-3.5 h-3.5" /> Pending</Badge>;
         }
@@ -81,15 +81,15 @@ const Devices: React.FC = () => {
         <div className="space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-700">
             <PageHeader
                 icon={<MonitorSmartphone className="w-10 h-10 text-primary" />}
-                title="Endpoint Inventory"
-                description="Manage and verify the trust status of all organizational nodes. Conduct remote attestation and hardware identification across the cluster."
+                title="Devices"
+                description="Manage and verify the security status of all company devices."
                 actions={
                     <div className="flex gap-6">
                         {[
-                            { label: 'Attested Nodes', value: devices.filter(d => d.trust_status === 'trusted').length, color: 'text-emerald-500', bg: 'bg-emerald-50' },
-                            { label: 'Pending Sync', value: devices.filter(d => d.trust_status === 'pending').length, color: 'text-amber-500', bg: 'bg-amber-50' },
+                            { label: 'Verified Devices', value: devices.filter(d => d.trust_status === 'trusted').length, color: 'text-success', bg: 'bg-success-subtle' },
+                            { label: 'Pending Review', value: devices.filter(d => d.trust_status === 'pending').length, color: 'text-amber-500', bg: 'bg-amber-50' },
                         ].map((stat, i) => (
-                             <GlassCard key={i} className="min-w-[160px] border-none shadow-xl shadow-on-surface/5 bg-white rounded-2xl p-6">
+                             <GlassCard key={i} className="min-w-[160px] border-none shadow-xl shadow-on-surface/5 bg-card rounded-2xl p-6">
                                 <div className="flex flex-col items-center gap-3">
                                     <span className={`text-3xl font-black tracking-tighter ${stat.color}`}>{stat.value}</span>
                                     <span className="text-[11px] font-bold tracking-tight text-on-surface-variant/40 italic mt-1">{stat.label}</span>
@@ -101,23 +101,23 @@ const Devices: React.FC = () => {
             />
 
              {error && (
-                <Alert variant="destructive" className="rounded-2xl border-none bg-red-50 text-red-600 animate-in slide-in-from-top-2">
+                <Alert variant="destructive" className="rounded-2xl border-none bg-destructive/10 text-destructive animate-in slide-in-from-top-2">
                     <AlertDescription className="font-bold text-xs tracking-tight flex items-center gap-3">
                         <ShieldAlert className="w-4 h-4" />
-                        Registry error: {error}
+                        Device error: {error}
                     </AlertDescription>
                 </Alert>
             )}
 
-            <GlassCard className="border-none shadow-2xl shadow-on-surface/5 bg-white overflow-hidden rounded-[40px]">
+            <GlassCard className="border-none shadow-2xl shadow-on-surface/5 bg-card overflow-hidden rounded-[40px]">
                 <GlassCardHeader className="py-10 px-10 border-b border-on-surface/5 bg-surface-container/5">
                     <div className="flex items-center gap-6">
                         <div className="p-4 bg-primary/5 rounded-2xl text-primary">
                             <Lock className="w-7 h-7" />
                         </div>
                          <div>
-                            <GlassCardTitle className="text-3xl font-bold tracking-tight text-on-surface">Hardware identity registry</GlassCardTitle>
-                            <p className="text-on-surface-variant/60 font-medium text-[11px] mt-2">Verified endpoints authenticated for secure role assumption.</p>
+                            <GlassCardTitle className="text-3xl font-bold tracking-tight text-on-surface">Device Directory</GlassCardTitle>
+                            <p className="text-on-surface-variant/60 font-medium text-[11px] mt-2">List of devices allowed to access company resources.</p>
                         </div>
                     </div>
                 </GlassCardHeader>
@@ -126,22 +126,22 @@ const Devices: React.FC = () => {
                         <GlassTable>
                             <GlassTableHeader>
                                  <GlassTableRow className="hover:bg-transparent border-b border-on-surface/5">
-                                    <GlassTableHead className="py-6 pl-10">Hardware serial</GlassTableHead>
-                                    <GlassTableHead>Subject context</GlassTableHead>
-                                    <GlassTableHead>Architecture</GlassTableHead>
-                                    <GlassTableHead>Trust logic</GlassTableHead>
-                                    <GlassTableHead>Last validation</GlassTableHead>
-                                    <GlassTableHead className="text-right pr-10">Directives</GlassTableHead>
+                                    <GlassTableHead className="py-6 pl-10">Serial Number</GlassTableHead>
+                                    <GlassTableHead>User</GlassTableHead>
+                                    <GlassTableHead>Platform</GlassTableHead>
+                                    <GlassTableHead>Security Status</GlassTableHead>
+                                    <GlassTableHead>Last Seen</GlassTableHead>
+                                    <GlassTableHead className="text-right pr-10">Actions</GlassTableHead>
                                 </GlassTableRow>
                             </GlassTableHeader>
                             <TableBody>
                                 {devices.length === 0 ? (
                                     <GlassTableRow>
                                          <TableCell colSpan={6} className="py-40 text-center">
-                                            <div className="flex flex-col items-center gap-6 opacity-20">
-                                                <Smartphone className="h-16 w-16" />
-                                                <span className="text-[13px] font-bold tracking-tight italic">Null endpoint state // Awaiting initialization</span>
-                                            </div>
+                                             <div className="flex flex-col items-center gap-6 opacity-20">
+                                                 <Smartphone className="h-16 w-16" />
+                                                 <span className="text-[13px] font-bold tracking-tight italic">No devices found.</span>
+                                             </div>
                                         </TableCell>
                                     </GlassTableRow>
                                 ) : (
@@ -185,27 +185,27 @@ const Devices: React.FC = () => {
                                                                 <MoreHorizontal className="h-5 w-5 text-on-surface-variant/60" />
                                                             </Button>
                                                         </DropdownMenuTrigger>
-                                                        <DropdownMenuContent align="end" className="w-[200px] rounded-[24px] border-none shadow-2xl shadow-on-surface/10 p-2 bg-white">
-                                                            <DropdownMenuItem 
-                                                                className="font-bold text-xs gap-3 py-3.5 px-4 cursor-pointer rounded-2xl focus:bg-emerald-50 focus:text-emerald-600 transition-colors"
-                                                                onClick={() => handleUpdateStatus(device.id, 'trusted')}
-                                                                disabled={device.trust_status === 'trusted'}
-                                                            >
-                                                                <ShieldCheck className="w-4 h-4 opacity-50" />
-                                                                Attest Endpoint
-                                                            </DropdownMenuItem>
-                                                            <DropdownMenuItem 
-                                                                className="font-bold text-xs gap-3 py-3.5 px-4 cursor-pointer rounded-2xl focus:bg-red-50 focus:text-red-600 transition-colors"
-                                                                onClick={() => handleUpdateStatus(device.id, 'untrusted')}
-                                                                disabled={device.trust_status === 'untrusted'}
-                                                            >
-                                                                <ShieldAlert className="w-4 h-4" />
-                                                                Revoke Trust
-                                                            </DropdownMenuItem>
-                                                            <DropdownMenuItem className="font-bold text-xs gap-3 py-3.5 px-4 cursor-pointer rounded-2xl focus:bg-primary/5 focus:text-primary transition-colors">
-                                                                <Terminal className="w-4 h-4 opacity-50" />
-                                                                Remote Shell
-                                                            </DropdownMenuItem>
+                                                        <DropdownMenuContent align="end" className="w-[200px] rounded-[24px] border-none shadow-2xl shadow-on-surface/10 p-2 bg-card">
+                                                             <DropdownMenuItem 
+                                                                 className="font-bold text-xs gap-3 py-3.5 px-4 cursor-pointer rounded-2xl focus:bg-success-subtle focus:text-success transition-colors"
+                                                                 onClick={() => handleUpdateStatus(device.id, 'trusted')}
+                                                                 disabled={device.trust_status === 'trusted'}
+                                                             >
+                                                                 <ShieldCheck className="w-4 h-4 opacity-50" />
+                                                                 Verify Device
+                                                             </DropdownMenuItem>
+                                                             <DropdownMenuItem 
+                                                                 className="font-bold text-xs gap-3 py-3.5 px-4 cursor-pointer rounded-2xl focus:bg-destructive/10 focus:text-destructive transition-colors"
+                                                                 onClick={() => handleUpdateStatus(device.id, 'untrusted')}
+                                                                 disabled={device.trust_status === 'untrusted'}
+                                                             >
+                                                                 <ShieldAlert className="w-4 h-4" />
+                                                                 Block Device
+                                                             </DropdownMenuItem>
+                                                             <DropdownMenuItem className="font-bold text-xs gap-3 py-3.5 px-4 cursor-pointer rounded-2xl focus:bg-primary/5 focus:text-primary transition-colors">
+                                                                 <Terminal className="w-4 h-4 opacity-50" />
+                                                                 Terminal
+                                                             </DropdownMenuItem>
                                                         </DropdownMenuContent>
                                                     </DropdownMenu>
                                                 </div>
@@ -219,23 +219,23 @@ const Devices: React.FC = () => {
                 </GlassCardContent>
             </GlassCard>
 
-            <div className="bg-on-surface text-white p-12 rounded-[48px] shadow-2xl shadow-on-surface/10 relative overflow-hidden group">
+            <div className="bg-inverse text-on-inverse p-12 rounded-[48px] shadow-2xl shadow-on-surface/10 relative overflow-hidden group">
                 <div className="absolute top-0 right-0 p-8 opacity-5 pointer-events-none group-hover:scale-110 transition-transform">
                     <Cpu className="w-32 h-32 -mr-8 -mt-8 text-primary" />
                 </div>
                 <div className="flex flex-col md:flex-row items-center gap-12 relative z-10">
-                    <div className="p-6 bg-white/5 rounded-3xl backdrop-blur-xl border border-white/5">
+                    <div className="p-6 bg-card/5 rounded-3xl backdrop-blur-xl border border-on-inverse/5">
                         <Activity className="w-12 h-12 text-primary animate-pulse" />
                     </div>
-                     <div className="space-y-6 flex-1 text-center md:text-left">
-                        <h3 className="text-3xl font-bold tracking-tight">Post-login device trust</h3>
-                        <p className="text-sm font-medium opacity-60 max-w-2xl leading-relaxed italic">
-                            All architectural endpoints must maintain a verified attestation status to bypass secondary entropy gatekeepers. Security policy PX_14 strictly prohibits unauthenticated hardware origins.
-                        </p>
-                    </div>
-                    <Button variant="outline" className="h-14 px-10 rounded-2xl border-white/10 bg-white/5 hover:bg-white/10 text-white font-bold tracking-tight text-[11px] hidden lg:flex">
-                        Audit logic manifest
-                    </Button>
+                      <div className="space-y-6 flex-1 text-center md:text-left">
+                         <h3 className="text-3xl font-bold tracking-tight">Device Security Policy</h3>
+                         <p className="text-sm font-medium opacity-60 max-w-2xl leading-relaxed italic">
+                             All devices must be verified to access company data. Unrecognized devices will be blocked automatically according to global security policies.
+                         </p>
+                     </div>
+                     <Button variant="outline" className="h-14 px-10 rounded-2xl border-on-inverse/10 bg-card/5 hover:bg-card/10 text-white font-bold tracking-tight text-[11px] hidden lg:flex">
+                         View Policy
+                     </Button>
                 </div>
             </div>
         </div>

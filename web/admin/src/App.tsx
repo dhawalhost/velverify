@@ -34,6 +34,7 @@ import Groups from '@/pages/Groups';
 import SlackIntegration from '@/pages/SlackIntegration';
 import GraphExplorer from '@/pages/GraphExplorer';
 import WorkloadManagement from '@/pages/WorkloadManagement';
+import Copilot from '@/pages/Copilot';
 
 import PortalLayout from './layouts/PortalLayout';
 import PortalDashboard from './pages/PortalDashboard';
@@ -86,6 +87,7 @@ const App: React.FC = () => {
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/users" element={<Users />} />
             <Route path="/users/new" element={<UserForm />} />
+            <Route path="/users/edit/:id" element={<UserForm />} />
             <Route path="/requests" element={<AccessRequests />} />
             <Route path="/request-access" element={<RequestAccess />} />
             <Route path="/roles" element={<Roles />} />
@@ -110,6 +112,7 @@ const App: React.FC = () => {
             <Route path="/graph-explorer" element={<GraphExplorer />} />
             <Route path="/workloads" element={<WorkloadManagement />} />
             <Route path="/integrations/slack" element={<SlackIntegration />} />
+            <Route path="/copilot" element={<Copilot />} />
           </Route>
         </Routes>
       </Router >

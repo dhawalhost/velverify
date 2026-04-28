@@ -140,10 +140,10 @@ const Organizations: React.FC = () => {
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start">
                 {/* Create Form */}
                 <div className="lg:col-span-4 lg:sticky lg:top-8">
-                    <GlassCard className="border-none shadow-xl shadow-on-surface/5 bg-white overflow-hidden rounded-[24px]">
+                    <GlassCard className="border-none shadow-xl shadow-on-surface/5 bg-card overflow-hidden rounded-[24px]">
                         <GlassCardHeader className="bg-primary p-8 text-white">
                             <div className="flex items-center gap-4">
-                                <div className="p-2.5 bg-white/20 rounded-xl backdrop-blur-md">
+                                <div className="p-2.5 bg-card/20 rounded-xl backdrop-blur-md">
                                     <Plus className="w-5 h-5 text-white" />
                                 </div>
                                 <GlassCardTitle className="text-xl font-bold">Provision sector</GlassCardTitle>
@@ -180,7 +180,7 @@ const Organizations: React.FC = () => {
                                     />
                                 </div>
                                 {error && (
-                                    <div className="text-[11px] font-bold text-red-600 bg-red-50/50 p-4 rounded-xl ring-1 ring-red-100 flex items-center gap-3">
+                                    <div className="text-[11px] font-bold text-destructive bg-destructive/10/50 p-4 rounded-xl ring-1 ring-red-100 flex items-center gap-3">
                                         <AlertTriangle className="h-4 w-4" />
                                         {error}
                                     </div>
@@ -195,7 +195,7 @@ const Organizations: React.FC = () => {
 
                 {/* List */}
                 <div className="lg:col-span-8">
-                    <GlassCard className="border-none shadow-2xl shadow-on-surface/5 bg-white overflow-hidden rounded-[32px]">
+                    <GlassCard className="border-none shadow-2xl shadow-on-surface/5 bg-card overflow-hidden rounded-[32px]">
                         <GlassCardHeader className="py-8 px-10 border-b border-on-surface/5">
                             <div className="flex items-center gap-5">
                                 <div className="p-3.5 bg-primary/5 rounded-2xl">
@@ -242,7 +242,7 @@ const Organizations: React.FC = () => {
                                                     </TableCell>
                                                     <TableCell className="py-8">
                                                         {org.domain_verified ? (
-                                                            <Badge className="bg-emerald-50 text-emerald-600 border-none rounded-xl font-bold text-[10px] px-4 py-1.5 shadow-sm">Verified root</Badge>
+                                                            <Badge className="bg-success-subtle text-success border-none rounded-xl font-bold text-[10px] px-4 py-1.5 shadow-sm">Verified root</Badge>
                                                         ) : org.domain ? (
                                                             <Button 
                                                                 size="sm"
@@ -260,7 +260,7 @@ const Organizations: React.FC = () => {
                                                         <Button 
                                                             size="icon" 
                                                             variant="ghost" 
-                                                            className="h-11 w-11 rounded-xl text-on-surface-variant/30 hover:text-red-500 hover:bg-red-50 transition-all" 
+                                                            className="h-11 w-11 rounded-xl text-on-surface-variant/30 hover:text-destructive hover:bg-destructive/10 transition-all" 
                                                             onClick={() => handleDelete(org.id)}
                                                         >
                                                             <Trash2 className="h-5 w-5" />
@@ -280,7 +280,7 @@ const Organizations: React.FC = () => {
             {/* Verification Modal */}
             {verifyModal && (
                 <div className="fixed inset-0 bg-on-surface/20 backdrop-blur-sm flex justify-center items-center z-50 p-6 animate-in fade-in duration-500">
-                    <GlassCard className="w-full max-w-2xl border-none shadow-2xl shadow-on-surface/20 bg-white overflow-hidden rounded-[40px]">
+                    <GlassCard className="w-full max-w-2xl border-none shadow-2xl shadow-on-surface/20 bg-card overflow-hidden rounded-[40px]">
                         <GlassCardHeader className="py-12 px-10 border-b border-on-surface/5 bg-surface-container/10">
                             <div className="flex items-center gap-6">
                                 <div className="p-4 bg-primary rounded-2xl text-white shadow-lg shadow-primary/20">
@@ -309,14 +309,14 @@ const Organizations: React.FC = () => {
                                 <>
                                     <div className="space-y-6">
                                         <span className="text-[12px] font-bold text-on-surface-variant/40 ml-1">DNS manifest entry (TXT)</span>
-                                        <div className="bg-on-surface text-white p-8 rounded-[32px] space-y-8 shadow-xl shadow-on-surface/20">
+                                        <div className="bg-inverse text-on-inverse p-8 rounded-[32px] space-y-8 shadow-xl shadow-on-surface/20">
                                             <div className="grid grid-cols-[100px_1fr] gap-6 items-center">
-                                                <span className="font-mono text-[10px] font-bold text-white/40">Host</span>
-                                                <div className="bg-white/5 border border-white/10 px-5 py-3 rounded-xl font-mono text-xs text-primary font-bold">
+                                                <span className="font-mono text-[10px] font-bold text-on-inverse/40">Host</span>
+                                                <div className="bg-card/5 border border-on-inverse/10 px-5 py-3 rounded-xl font-mono text-xs text-primary font-bold">
                                                     {verifyDetails.txt_record}
                                                 </div>
-                                                <span className="font-mono text-[10px] font-bold text-white/40">Token</span>
-                                                <div className="bg-white/5 border border-white/10 px-5 py-3 rounded-xl font-mono text-xs text-white/90 break-all leading-relaxed">
+                                                <span className="font-mono text-[10px] font-bold text-on-inverse/40">Token</span>
+                                                <div className="bg-card/5 border border-on-inverse/10 px-5 py-3 rounded-xl font-mono text-xs text-on-inverse/90 break-all leading-relaxed">
                                                     {verifyDetails.token}
                                                 </div>
                                             </div>
@@ -324,7 +324,7 @@ const Organizations: React.FC = () => {
                                     </div>
                                     
                                     {verifyResult && (
-                                        <div className={`p-6 rounded-2xl flex items-center gap-4 animate-in slide-in-from-bottom-4 duration-500 ring-1 shadow-sm ${verifyResult.includes('✅') ? 'bg-emerald-50 ring-emerald-100 text-emerald-700' : 'bg-red-50 ring-red-100 text-red-700'}`}>
+                                        <div className={`p-6 rounded-2xl flex items-center gap-4 animate-in slide-in-from-bottom-4 duration-500 ring-1 shadow-sm ${verifyResult.includes('✅') ? 'bg-success-subtle ring-emerald-100 text-emerald-700' : 'bg-destructive/10 ring-red-100 text-red-700'}`}>
                                             {verifyResult.includes('✅') ? <CheckCircle className="h-5 w-5" /> : <AlertTriangle className="h-5 w-5" />}
                                             <span className="text-xs font-bold">{verifyResult.replace('✅', '').replace('❌', '').trim()}</span>
                                         </div>
@@ -341,7 +341,7 @@ const Organizations: React.FC = () => {
                                         <Button 
                                             onClick={handleVerify} 
                                             disabled={verifyLoading}
-                                            className="h-14 bg-primary text-white hover:opacity-90 rounded-2xl font-bold text-[13px] px-12 shadow-xl shadow-primary/20 transition-all flex items-center gap-3"
+                                            className="h-14 bg-primary text-primary-foreground hover:opacity-90 rounded-2xl font-bold text-[13px] px-12 shadow-xl shadow-primary/20 transition-all flex items-center gap-3"
                                         >
                                             {verifyLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Globe className="h-5 w-5" />}
                                             Execute validation
@@ -349,7 +349,7 @@ const Organizations: React.FC = () => {
                                     </div>
                                 </>
                             ) : (
-                                <div className="p-10 rounded-[32px] bg-red-50 border-2 border-dashed border-red-200 text-red-700 flex flex-col items-center gap-4 text-center">
+                                <div className="p-10 rounded-[32px] bg-destructive/10 border-2 border-dashed border-red-200 text-red-700 flex flex-col items-center gap-4 text-center">
                                     <AlertTriangle className="h-10 w-10 opacity-40" />
                                     <span className="text-sm font-bold tracking-tight">Failed to establish synchronized link with verification engine.</span>
                                 </div>

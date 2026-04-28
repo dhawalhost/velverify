@@ -103,8 +103,14 @@ func (m *MockService) UpdateUserSelf(ctx context.Context, tenantID, userID strin
 func (m *MockService) ValidateToken(tokenString string) (*middleware.Claims, error) {
 	return nil, nil
 }
+func (m *MockService) ValidateStepUpToken(tokenString string) (*middleware.Claims, error) {
+	return nil, nil
+}
 func (m *MockService) LoginWithMFAStepUp(ctx context.Context, stepUpToken, totpCode string) (string, error) {
 	return "", nil
+}
+func (m *MockService) GetUserByID(ctx context.Context, tenantID, userID string) (auth.UserProfile, error) {
+	return auth.UserProfile{}, nil
 }
 
 // Simple test to verify the HTTP wiring for Setup and Login
@@ -156,11 +162,11 @@ func TestSystemSetupAndLoginFlow(t *testing.T) {
 		}
 		jsonBody, _ := json.Marshal(body)
 		w := httptest.NewRecorder()
-		req, _ := http.NewRequest("POST", "/t/11111111-1111-1111-1111-111111111111/login", bytes.NewReader(jsonBody))
+		req, _ := http.NewRequest("POST", "/t/admin-system/login", bytes.NewReader(jsonBody))
 		// Mock Tenant ID as if we are on the login page (setup usually assumes system tenant or no tenant initially/discovery)
 		// UI might send a header.
 		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("X-Tenant-ID", "11111111-1111-1111-1111-111111111111")
+		req.Header.Set("X-Tenant-ID", "admin-system")
 		router.ServeHTTP(w, req)
 
 		assert.Equal(t, http.StatusOK, w.Code)

@@ -15,6 +15,7 @@ import (
 type RiskGovernor struct {
 	signalStore auth.SignalRepository
 	provSvc     connector.ProvisioningService
+	govSvc      Service
 	interval    time.Duration
 	threshold   int
 	logger      *zap.Logger
@@ -24,11 +25,13 @@ type RiskGovernor struct {
 func NewRiskGovernor(
 	signalStore auth.SignalRepository,
 	provSvc connector.ProvisioningService,
+	govSvc Service,
 	logger *zap.Logger,
 ) *RiskGovernor {
 	return &RiskGovernor{
 		signalStore: signalStore,
 		provSvc:     provSvc,
+		govSvc:      govSvc,
 		interval:    5 * time.Minute, // Sweep every 5 minutes
 		threshold:   90,              // Critical threshold for autonomous action
 		logger:      logger,
@@ -114,5 +117,14 @@ func (g *RiskGovernor) mitigateUser(ctx context.Context, risk auth.UserRisk) {
 			zap.String("user_id", risk.UserID), zap.Error(err))
 	} else {
 		g.logger.Info("Mitigation task enqueued", zap.String("task_id", taskID))
+	}
+
+	// 3. Log as Safety Action for audit visibility
+	if g.govSvc != nil {
+		_, _ = g.govSvc.ProposeSafetyAction(ctx, risk.TenantID, ProposeSafetyActionInput{
+			ActionType: "autonomous_lockdown",
+			TargetID:   risk.UserID,
+			Reason:     fmt.Sprintf("Autonomous lockdown triggered: Score %d", risk.Score),
+		})
 	}
 }

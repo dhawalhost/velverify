@@ -52,7 +52,11 @@ func (h *SafetyHandler) ConfirmAction(c *gin.Context) {
 		return
 	}
 	actionID := c.Param("id")
-	approverID := c.GetHeader("X-User-ID") // Assume header for MVP
+	approverID := actorIDFromRequest(c)
+	if approverID == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "approver user id required"})
+		return
+	}
 
 	var req ConfirmSafetyActionRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -63,7 +67,7 @@ func (h *SafetyHandler) ConfirmAction(c *gin.Context) {
 	err = h.svc.ConfirmSafetyAction(c.Request.Context(), tenantID, actionID, approverID, req.Comment)
 	if err != nil {
 		h.log.Error("Failed to confirm safety action", zap.Error(err), zap.String("action_id", actionID))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
 		return
 	}
 
@@ -77,7 +81,11 @@ func (h *SafetyHandler) RejectAction(c *gin.Context) {
 		return
 	}
 	actionID := c.Param("id")
-	approverID := c.GetHeader("X-User-ID")
+	approverID := actorIDFromRequest(c)
+	if approverID == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "approver user id required"})
+		return
+	}
 
 	var req ConfirmSafetyActionRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -88,7 +96,7 @@ func (h *SafetyHandler) RejectAction(c *gin.Context) {
 	err = h.svc.RejectSafetyAction(c.Request.Context(), tenantID, actionID, approverID, req.Comment)
 	if err != nil {
 		h.log.Error("Failed to reject safety action", zap.Error(err), zap.String("action_id", actionID))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
 		return
 	}
 

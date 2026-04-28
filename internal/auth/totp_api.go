@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"image/png"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/pquerna/otp/totp"
@@ -29,9 +30,47 @@ type TOTPVerifyRequest struct {
 	Code   string `json:"code" binding:"required"`
 }
 
+func (h *HTTPHandler) RequireMFAAuth() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		authHeader := c.GetHeader("Authorization")
+		if authHeader == "" {
+			token, err := c.Cookie("wardseal_access_token")
+			if err == nil {
+				authHeader = "Bearer " + token
+			}
+		}
+
+		if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "authentication required"})
+			return
+		}
+
+		tokenString := strings.TrimPrefix(authHeader, "Bearer ")
+
+		claims, err := h.svc.ValidateToken(tokenString)
+		if err == nil {
+			c.Set("user_id", claims.Subject)
+			c.Set("claims", claims)
+			c.Next()
+			return
+		}
+
+		claims, err = h.svc.ValidateStepUpToken(tokenString)
+		if err == nil {
+			c.Set("user_id", claims.Subject)
+			c.Set("claims", claims)
+			c.Next()
+			return
+		}
+
+		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid or expired token"})
+	}
+}
+
 // RegisterTOTPRoutes registers TOTP-related routes.
 func (h *HTTPHandler) RegisterTOTPRoutes(rg *gin.RouterGroup) {
 	totp := rg.Group("/mfa/totp")
+	totp.Use(h.RequireMFAAuth())
 	{
 		totp.POST("/enroll", h.enrollTOTP)
 		totp.POST("/verify", h.verifyTOTP)
@@ -52,6 +91,13 @@ func (h *HTTPHandler) enrollTOTP(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "X-Tenant-ID header required"})
 		return
 	}
+
+	userID := c.GetString("user_id")
+	if userID == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+	req.UserID = userID
 
 	// Generate TOTP key
 	key, err := totp.Generate(totp.GenerateOpts{
@@ -111,6 +157,13 @@ func (h *HTTPHandler) verifyTOTP(c *gin.Context) {
 		return
 	}
 
+	userID := c.GetString("user_id")
+	if userID == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+	req.UserID = userID
+
 	// Get stored secret
 	stored, err := h.svc.TOTP().GetByIdentity(c.Request.Context(), tenantID, req.UserID)
 	if err != nil {
@@ -143,15 +196,15 @@ func (h *HTTPHandler) verifyTOTP(c *gin.Context) {
 }
 
 func (h *HTTPHandler) deleteTOTP(c *gin.Context) {
-	userID := c.Query("user_id")
-	if userID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "user_id query parameter required"})
-		return
-	}
-
 	tenantID := c.GetHeader("X-Tenant-ID")
 	if tenantID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "X-Tenant-ID header required"})
+		return
+	}
+
+	userID := c.GetString("user_id")
+	if userID == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 		return
 	}
 
@@ -165,15 +218,15 @@ func (h *HTTPHandler) deleteTOTP(c *gin.Context) {
 }
 
 func (h *HTTPHandler) getTOTPStatus(c *gin.Context) {
-	userID := c.Query("user_id")
-	if userID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "user_id query parameter required"})
-		return
-	}
-
 	tenantID := c.GetHeader("X-Tenant-ID")
 	if tenantID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "X-Tenant-ID header required"})
+		return
+	}
+
+	userID := c.GetString("user_id")
+	if userID == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 		return
 	}
 

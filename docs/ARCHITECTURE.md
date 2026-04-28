@@ -339,7 +339,115 @@ The governance layer supports three levels of policy sophistication:
 
 ---
 
+## 7. SOLID Principles in WardSeal
+
+WardSeal is built with long-term maintainability in mind, strictly following the **SOLID** design principles:
+
+### Single Responsibility Principle (SRP)
+Each package and service has one focused reason to change.
+- **`internal/auth`**: Focused solely on identity validation and token lifecycles.
+- **`pkg/kms`**: Dedicated to cryptographic primitives, isolated from business logic.
+- **`internal/directory`**: Centralized authority for user profiles and memberships.
+
+### Open/Closed Principle (OCP)
+The system is open for extension but closed for modification.
+- **LLM Integration**: The `llm.Provider` interface allows adding new providers (OpenRouter, Gemini) without changing the `governance` service code.
+- **Connectors**: The `connector.Registry` allows dynamic registration of new third-party systems (Google, AzureAD, Slack) at runtime.
+
+### Liskov Substitution Principle (LSP)
+Subtypes are interchangeable without affecting program correctness.
+- **Storage Backends**: All repository interfaces (e.g., `AuthorizationCodeRepository`) have interchangeable SQL and In-Memory implementations.
+- **Connectors**: Any implementation of the `Connector` interface can be used by the provisioning engine regardless of the underlying platform.
+
+### Interface Segregation Principle (ISP)
+Clients should not be forced to depend on methods they do not use.
+- **KMS**: Divided into `Signer`, `Cipher`, and `KeyManager` interfaces so consumers only request the specific capability they need.
+- **Auth Repositories**: Individual stores for TOTP, WebAuthn, and Sessions prevent a "god-object" repository pattern.
+
+### Dependency Inversion Principle (DIP)
+High-level modules depend on abstractions, not concrete implementations.
+- **Service Factories**: Services are instantiated via `NewService` functions that accept interfaces, enabling easy dependency injection and testing.
+- **Provider Pattern**: The `governance` service consumes a `DirectoryClient` interface, allowing it to communicate with a remote service or a local mock during testing.
+
+---
+
+## 8. Detailed Flows
+
+### OAuth2 Authorization Code Flow with PKCE
+```mermaid
+sequenceDiagram
+    participant User as End User
+    participant App as Client App (SPA/Mobile)
+    participant Auth as authsvc
+    participant Dir as dirsvc
+    participant KMS as KMS (Vault)
+
+    User->>App: Initiates Login
+    Note over App: Generates code_verifier & S256(challenge)
+    App->>Auth: GET /oauth2/authorize?code_challenge=xyz
+    Auth->>User: Renders Login UI
+    User->>Auth: Enters Credentials
+    Auth->>Dir: POST /internal/credentials/verify
+    Dir-->>Auth: User Profile (Success)
+    Auth->>User: Redirect to App with ?code=abc
+    User->>App: Delivers Code
+    App->>Auth: POST /oauth2/token (code, code_verifier)
+    Auth->>Auth: Validates Verifier against Challenge
+    Auth->>KMS: Request JWT Signature
+    KMS-->>Auth: Signed JWT
+    Auth-->>App: Access Token + ID Token + Refresh Token
+```
+
+### Access Request Lifecycle (Zero Trust)
+```mermaid
+flowchart TD
+    Start([Access Request Created]) --> Context[Gather Context: Device Score, User Risk]
+    Context --> Policy{Policy Evaluation}
+    
+    Policy -- Deny --> Rejected([Rejected & Logged])
+    Policy -- Allow (Auto) --> Provision[Auto-Provision Access]
+    Policy -- Allow (Approval Required) --> Pending[Pending Human Approval]
+    
+    Pending --> Slack[Notify Approver via Slack]
+    Slack --> Human{Human Decision}
+    
+    Human -- Reject --> Rejected
+    Human -- Approve --> Provision
+    
+    Provision --> Sync[Push to External Connector]
+    Sync --> End([Access Granted & Notified])
+```
+
+### LLM-Powered Governance Discovery
+```mermaid
+flowchart LR
+    Trigger[Scheduled Job] --> Fetch[Fetch Raw Config/Metadata]
+    Fetch --> LLM[LLM Provider (OpenRouter)]
+    LLM --> Analyze{Analysis}
+    Analyze --> Classify[Classify: Sensitive? Shadow AI?]
+    Classify --> Store[Store Discovered Resource]
+    Store --> Audit[Generate Compliance Report]
+```
+
+---
+
+## 9. ReBAC Authorization Engine
+
+WardSeal includes a high-performance Relationship-Based Access Control (ReBAC) evaluation engine inspired by Google's Zanzibar paper.
+
+### Traversal & Userset Evaluation
+
+Permissions are modeled as an entity graph. When evaluating permissions:
+1. **Direct Check**: Resolves explicit `(namespace:object)#relation@subject` mappings.
+2. **Set Indirection**: Discovers indirect assignments via nested groups.
+
+### Caching Layer
+To prevent deep recursive graph lookups from bottlenecking standard authentication pipelines, authorization decisions are aggressively stored in a `sync.Map` invalidated by specific tuple updates.
+
+---
+
 ## Quick Reference
+
 
 | Metric | Value |
 |--------|-------|
@@ -351,3 +459,4 @@ The governance layer supports three levels of policy sophistication:
 | Rate Limit | 20 req/s per IP |
 | Lockout Threshold | 5 failed attempts |
 | Token Expiry | Access: 1h, Refresh: 7d |
+

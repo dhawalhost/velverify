@@ -120,7 +120,7 @@ Expected response:
 Test listing OAuth clients (should return empty initially):
 
 ```bash
-curl -H "X-Tenant-ID: 11111111-1111-1111-1111-111111111111" \
+curl -H "X-Tenant-ID: admin-system" \
   http://localhost:8082/api/v1/oauth/clients
 ```
 
@@ -137,7 +137,7 @@ Using the Admin CLI:
 
 ```bash
 go run ./cmd/admincli create \
-  -tenant 11111111-1111-1111-1111-111111111111 \
+  -tenant admin-system \
   -client-id my-app \
   -name "My Application" \
   -type public \
@@ -150,7 +150,7 @@ Or via curl:
 ```bash
 curl -X POST http://localhost:8082/api/v1/oauth/clients \
   -H "Content-Type: application/json" \
-  -H "X-Tenant-ID: 11111111-1111-1111-1111-111111111111" \
+  -H "X-Tenant-ID: admin-system" \
   -d '{
     "client_id": "my-app",
     "name": "My Application",
@@ -353,7 +353,7 @@ adminui:
 The platform is multi-tenant and requires a valid UUID for the `X-Tenant-ID` header. The sample tenant UUID used throughout this guide is:
 
 ```text
-11111111-1111-1111-1111-111111111111
+admin-system
 ```
 
 
@@ -427,7 +427,7 @@ docker compose up -d govsvc
 **Solution:** Use a properly formatted UUID:
 
 ```bash
-go run ./cmd/admincli list -tenant 11111111-1111-1111-1111-111111111111
+go run ./cmd/admincli list -tenant admin-system
 ```
 
 ### Issue: Cannot connect to database from local services

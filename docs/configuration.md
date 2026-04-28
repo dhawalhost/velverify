@@ -13,11 +13,10 @@ WardSeal uses a hybrid configuration system that loads settings from multiple so
 ## File Structure
 
 ```
-config/
-├── .env.defaults        # Base config, in git
-├── .env.development     # Local dev, gitignored (has dev secrets)
-├── .env.staging         # Staging non-secrets, in git
-└── .env.production      # Production non-secrets, in git
+├── .env                 # Local development configuration (gitignored)
+├── .env.example         # Template for environment settings
+├── docker-compose.yml   # Infrastructure orchestration
+└── Makefile             # Command orchestration (make dev)
 ```
 
 ## Usage
@@ -48,14 +47,17 @@ The environment is determined by the `ENVIRONMENT` variable:
 
 ## Local Development
 
-1. Copy the development template:
+1. Copy the environment template:
    ```bash
-   cp config/.env.development.example config/.env.development
+   cp .env.example .env
    ```
 
-2. Edit with your local settings (this file is gitignored)
+2. Edit `.env` with your local settings (this file is gitignored).
 
-3. Run services - config loads automatically
+3. Run the orchestration stack:
+   ```bash
+   make dev
+   ```
 
 ## Staging/Production with Vault
 

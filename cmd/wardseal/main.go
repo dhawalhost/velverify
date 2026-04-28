@@ -18,7 +18,7 @@ const (
 	defaultBaseURL        = "http://localhost:8082" // Governance Service
 	defaultDirServiceURL  = "http://localhost:8081" // Directory Service
 	defaultAuthServiceURL = "http://localhost:8080" // Auth Service
-	defaultTenantID       = "11111111-1111-1111-1111-111111111111"
+	defaultTenantID       = "admin-system"
 )
 
 // OAuth Client structs

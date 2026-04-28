@@ -73,6 +73,30 @@ func (h *HTTPHandler) updatePosture(c *gin.Context) {
 		return
 	}
 
+	tenantID, err := middleware.TenantIDFromGinContext(c)
+	if err != nil {
+		h.logger.Error("Failed to extract tenant ID", zap.Error(err))
+		c.JSON(http.StatusBadRequest, gin.H{"error": "missing tenant context"})
+		return
+	}
+
+	device, err := h.svc.Device().GetByID(c.Request.Context(), id)
+	if err != nil {
+		h.logger.Error("Failed to fetch device for posture update", zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to verify device ownership"})
+		return
+	}
+
+	if device == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "device not found"})
+		return
+	}
+
+	if device.TenantID != tenantID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "device does not belong to this tenant"})
+		return
+	}
+
 	if err := h.svc.Device().UpdatePosture(c.Request.Context(), id, req.IsCompliant, req.RiskScore); err != nil {
 		h.logger.Error("Failed to update posture", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update device posture"})
@@ -105,9 +129,29 @@ func (h *HTTPHandler) listDevices(c *gin.Context) {
 func (h *HTTPHandler) deleteDevice(c *gin.Context) {
 	id := c.Param("id")
 
-	// Ideally we should check if the device belongs to the tenant, but for MVP ID is unique enough
-	// or we can implement GetByID and check tenant.
-	// For now, let's just delete.
+	tenantID, err := middleware.TenantIDFromGinContext(c)
+	if err != nil {
+		h.logger.Error("Failed to extract tenant ID", zap.Error(err))
+		c.JSON(http.StatusBadRequest, gin.H{"error": "missing tenant context"})
+		return
+	}
+
+	device, err := h.svc.Device().GetByID(c.Request.Context(), id)
+	if err != nil {
+		h.logger.Error("Failed to fetch device for deletion", zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to verify device ownership"})
+		return
+	}
+
+	if device == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "device not found"})
+		return
+	}
+
+	if device.TenantID != tenantID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "device does not belong to this tenant"})
+		return
+	}
 
 	if err := h.svc.Device().Delete(c.Request.Context(), id); err != nil {
 		h.logger.Error("Failed to delete device", zap.Error(err))

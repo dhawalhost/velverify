@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Trash2, Edit, ShieldCheck, Lock, Fingerprint, Activity, Terminal, ArrowLeft, Loader2 } from 'lucide-react';
+import { Plus, Trash2, Edit, ShieldCheck, Lock, Fingerprint, Activity, Terminal, ArrowLeft, Loader2, Building2 } from 'lucide-react';
 import { PageHeader, GlassCard, GlassCardHeader, GlassCardTitle, GlassCardContent, GlassTable, GlassTableHeader, GlassTableHead, GlassTableRow, GlassCardDescription } from '@/components/layout';
 
 interface SSOProvider {
@@ -98,12 +98,12 @@ export default function SSOConfig() {
     return (
         <div className="space-y-12 animate-in fade-in duration-700">
             <PageHeader
-                icon={<Fingerprint className="w-10 h-10 text-primary" />}
-                title="SSO infrastructure"
-                description="Manage enterprise identity federation and SAML/OIDC protocols. Architect secure authentication handshakes across distributed clusters."
+                icon={<Building2 className="w-10 h-10 text-primary" />}
+                title="Single Sign-On (SSO)"
+                description="Configure SSO to allow users to sign in using their existing identity provider. Support SAML, OIDC, and other standard protocols."
                 actions={
                     !editingProvider && (
-                         <div className="flex gap-4">
+                        <div className="flex gap-4">
                             <Button
                                 onClick={() => { setEditingProvider({ type: 'oidc', enabled: true, auto_create_users: true }); setIsCreating(true); }}
                                 className="h-11 rounded-xl font-bold text-[12px] tracking-tight px-8 shadow-sm transition-all"
@@ -113,7 +113,7 @@ export default function SSOConfig() {
                             <Button
                                 variant="outline"
                                 onClick={() => { setEditingProvider({ type: 'saml', enabled: true, auto_create_users: true }); setIsCreating(true); }}
-                                className="h-11 rounded-xl bg-white ring-1 ring-on-surface/5 font-bold text-[12px] tracking-tight px-8 shadow-sm transition-all hover:bg-surface-container"
+                                className="h-11 rounded-xl bg-card ring-1 ring-on-surface/5 font-bold text-[12px] tracking-tight px-8 shadow-sm transition-all hover:bg-surface-container"
                             >
                                 <Plus className="mr-2 h-4 w-4" /> Integrate SAML
                             </Button>
@@ -123,15 +123,17 @@ export default function SSOConfig() {
             />
 
             {!editingProvider ? (
-                <GlassCard className="border-none shadow-2xl shadow-on-surface/5 bg-white overflow-hidden rounded-[32px]">
+                <GlassCard className="border-none shadow-2xl shadow-on-surface/5 bg-card overflow-hidden rounded-[32px]">
                     <GlassCardHeader className="py-8 px-10 border-b border-on-surface/5">
                         <div className="flex items-center gap-5">
                             <div className="p-3.5 bg-primary/5 rounded-2xl">
                                 <ShieldCheck className="w-7 h-7 text-primary" />
                             </div>
-                             <div>
-                                <GlassCardTitle className="text-2xl font-bold tracking-tight text-on-surface">Trust anchors</GlassCardTitle>
-                                <p className="text-on-surface-variant/60 font-medium text-[11px] mt-1.5 italic">Connected identity providers ({providers.length}) authenticated for enterprise access.</p>
+                            <div>
+                                <GlassCardTitle className="text-2xl font-bold tracking-tight text-on-surface">SSO Configurations</GlassCardTitle>
+                                <p className="text-on-surface-variant/40 font-bold text-[12px] mt-1 tracking-tight">
+                                    {providers.length} Active Identity Providers
+                                </p>
                             </div>
                         </div>
                     </GlassCardHeader>
@@ -139,11 +141,11 @@ export default function SSOConfig() {
                         <div className="overflow-x-auto">
                             <GlassTable>
                                 <GlassTableHeader>
-                                     <GlassTableRow className="hover:bg-transparent border-b border-on-surface/5">
-                                        <GlassTableHead className="py-6 pl-10 font-bold text-[12px] tracking-tight text-on-surface-variant/40">Provider alias</GlassTableHead>
-                                        <GlassTableHead className="font-bold text-[12px] tracking-tight text-on-surface-variant/40">Protocol stack</GlassTableHead>
+                                    <GlassTableRow className="hover:bg-transparent border-b border-on-surface/5">
+                                        <GlassTableHead className="py-6 pl-10 font-bold text-[12px] tracking-tight text-on-surface-variant/40">Provider Name</GlassTableHead>
+                                        <GlassTableHead className="font-bold text-[12px] tracking-tight text-on-surface-variant/40">Protocol</GlassTableHead>
                                         <GlassTableHead className="font-bold text-[12px] tracking-tight text-on-surface-variant/40">Status</GlassTableHead>
-                                        <GlassTableHead className="text-right pr-10 font-bold text-[12px] tracking-tight text-on-surface-variant/40">Actions</GlassTableHead>
+                                        <GlassTableHead className="text-right font-bold text-[12px] tracking-tight text-on-surface-variant/40 pr-10">Actions</GlassTableHead>
                                     </GlassTableRow>
                                 </GlassTableHeader>
                                 <TableBody>
@@ -159,19 +161,19 @@ export default function SSOConfig() {
                                                 <TableCell className="py-8 pl-10">
                                                     <span className="text-lg font-bold tracking-tight text-on-surface group-hover:text-primary transition-colors">{p.name}</span>
                                                 </TableCell>
-                                                 <TableCell className="py-8">
+                                                <TableCell className="py-8">
                                                     <Badge className={`rounded-lg font-bold text-[10px] tracking-tight border-none px-3 py-1 transition-all ${p.type === 'oidc' ? 'bg-primary/10 text-primary' : 'bg-amber-500/10 text-amber-600'}`}>
                                                         {p.type.toUpperCase()}
                                                     </Badge>
                                                 </TableCell>
                                                 <TableCell className="py-8">
                                                     <div className="flex items-center gap-4">
-                                                         <Switch
+                                                        <Switch
                                                             checked={p.enabled}
                                                             onCheckedChange={(checked) => handleToggle(p.id, checked)}
-                                                            className="data-[state=checked]:bg-emerald-500"
+                                                            className="data-[state=checked]:bg-success"
                                                         />
-                                                        <span className={`text-[10px] font-bold tracking-tight transition-all uppercase ${p.enabled ? 'text-emerald-600' : 'text-on-surface-variant/40'}`}>
+                                                        <span className={`text-[10px] font-bold tracking-tight transition-all uppercase ${p.enabled ? 'text-success' : 'text-on-surface-variant/40'}`}>
                                                             {p.enabled ? 'Live' : 'Inactive'}
                                                         </span>
                                                     </div>
@@ -181,7 +183,7 @@ export default function SSOConfig() {
                                                         <Button size="icon" variant="ghost" className="h-11 w-11 rounded-xl text-on-surface-variant/40 hover:text-on-surface hover:bg-surface-container transition-all" onClick={() => { setEditingProvider(p); setIsCreating(false); }}>
                                                             <Edit className="h-5 w-5" />
                                                         </Button>
-                                                        <Button size="icon" variant="ghost" className="h-11 w-11 rounded-xl text-on-surface-variant/40 hover:text-red-500 hover:bg-red-50 transition-all" onClick={() => handleDelete(p.id)}>
+                                                        <Button size="icon" variant="ghost" className="h-11 w-11 rounded-xl text-on-surface-variant/40 hover:text-destructive hover:bg-destructive/10 transition-all" onClick={() => handleDelete(p.id)}>
                                                             <Trash2 className="h-5 w-5" />
                                                         </Button>
                                                     </div>
@@ -195,24 +197,24 @@ export default function SSOConfig() {
                     </GlassCardContent>
                 </GlassCard>
             ) : (
-                <GlassCard className="max-w-4xl mx-auto border-none shadow-2xl shadow-on-surface/10 bg-white overflow-hidden rounded-[32px]">
+                <GlassCard className="max-w-4xl mx-auto border-none shadow-2xl shadow-on-surface/10 bg-card overflow-hidden rounded-[32px]">
                     <GlassCardHeader className="py-12 px-10 border-b border-on-surface/5 bg-surface-container/10">
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-6">
                                 <div className="p-4 bg-primary rounded-2xl text-white shadow-lg shadow-primary/20">
                                     <Fingerprint className="w-7 h-7" />
                                 </div>
-                                 <div>
+                                <div>
                                     <GlassCardTitle className="text-3xl font-bold tracking-tight text-on-surface">
                                         {isCreating ? 'Provision' : 'Architect'} {editingProvider.type?.toUpperCase()}
                                     </GlassCardTitle>
                                     <p className="text-on-surface-variant/60 font-medium text-[11px] mt-2 italic">Configure federation tunnel protocol logic.</p>
                                 </div>
                             </div>
-                             <Button
+                            <Button
                                 variant="outline"
                                 size="sm"
-                                className="bg-white rounded-xl font-bold text-[11px] h-10 px-6 ring-1 ring-on-surface/5 shadow-sm hover:bg-surface-container transition-all"
+                                className="bg-card rounded-xl font-bold text-[11px] h-10 px-6 ring-1 ring-on-surface/5 shadow-sm hover:bg-surface-container transition-all"
                                 onClick={() => setEditingProvider(null)}
                             >
                                 <ArrowLeft className="mr-2 h-4 w-4" /> Cancel
@@ -220,7 +222,7 @@ export default function SSOConfig() {
                         </div>
                     </GlassCardHeader>
                     <GlassCardContent className="p-10 space-y-10">
-                         <form id="sso-form" onSubmit={handleSave} className="space-y-10">
+                        <form id="sso-form" onSubmit={handleSave} className="space-y-10">
                             <div className="space-y-4">
                                 <Label htmlFor="name" className="text-[11px] font-bold tracking-tight text-on-surface-variant/40 ml-1 italic">01 // Operational alias</Label>
                                 <Input
@@ -236,7 +238,7 @@ export default function SSOConfig() {
                             <div className="h-px bg-on-surface/5" />
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                 {editingProvider.type === 'oidc' && (
+                                {editingProvider.type === 'oidc' && (
                                     <>
                                         <div className="space-y-4 md:col-span-2">
                                             <Label htmlFor="issuer" className="text-[11px] font-bold tracking-tight text-on-surface-variant/40 ml-1 italic">02 // Discovery endpoint</Label>
@@ -252,7 +254,7 @@ export default function SSOConfig() {
                                                     placeholder="https://idp.discovery.url"
                                                 />
                                             </div>
-                                         </div>
+                                        </div>
                                         <div className="space-y-4">
                                             <Label htmlFor="client_id" className="text-[11px] font-bold tracking-tight text-on-surface-variant/40 ml-1 italic">03 // Handshake uid</Label>
                                             <Input
@@ -263,7 +265,7 @@ export default function SSOConfig() {
                                                 className="h-12 border-none rounded-xl bg-surface-container/30 ring-1 ring-on-surface/5 focus-visible:ring-2 focus-visible:ring-primary/20 transition-all font-mono text-xs px-5"
                                                 placeholder="Client ID"
                                             />
-                                         </div>
+                                        </div>
                                         <div className="space-y-4">
                                             <Label htmlFor="client_secret" className="text-[11px] font-bold tracking-tight text-on-surface-variant/40 ml-1 italic">04 // Secret entropy {isCreating ? '' : '(locked)'}</Label>
                                             <Input
@@ -275,7 +277,7 @@ export default function SSOConfig() {
                                                 className="h-12 border-none rounded-xl bg-surface-container/30 ring-1 ring-on-surface/5 focus-visible:ring-2 focus-visible:ring-primary/20 transition-all text-xs px-5"
                                                 placeholder="••••••••••••••••"
                                             />
-                                         </div>
+                                        </div>
                                         <div className="space-y-4 md:col-span-2">
                                             <Label htmlFor="scopes" className="text-[11px] font-bold tracking-tight text-on-surface-variant/40 ml-1 italic">05 // Claim scopes</Label>
                                             <Input
@@ -288,7 +290,7 @@ export default function SSOConfig() {
                                     </>
                                 )}
 
-                                 {editingProvider.type === 'saml' && (
+                                {editingProvider.type === 'saml' && (
                                     <>
                                         <div className="space-y-4 md:col-span-2">
                                             <Label htmlFor="entity_id" className="text-[11px] font-bold tracking-tight text-on-surface-variant/40 ml-1 italic">02 // Subject identifier</Label>
@@ -300,7 +302,7 @@ export default function SSOConfig() {
                                                 className="h-12 border-none rounded-xl bg-surface-container/30 ring-1 ring-on-surface/5 focus-visible:ring-2 focus-visible:ring-primary/20 transition-all font-mono text-xs px-5"
                                                 placeholder="SAML Entity ID"
                                             />
-                                         </div>
+                                        </div>
                                         <div className="space-y-4 md:col-span-2">
                                             <Label htmlFor="sso_url" className="text-[11px] font-bold tracking-tight text-on-surface-variant/40 ml-1 italic">03 // Sso vector url</Label>
                                             <div className="relative">
@@ -315,7 +317,7 @@ export default function SSOConfig() {
                                                     placeholder="https://idp.saml.endpoint"
                                                 />
                                             </div>
-                                         </div>
+                                        </div>
                                         <div className="space-y-4 md:col-span-2">
                                             <Label htmlFor="cert" className="text-[11px] font-bold tracking-tight text-on-surface-variant/40 ml-1 italic">04 // Pem certification logic</Label>
                                             <textarea
@@ -336,7 +338,7 @@ export default function SSOConfig() {
                                                     onCheckedChange={checked => setEditingProvider({ ...editingProvider, saml_sign_assertions: checked })}
                                                     className="data-[state=checked]:bg-primary"
                                                 />
-                                                 <Label htmlFor="saml-sign-assertions" className="flex items-center gap-2 cursor-pointer">
+                                                <Label htmlFor="saml-sign-assertions" className="flex items-center gap-2 cursor-pointer">
                                                     <ShieldCheck className="h-4 w-4 text-primary" />
                                                     <span className="text-[11px] font-bold tracking-tight text-on-surface-variant/60 group-hover:text-on-surface transition-colors">Sign assertions</span>
                                                 </Label>
@@ -348,7 +350,7 @@ export default function SSOConfig() {
                                                     onCheckedChange={checked => setEditingProvider({ ...editingProvider, saml_encrypt_assertions: checked })}
                                                     className="data-[state=checked]:bg-amber-500"
                                                 />
-                                                 <Label htmlFor="saml-encrypt-assertions" className="flex items-center gap-2 cursor-pointer">
+                                                <Label htmlFor="saml-encrypt-assertions" className="flex items-center gap-2 cursor-pointer">
                                                     <Lock className="h-4 w-4 text-amber-500" />
                                                     <span className="text-[11px] font-bold tracking-tight text-on-surface-variant/60 group-hover:text-on-surface transition-colors">Encrypt assertions</span>
                                                 </Label>
@@ -365,7 +367,7 @@ export default function SSOConfig() {
                                     onCheckedChange={(checked) => setEditingProvider({ ...editingProvider, auto_create_users: checked })}
                                     className="data-[state=checked]:bg-primary"
                                 />
-                                 <div className="space-y-1">
+                                <div className="space-y-1">
                                     <Label htmlFor="auto-create" className="text-[12px] font-bold cursor-pointer leading-none text-on-surface">Auto-provision sync cells</Label>
                                     <p className="text-[10px] font-medium text-on-surface-variant/40 italic">Automatically instantiate user records upon successful federation handshake.</p>
                                 </div>

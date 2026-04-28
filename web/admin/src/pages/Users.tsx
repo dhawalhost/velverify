@@ -1,28 +1,32 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getSCIMUsers } from '../api';
+import { getSCIMUsers, deleteSCIMUser } from '../api';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { 
-    Plus, 
-    User as UserIcon, 
-    Mail, 
-    Search, 
-    MoreHorizontal, 
-    ShieldCheck, 
-    ShieldAlert, 
+import {
+    Plus,
+    User as UserIcon,
+    Mail,
+    Search,
+    MoreHorizontal,
+    ShieldCheck,
+    ShieldAlert,
     Loader2,
     Users as UsersIcon,
-    ArrowUpRight
+    ArrowUpRight,
+    UserPlus,
+    Fingerprint,
+    Settings2,
+    Eye
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { 
-    DropdownMenu, 
-    DropdownMenuContent, 
-    DropdownMenuItem, 
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
     DropdownMenuTrigger,
-    DropdownMenuSeparator 
+    DropdownMenuSeparator
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -46,6 +50,20 @@ const Users: React.FC = () => {
         }
     };
 
+    const handleDeleteUser = async (id: string) => {
+        if (window.confirm("Are you sure you want to delete this user?")) {
+            try {
+                setLoading(true);
+                await deleteSCIMUser(id);
+                await loadUsers();
+            } catch (error) {
+                console.error("Failed to delete user", error);
+            } finally {
+                setLoading(false);
+            }
+        }
+    };
+
     useEffect(() => {
         loadUsers();
     }, []);
@@ -60,31 +78,31 @@ const Users: React.FC = () => {
 
     return (
         <div className="space-y-10 animate-in fade-in duration-700">
-            <PageHeader 
-                icon={<UserIcon className="w-10 h-10 text-primary" />}
-                title="Identity Directory"
-                description="Manage organizational identities, security posture, and cross-cluster resource assignments. Orchestrate logical subject lifecycle."
+            <PageHeader
+                icon={<UsersIcon className="w-10 h-10 text-primary" />}
+                title="Users"
+                description="Manage all user accounts in your organization. Assign users to groups and control their access to resources."
                 actions={
-                    <Button 
+                    <Button
                         onClick={() => navigate('/users/new')}
-                        className="h-11 rounded-xl bg-primary text-white font-semibold text-sm px-8 shadow-xl shadow-primary/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                        className="h-11 rounded-xl bg-primary text-primary-foreground font-bold tracking-tight text-[11px] px-8 shadow-xl shadow-primary/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
                     >
-                        <Plus className="mr-3 h-4 w-4" /> Provision Identity
+                        <UserPlus className="w-4 h-4 mr-3" /> Add User
                     </Button>
                 }
             />
 
-            <GlassCard className="overflow-hidden border-none shadow-xl shadow-on-surface/5 bg-white">
+            <GlassCard className="overflow-hidden border-none shadow-xl shadow-on-surface/5 bg-card">
                 <GlassCardHeader className="py-8 px-10">
                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-8">
                         <div className="flex items-center gap-5">
                             <div className="p-3.5 bg-primary/5 rounded-2xl">
-                                <ShieldCheck className="w-6 h-6 text-primary" />
+                                <Fingerprint className="w-6 h-6 text-primary" />
                             </div>
                             <div>
-                                <GlassCardTitle className="text-2xl font-bold tracking-tight text-on-surface">Directory Registry</GlassCardTitle>
-                                <p className="text-on-surface-variant/40 font-semibold text-[12px] mt-1 tracking-tight">
-                                    {users.length} Active Identity Bindings
+                                <GlassCardTitle className="text-2xl font-bold tracking-tight text-on-surface">User Registry</GlassCardTitle>
+                                <p className="text-on-surface-variant/40 font-bold text-[12px] mt-1 tracking-tight">
+                                    {users.length} Total Users
                                 </p>
                             </div>
                         </div>
@@ -104,17 +122,17 @@ const Users: React.FC = () => {
                         <GlassTable>
                             <GlassTableHeader>
                                 <GlassTableRow className="hover:bg-transparent border-b border-on-surface/5">
-                                    <GlassTableHead className="py-6 pl-10 font-bold text-[12px] tracking-tight text-on-surface-variant/40">Identity Profile</GlassTableHead>
+                                    <GlassTableHead className="py-6 pl-10 font-bold text-[12px] tracking-tight text-on-surface-variant/40">User</GlassTableHead>
                                     <GlassTableHead className="font-bold text-[12px] tracking-tight text-on-surface-variant/40">Status</GlassTableHead>
-                                    <GlassTableHead className="font-bold text-[12px] tracking-tight text-on-surface-variant/40">Cluster Assignments</GlassTableHead>
-                                    <GlassTableHead className="text-right pr-10 font-bold text-[12px] tracking-tight text-on-surface-variant/40">Directives</GlassTableHead>
+                                    <GlassTableHead className="font-bold text-[12px] tracking-tight text-on-surface-variant/40">Groups</GlassTableHead>
+                                    <GlassTableHead className="text-right font-bold text-[12px] tracking-tight text-on-surface-variant/40 pr-10">Actions</GlassTableHead>
                                 </GlassTableRow>
                             </GlassTableHeader>
                             <TableBody>
                                 {filteredUsers.length === 0 ? (
                                     <GlassTableRow>
                                         <TableCell colSpan={4} className="py-32 text-center text-sm font-medium text-on-surface-variant/40">
-                                            No identities matching the current search criteria.
+                                            No users matching the current search criteria.
                                         </TableCell>
                                     </GlassTableRow>
                                 ) : (
@@ -139,10 +157,10 @@ const Users: React.FC = () => {
                                                 </div>
                                             </TableCell>
                                             <TableCell className="py-6">
-                                                <Badge className={`rounded-xl font-bold text-[11px] tracking-tight px-3 py-1 shadow-none border-none ${user.active 
-                                                    ? 'bg-emerald-50 text-emerald-600' 
-                                                    : 'bg-red-50 text-red-600'
-                                                }`}>
+                                                <Badge className={`rounded-xl font-bold text-[11px] tracking-tight px-3 py-1 shadow-none border-none ${user.active
+                                                    ? 'bg-success-subtle text-success'
+                                                    : 'bg-destructive/10 text-destructive'
+                                                    }`}>
                                                     {user.active ? 'Active' : 'Suspended'}
                                                 </Badge>
                                             </TableCell>
@@ -155,7 +173,7 @@ const Users: React.FC = () => {
                                                             </Badge>
                                                         ))
                                                     ) : (
-                                                        <span className="text-[11px] font-medium text-on-surface-variant/30 italic">No Cluster Assignments</span>
+                                                        <span className="text-[11px] font-medium text-on-surface-variant/30 italic">No Groups</span>
                                                     )}
                                                     {user.groups && user.groups.length > 3 && (
                                                         <Badge className="bg-primary/5 text-primary border-none rounded-xl text-[10px] font-bold py-1 px-2">+{user.groups.length - 3}</Badge>
@@ -169,25 +187,25 @@ const Users: React.FC = () => {
                                                             <MoreHorizontal className="h-4.5 w-4.5 text-on-surface-variant/60" />
                                                         </Button>
                                                     </DropdownMenuTrigger>
-                                                    <DropdownMenuContent align="end" className="w-[200px] rounded-2xl border-none shadow-xl shadow-on-surface/10 p-2 bg-white">
-                                                        <DropdownMenuItem 
-                                                            onClick={() => navigate(`/users/${user.id}`)}
-                                                            className="font-bold text-[13px] gap-3 py-3 px-4 cursor-pointer rounded-xl focus:bg-primary/5 focus:text-primary"
+                                                    <DropdownMenuContent align="end" className="w-[200px] rounded-2xl border-none shadow-xl shadow-on-surface/10 p-2 bg-card">
+                                                        <DropdownMenuItem
+                                                            onClick={() => navigate(`/users/edit/${user.id}`)}
+                                                            className="font-bold text-[11px] tracking-tight gap-3 py-3 px-4 rounded-lg focus:bg-primary/5 focus:text-primary cursor-pointer transition-colors"
                                                         >
-                                                            <ArrowUpRight className="w-4 h-4 opacity-50" />
-                                                            Inspect Identity
+                                                            <Eye className="w-3.5 h-3.5 opacity-40" /> Edit Details
                                                         </DropdownMenuItem>
-                                                        <DropdownMenuItem 
+                                                        <DropdownMenuItem
                                                             onClick={() => navigate('/groups')}
-                                                            className="font-bold text-[13px] gap-3 py-3 px-4 cursor-pointer rounded-xl focus:bg-primary/5 focus:text-primary"
+                                                            className="font-bold text-[11px] tracking-tight gap-3 py-3 px-4 rounded-lg focus:bg-primary/5 focus:text-primary cursor-pointer transition-colors"
                                                         >
-                                                            <UsersIcon className="w-4 h-4 opacity-50" />
-                                                            Delegate Clusters
+                                                            <Settings2 className="w-3.5 h-3.5 opacity-40" /> Manage Groups
                                                         </DropdownMenuItem>
                                                         <DropdownMenuSeparator className="bg-on-surface/5 my-1.5 mx-2" />
-                                                        <DropdownMenuItem className="text-red-500 font-bold text-[13px] gap-3 py-3 px-4 cursor-pointer rounded-xl focus:bg-red-50 focus:text-red-600">
-                                                            <ShieldAlert className="w-4 h-4" />
-                                                            Suspend Access
+                                                        <DropdownMenuItem 
+                                                            onClick={() => handleDeleteUser(user.id)}
+                                                            className="text-destructive font-bold text-[11px] tracking-tight gap-3 py-3 px-4 rounded-lg focus:bg-destructive/10 focus:text-destructive cursor-pointer transition-colors"
+                                                        >
+                                                            <ShieldAlert className="w-3.5 h-3.5" /> Delete User
                                                         </DropdownMenuItem>
                                                     </DropdownMenuContent>
                                                 </DropdownMenu>

@@ -11,9 +11,10 @@ type User struct {
 	TenantID  string    `json:"tenant_id,omitempty" db:"tenant_id" validate:"omitempty,uuid"`
 	Email     string    `json:"email" db:"email" validate:"required,email"`
 	Password  string    `json:"password,omitempty" db:"-" validate:"omitempty,min=8"` // Ignore password for db scan, normally not selected or manual
-	Status    string    `json:"status,omitempty" db:"status" validate:"omitempty,oneof=active inactive suspended"`
-	CreatedAt time.Time `json:"created_at,omitempty" db:"created_at"`
-	UpdatedAt time.Time `json:"updated_at,omitempty" db:"updated_at"`
+	Status      string    `json:"status,omitempty" db:"status" validate:"omitempty,oneof=active inactive suspended"`
+	MFAEnforced bool      `json:"mfa_enforced" db:"mfa_enforced"`
+	CreatedAt   time.Time `json:"created_at,omitempty" db:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at,omitempty" db:"updated_at"`
 }
 
 // Group represents a group in the system.

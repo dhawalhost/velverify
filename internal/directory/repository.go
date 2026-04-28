@@ -21,7 +21,7 @@ type Repository interface {
 	GetUserByID(ctx context.Context, tenantID, id string) (User, error)
 	GetUserByEmail(ctx context.Context, tenantID, email string) (User, error)
 	ListUsers(ctx context.Context, tenantID string, limit, offset int) ([]User, int, error)
-	UpdateIdentity(ctx context.Context, tx *sqlx.Tx, tenantID, id, status string) error
+	UpdateIdentity(ctx context.Context, tx *sqlx.Tx, tenantID, id, status string, mfaEnforced bool) error
 	UpdateAccount(ctx context.Context, tx *sqlx.Tx, tenantID, id, email, passwordHash string) error
 	DeleteIdentity(ctx context.Context, tenantID, id string) error
 
@@ -35,6 +35,7 @@ type Repository interface {
 	AddUserToGroup(ctx context.Context, tenantID, userID, groupID string) error
 	RemoveUserFromGroup(ctx context.Context, tenantID, userID, groupID string) error
 	ListGroupMembers(ctx context.Context, tenantID, groupID string) ([]User, error)
+	ListUserGroups(ctx context.Context, tenantID, userID string) ([]Group, error)
 
 	// Organization
 	AddUserToOrganization(ctx context.Context, tenantID, userID, orgID, role string) error
@@ -107,7 +108,7 @@ func (r *sqlRepository) CreateAccount(ctx context.Context, tx *sqlx.Tx, userID, 
 
 func (r *sqlRepository) GetUserByID(ctx context.Context, tenantID, id string) (User, error) {
 	var user User
-	err := r.db.GetContext(ctx, &user, `SELECT i.id, i.tenant_id, a.login AS email, i.status, i.created_at, i.updated_at
+	err := r.db.GetContext(ctx, &user, `SELECT i.id, i.tenant_id, a.login AS email, i.status, i.mfa_enforced, i.created_at, i.updated_at
 		 FROM identities i JOIN accounts a ON i.id = a.identity_id WHERE i.id = $1 AND i.tenant_id = $2`,
 		id, tenantID)
 	return user, err
@@ -115,7 +116,7 @@ func (r *sqlRepository) GetUserByID(ctx context.Context, tenantID, id string) (U
 
 func (r *sqlRepository) GetUserByEmail(ctx context.Context, tenantID, email string) (User, error) {
 	var user User
-	err := r.db.GetContext(ctx, &user, `SELECT i.id, i.tenant_id, a.login AS email, i.status, i.created_at, i.updated_at
+	err := r.db.GetContext(ctx, &user, `SELECT i.id, i.tenant_id, a.login AS email, i.status, i.mfa_enforced, i.created_at, i.updated_at
 		 FROM identities i JOIN accounts a ON i.id = a.identity_id WHERE a.login = $1 AND a.tenant_id = $2`,
 		email, tenantID)
 	return user, err
@@ -126,7 +127,7 @@ func (r *sqlRepository) GetPasswordHash(ctx context.Context, tenantID, email str
 		User
 		PasswordHash string `db:"password_hash"`
 	}
-	err := r.db.GetContext(ctx, &record, `SELECT i.id, i.tenant_id, a.login AS email, i.status, i.created_at, i.updated_at, a.password_hash
+	err := r.db.GetContext(ctx, &record, `SELECT i.id, i.tenant_id, a.login AS email, i.status, i.mfa_enforced, i.created_at, i.updated_at, a.password_hash
 		FROM identities i JOIN accounts a ON i.id = a.identity_id
 		WHERE a.login = $1 AND a.tenant_id = $2`, email, tenantID)
 	if err != nil {
@@ -143,7 +144,7 @@ func (r *sqlRepository) ListUsers(ctx context.Context, tenantID string, limit, o
 	}
 
 	var users []User
-	err = r.db.SelectContext(ctx, &users, `SELECT i.id, i.tenant_id, a.login AS email, i.status, i.created_at, i.updated_at
+	err = r.db.SelectContext(ctx, &users, `SELECT i.id, i.tenant_id, a.login AS email, i.status, i.mfa_enforced, i.created_at, i.updated_at
 		FROM identities i JOIN accounts a ON i.id = a.identity_id 
 		WHERE i.tenant_id = $1 
 		ORDER BY i.created_at DESC 
@@ -152,13 +153,13 @@ func (r *sqlRepository) ListUsers(ctx context.Context, tenantID string, limit, o
 	return users, total, err
 }
 
-func (r *sqlRepository) UpdateIdentity(ctx context.Context, tx *sqlx.Tx, tenantID, id, status string) error {
-	query := `UPDATE identities SET status = $1, updated_at = NOW() WHERE id = $2 AND tenant_id = $3`
+func (r *sqlRepository) UpdateIdentity(ctx context.Context, tx *sqlx.Tx, tenantID, id, status string, mfaEnforced bool) error {
+	query := `UPDATE identities SET status = $1, mfa_enforced = $2, updated_at = NOW() WHERE id = $3 AND tenant_id = $4`
 	var err error
 	if tx != nil {
-		_, err = tx.ExecContext(ctx, query, status, id, tenantID)
+		_, err = tx.ExecContext(ctx, query, status, mfaEnforced, id, tenantID)
 	} else {
-		_, err = r.db.ExecContext(ctx, query, status, id, tenantID)
+		_, err = r.db.ExecContext(ctx, query, status, mfaEnforced, id, tenantID)
 	}
 	return err
 }
@@ -251,6 +252,16 @@ func (r *sqlRepository) ListGroupMembers(ctx context.Context, tenantID, groupID 
 		WHERE ig.group_id = $1 AND i.tenant_id = $2`
 	err := r.db.SelectContext(ctx, &users, query, groupID, tenantID)
 	return users, err
+}
+
+func (r *sqlRepository) ListUserGroups(ctx context.Context, tenantID, userID string) ([]Group, error) {
+	var groups []Group
+	query := `SELECT g.id, g.tenant_id, g.name, g.created_at, g.updated_at
+		FROM groups g
+		JOIN identity_groups ig ON g.id = ig.group_id
+		WHERE ig.identity_id = $1 AND g.tenant_id = $2`
+	err := r.db.SelectContext(ctx, &groups, query, userID, tenantID)
+	return groups, err
 }
 
 func (r *sqlRepository) AddUserToOrganization(ctx context.Context, tenantID, userID, orgID, role string) error {

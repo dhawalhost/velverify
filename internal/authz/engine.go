@@ -154,10 +154,14 @@ func (e *Engine) checkRecursive(ctx context.Context, tenantID, subID, subType, r
 		// For now, we assume the subject namespace is part of the 'Namespace' config or implicit.
 		// In a full Zanzibar, the subject_id is actually another object.
 
-		// TODO: Improve subject namespace resolution.
-		// For this MVP, we assume relationships flow within the same namespace or specific hardcoded ones.
+		subjectNS := ns
+		subjectObjID := t.SubjectID
+		if parts := strings.SplitN(t.SubjectID, ":", 2); len(parts) == 2 {
+			subjectNS = parts[0]
+			subjectObjID = parts[1]
+		}
 
-		allowed, err := e.checkRecursive(ctx, tenantID, subID, subType, *t.SubjectRelation, ns, t.SubjectID, depth+1)
+		allowed, err := e.checkRecursive(ctx, tenantID, subID, subType, *t.SubjectRelation, subjectNS, subjectObjID, depth+1)
 		if err == nil && allowed {
 			return true, nil
 		}

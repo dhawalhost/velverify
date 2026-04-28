@@ -109,13 +109,13 @@ export default function Connectors() {
             <div className="space-y-12 animate-in fade-in duration-700">
                 <PageHeader
                     icon={<Plug className="w-10 h-10 text-primary" />}
-                    title={isCreating ? 'Provision Connector' : 'Configure Vector'}
-                    description={`Orchestrating bridge protocols for external identity shards. Synchronizing with the ${editingConnector.type?.toUpperCase()} matrix.`}
+                    title={isCreating ? 'Add Connector' : 'Edit Connector'}
+                    description={`Configure how WardSeal syncs data with your external provider.`}
                     actions={
                         <Button
                             variant="outline"
                             onClick={() => { setEditingConnector(null); setTestResult(null); }}
-                            className="bg-white rounded-xl font-bold tracking-tight text-[11px] h-11 px-8 ring-1 ring-on-surface/5 shadow-sm hover:bg-surface-container transition-all"
+                            className="bg-card rounded-xl font-bold tracking-tight text-[11px] h-11 px-8 ring-1 ring-on-surface/5 shadow-sm hover:bg-surface-container transition-all"
                         >
                             <ArrowLeft className="mr-2 h-4 w-4" /> Cancel
                         </Button>
@@ -123,7 +123,7 @@ export default function Connectors() {
                 />
 
                 <div className="flex justify-center">
-                    <GlassCard className="w-full max-w-4xl border-none shadow-2xl shadow-on-surface/10 bg-white overflow-hidden rounded-[32px]">
+                    <GlassCard className="w-full max-w-4xl border-none shadow-2xl shadow-on-surface/10 bg-card overflow-hidden rounded-[32px]">
                         <GlassCardHeader className="py-12 px-10 border-b border-on-surface/5 bg-surface-container/10">
                             <div className="flex items-center gap-6">
                                 <div className="p-4 bg-primary rounded-2xl text-white shadow-lg shadow-primary/20">
@@ -131,16 +131,16 @@ export default function Connectors() {
                                 </div>
                                 <div>
                                     <GlassCardTitle className="text-3xl font-bold tracking-tight text-on-surface">
-                                        {editingConnector.type ? editingConnector.type.charAt(0).toUpperCase() + editingConnector.type.slice(1).toLowerCase() : 'Generic'} Integrator
+                                        {editingConnector.type ? editingConnector.type.charAt(0).toUpperCase() + editingConnector.type.slice(1).toLowerCase() : 'Generic'} Connector
                                     </GlassCardTitle>
-                                    <p className="text-on-surface-variant/40 font-bold text-[12px] mt-1 tracking-tight">Architectural deep-link for enterprise identity federation.</p>
+                                    <p className="text-on-surface-variant/40 font-bold text-[12px] mt-1 tracking-tight">Sync users and groups from your external directory.</p>
                                 </div>
                             </div>
                         </GlassCardHeader>
                         <GlassCardContent className="p-10 space-y-10">
                             <form onSubmit={handleSave} className="space-y-10">
                                 <div className="space-y-4">
-                                    <Label className="text-[12px] font-bold tracking-tight text-on-surface-variant/40 ml-1">01 // Bridge Alias</Label>
+                                    <Label className="text-[12px] font-bold tracking-tight text-on-surface-variant/40 ml-1">01 // Connection Name</Label>
                                     <Input
                                         placeholder="e.g., Corporate LDAP"
                                         value={editingConnector.name || ''}
@@ -156,7 +156,7 @@ export default function Connectors() {
                                 <div className="space-y-8">
                                     <div className="flex items-center gap-3">
                                         <div className="h-1.5 w-1.5 rounded-full bg-primary" />
-                                        <h3 className="text-[12px] font-bold tracking-tight text-on-surface-variant/40">Credential Manifest</h3>
+                                        <h3 className="text-[12px] font-bold tracking-tight text-on-surface-variant/40">Connection Credentials</h3>
                                     </div>
 
                                     {editingConnector.type === 'scim' && (
@@ -189,7 +189,7 @@ export default function Connectors() {
                                     {editingConnector.type === 'ldap' && (
                                         <div className="grid gap-6">
                                             <div className="space-y-3">
-                                                <Label className="text-[11px] font-bold tracking-tight text-on-surface-variant/40 ml-1">Resource Locator (URL)</Label>
+                                                <Label className="text-[11px] font-bold tracking-tight text-on-surface-variant/40 ml-1">Server URL</Label>
                                                 <Input
                                                     placeholder="ldaps://identity.corp:636"
                                                     value={editingConnector.endpoint || ''}
@@ -323,17 +323,17 @@ export default function Connectors() {
                                         variant="outline"
                                         onClick={handleTest}
                                         disabled={testing}
-                                        className="h-12 w-full md:w-auto px-10 rounded-xl bg-white ring-1 ring-on-surface/5 font-bold tracking-tight text-[11px] transition-all hover:bg-primary/5 hover:text-primary hover:ring-primary/20"
+                                        className="h-12 w-full md:w-auto px-10 rounded-xl bg-card ring-1 ring-on-surface/5 font-bold tracking-tight text-[11px] transition-all hover:bg-primary/5 hover:text-primary hover:ring-primary/20"
                                     >
                                         {testing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RotateCcw className="mr-2 h-4 w-4" />}
                                         Test Connectivity
                                     </Button>
 
                                     {testResult && (
-                                        <div className={`p-4 rounded-xl border flex items-center gap-4 animate-in slide-in-from-left-4 duration-500 flex-1 ${testResult.status === 'success' ? 'bg-emerald-50 border-emerald-100 text-emerald-600' : 'bg-red-50 border-red-100 text-red-600'}`}>
+                                        <div className={`p-4 rounded-xl border flex items-center gap-4 animate-in slide-in-from-left-4 duration-500 flex-1 ${testResult.status === 'success' ? 'bg-success-subtle border-success/10 text-success' : 'bg-destructive/10 border-destructive/20 text-destructive'}`}>
                                             {testResult.status === 'success' ? <Check className="h-5 w-5" /> : <X className="h-5 w-5" />}
                                             <div className="flex flex-col">
-                                                <span className="text-[11px] font-bold tracking-tight leading-none">{testResult.status === 'success' ? 'Handshake successful' : 'Handshake failed'}</span>
+                                                <span className="text-[11px] font-bold tracking-tight leading-none">{testResult.status === 'success' ? 'Test successful' : 'Test failed'}</span>
                                                 {testResult.error && <span className="text-[10px] font-medium opacity-60 mt-1.5 truncate max-w-md">{testResult.error}</span>}
                                             </div>
                                         </div>
@@ -368,107 +368,107 @@ export default function Connectors() {
         <div className="space-y-12 animate-in fade-in duration-700">
             <PageHeader
                 icon={<Plug className="w-10 h-10 text-primary" />}
-                title="Identity Bridges"
-                description="Synchronize external identity shards with the core identity matrix. Multi-source provisioning for the zero-trust architecture."
+                title="External Sync"
+                description="Connect your existing identity providers like Google, Microsoft, and LDAP to sync users automatically."
             />
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 <Button
                     variant="outline"
-                    className="h-44 flex flex-col gap-5 items-center justify-center border-none bg-white hover:bg-primary/5 rounded-[32px] group transition-all relative overflow-hidden shadow-xl shadow-on-surface/5"
+                    className="h-44 flex flex-col gap-5 items-center justify-center border-none bg-card hover:bg-primary/5 rounded-[32px] group transition-all relative overflow-hidden shadow-xl shadow-on-surface/5"
                     onClick={() => { setEditingConnector({ type: 'scim', enabled: true, credentials: {}, settings: {} }); setIsCreating(true); }}
                 >
                     <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none group-hover:scale-110 transition-transform">
                         <Link2 className="w-20 h-20 -mr-4 -mt-4 text-primary" />
                     </div>
-                    <div className="p-4 bg-primary/5 rounded-2xl group-hover:bg-primary group-hover:text-white transition-all text-primary">
+                    <div className="p-4 bg-primary/5 rounded-2xl group-hover:bg-primary group-hover:text-primary-foreground transition-all text-primary">
                         <Plug className="h-7 w-7" />
                     </div>
                     <div className="flex flex-col items-center gap-1.5">
-                        <span className="text-sm font-bold tracking-tight text-on-surface">Provision SCIM</span>
-                        <span className="text-[11px] font-bold tracking-tight text-on-surface-variant/20 italic">Direct API Handshake</span>
+                        <span className="text-sm font-bold tracking-tight text-on-surface">Add SCIM</span>
+                        <span className="text-[11px] font-bold tracking-tight text-on-surface-variant/20 italic">Standard API Sync</span>
                     </div>
                 </Button>
 
                 <Button
                     variant="outline"
-                    className="h-44 flex flex-col gap-5 items-center justify-center border-none bg-white hover:bg-primary/5 rounded-[32px] group transition-all relative overflow-hidden shadow-xl shadow-on-surface/5"
+                    className="h-44 flex flex-col gap-5 items-center justify-center border-none bg-card hover:bg-primary/5 rounded-[32px] group transition-all relative overflow-hidden shadow-xl shadow-on-surface/5"
                     onClick={() => { setEditingConnector({ type: 'ldap', enabled: true, credentials: {}, settings: {} }); setIsCreating(true); }}
                 >
                     <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none group-hover:scale-110 transition-transform">
                         <Database className="w-20 h-20 -mr-4 -mt-4 text-primary" />
                     </div>
-                    <div className="p-4 bg-primary/5 rounded-2xl group-hover:bg-primary group-hover:text-white transition-all text-primary">
+                    <div className="p-4 bg-primary/5 rounded-2xl group-hover:bg-primary group-hover:text-primary-foreground transition-all text-primary">
                         <span className="font-bold italic text-lg leading-none">LDAP</span>
                     </div>
                     <div className="flex flex-col items-center gap-1.5">
-                        <span className="text-sm font-bold tracking-tight text-on-surface">Provision Directory</span>
-                        <span className="text-[11px] font-bold tracking-tight text-on-surface-variant/20 italic">Active Directory Sync</span>
+                        <span className="text-sm font-bold tracking-tight text-on-surface">Add LDAP</span>
+                        <span className="text-[11px] font-bold tracking-tight text-on-surface-variant/20 italic">On-premise Sync</span>
                     </div>
                 </Button>
 
                 <Button
                     variant="outline"
-                    className="h-44 flex flex-col gap-5 items-center justify-center border-none bg-white hover:bg-primary/5 rounded-[32px] group transition-all relative overflow-hidden shadow-xl shadow-on-surface/5"
+                    className="h-44 flex flex-col gap-5 items-center justify-center border-none bg-card hover:bg-primary/5 rounded-[32px] group transition-all relative overflow-hidden shadow-xl shadow-on-surface/5"
                     onClick={() => { setEditingConnector({ type: 'azure-ad', enabled: true, credentials: {}, settings: {} }); setIsCreating(true); }}
                 >
                     <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none group-hover:scale-110 transition-transform">
                         <ShieldCheck className="w-20 h-20 -mr-4 -mt-4 text-primary" />
                     </div>
-                    <div className="p-4 bg-primary/5 rounded-2xl group-hover:bg-primary group-hover:text-white transition-all text-primary">
+                    <div className="p-4 bg-primary/5 rounded-2xl group-hover:bg-primary group-hover:text-primary-foreground transition-all text-primary">
                         <span className="font-bold italic text-lg leading-none">ENTRA</span>
                     </div>
                     <div className="flex flex-col items-center gap-1.5">
-                        <span className="text-sm font-bold tracking-tight text-on-surface">Provision Microsoft</span>
-                        <span className="text-[11px] font-bold tracking-tight text-on-surface-variant/20 italic">Graph API Federation</span>
+                        <span className="text-sm font-bold tracking-tight text-on-surface">Add Entra ID</span>
+                        <span className="text-[11px] font-bold tracking-tight text-on-surface-variant/20 italic">Microsoft Cloud Sync</span>
                     </div>
                 </Button>
 
                 <Button
                     variant="outline"
-                    className="h-44 flex flex-col gap-5 items-center justify-center border-none bg-white hover:bg-primary/5 rounded-[32px] group transition-all relative overflow-hidden shadow-xl shadow-on-surface/5"
+                    className="h-44 flex flex-col gap-5 items-center justify-center border-none bg-card hover:bg-primary/5 rounded-[32px] group transition-all relative overflow-hidden shadow-xl shadow-on-surface/5"
                     onClick={() => { setEditingConnector({ type: 'google', enabled: true, credentials: {}, settings: { domain: '' } }); setIsCreating(true); }}
                 >
                     <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none group-hover:scale-110 transition-transform">
                         <Fingerprint className="w-20 h-20 -mr-4 -mt-4 text-primary" />
                     </div>
-                    <div className="p-4 bg-primary/5 rounded-2xl group-hover:bg-primary group-hover:text-white transition-all text-primary">
+                    <div className="p-4 bg-primary/5 rounded-2xl group-hover:bg-primary group-hover:text-primary-foreground transition-all text-primary">
                         <span className="font-bold italic text-lg leading-none">GOOGLE</span>
                     </div>
                     <div className="flex flex-col items-center gap-1.5">
-                        <span className="text-sm font-bold tracking-tight text-on-surface">Provision Workspace</span>
-                        <span className="text-[11px] font-bold tracking-tight text-on-surface-variant/20 italic">Delegated Sync Engine</span>
+                        <span className="text-sm font-bold tracking-tight text-on-surface">Add Google</span>
+                        <span className="text-[11px] font-bold tracking-tight text-on-surface-variant/20 italic">Google Workspace Sync</span>
                     </div>
                 </Button>
             </div>
 
             <div className="space-y-8">
                 <div className="flex items-center gap-6">
-                    <h2 className="text-[12px] font-bold tracking-tight text-on-surface-variant/40 italic flex-shrink-0">Active Bridge Nodes</h2>
+                    <h2 className="text-[12px] font-bold tracking-tight text-on-surface-variant/40 italic flex-shrink-0">Active Sync Sources</h2>
                     <div className="h-px flex-1 bg-on-surface/5" />
                 </div>
 
-                <GlassCard className="border-none shadow-2xl shadow-on-surface/5 bg-white overflow-hidden rounded-[32px]">
+                <GlassCard className="border-none shadow-2xl shadow-on-surface/5 bg-card overflow-hidden rounded-[32px]">
                     <GlassCardHeader className="py-8 px-10 border-b border-on-surface/5">
                         <div className="flex items-center gap-5">
                             <div className="p-3.5 bg-primary/5 rounded-2xl">
                                 <Link2 className="w-7 h-7 text-primary" />
                             </div>
                             <div>
-                                <GlassCardTitle className="text-2xl font-bold tracking-tight text-on-surface">Bridge Directory ({connectors.length})</GlassCardTitle>
-                                <p className="text-on-surface-variant/20 font-bold text-[12px] mt-1 tracking-tight">Verified synchronization vectors establishing parity.</p>
+                                <GlassCardTitle className="text-2xl font-bold tracking-tight text-on-surface">Configured Sources ({connectors.length})</GlassCardTitle>
+                                <p className="text-on-surface-variant/20 font-bold text-[12px] mt-1 tracking-tight">Identify sources that are correctly syncing with WardSeal.</p>
                             </div>
                         </div>
                     </GlassCardHeader>
                     <GlassCardContent className="p-0">
                         {connectors.length === 0 ? (
-                            <div className="py-32 text-center text-sm font-medium text-on-surface-variant/30 italic">No identity bridges established in the current matrix.</div>
+                            <div className="py-32 text-center text-sm font-medium text-on-surface-variant/30 italic">No sync sources configured.</div>
                         ) : (
                             <div className="divide-y divide-on-surface/5">
                                 {connectors.map(c => (
                                     <div key={c.id} className="p-8 flex flex-col md:flex-row items-start md:items-center justify-between hover:bg-surface-container/10 transition-all group gap-8">
                                         <div className="flex items-center gap-8">
-                                            <div className="w-14 h-14 rounded-2xl bg-surface-container/50 text-on-surface-variant/40 flex items-center justify-center transition-all group-hover:bg-primary group-hover:text-white group-hover:scale-105">
+                                            <div className="w-14 h-14 rounded-2xl bg-surface-container/50 text-on-surface-variant/40 flex items-center justify-center transition-all group-hover:bg-primary group-hover:text-primary-foreground group-hover:scale-105">
                                                 <Plug className="h-6 w-6" />
                                             </div>
                                             <div className="flex flex-col gap-2">
@@ -478,7 +478,7 @@ export default function Connectors() {
                                                 </div>
                                                 <div className="flex items-center gap-3 text-[11px] font-bold tracking-tight text-on-surface-variant/20 group-hover:text-on-surface-variant/40 transition-opacity">
                                                     <Terminal className="h-3 w-3" />
-                                                    Vector: {c.endpoint || 'Managed internal protocol'}
+                                                    Source: {c.endpoint || 'Internal'}
                                                 </div>
                                             </div>
                                         </div>
@@ -487,13 +487,13 @@ export default function Connectors() {
                                                 <Switch
                                                     checked={c.enabled}
                                                     onCheckedChange={(checked) => handleToggle(c.id, checked)}
-                                                    className="data-[state=checked]:bg-emerald-500"
+                                                    className="data-[state=checked]:bg-success"
                                                 />
                                                 <div className="flex flex-col">
-                                                    <span className={`text-[11px] font-bold tracking-tight transition-all ${c.enabled ? 'text-emerald-600' : 'text-on-surface-variant/20'}`}>
-                                                        {c.enabled ? 'Active' : 'Standby'}
+                                                    <span className={`text-[11px] font-bold tracking-tight transition-all ${c.enabled ? 'text-success' : 'text-on-surface-variant/20'}`}>
+                                                        {c.enabled ? 'Active' : 'Disabled'}
                                                     </span>
-                                                    <span className="text-[9px] font-bold tracking-tight opacity-20 italic">Sync Engine</span>
+                                                    <span className="text-[9px] font-bold tracking-tight opacity-20 italic">Status</span>
                                                 </div>
                                             </div>
 
@@ -501,7 +501,7 @@ export default function Connectors() {
                                                 <Button size="icon" variant="ghost" className="h-11 w-11 rounded-xl text-on-surface-variant/40 hover:text-on-surface hover:bg-surface-container transition-all" onClick={() => { setEditingConnector(c); setIsCreating(false); }}>
                                                     <Settings className="h-5 w-5" />
                                                 </Button>
-                                                <Button size="icon" variant="ghost" className="h-11 w-11 rounded-xl text-on-surface-variant/40 hover:text-red-500 hover:bg-red-50 transition-all" onClick={() => handleDelete(c.id)}>
+                                                <Button size="icon" variant="ghost" className="h-11 w-11 rounded-xl text-on-surface-variant/40 hover:text-destructive hover:bg-destructive/10 transition-all" onClick={() => handleDelete(c.id)}>
                                                     <Trash2 className="h-5 w-5" />
                                                 </Button>
                                             </div>

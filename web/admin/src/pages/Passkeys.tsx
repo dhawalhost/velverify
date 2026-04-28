@@ -1,10 +1,9 @@
 import React, { useState } from 'react';
 import { beginRegistration, finishRegistration } from '../api';
 import { startRegistration } from '@simplewebauthn/browser';
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Fingerprint, Loader2, Check, AlertTriangle } from 'lucide-react';
-import { jwtDecode } from "jwt-decode"; // IF we had this package, but let's stick to the manual decoding for now or just generic payload
+import { PageHeader, GlassCard, GlassCardHeader, GlassCardTitle, GlassCardContent, GlassCardDescription } from '@/components/layout';
 
 const Passkeys: React.FC = () => {
     const [message, setMessage] = useState('');
@@ -58,55 +57,65 @@ const Passkeys: React.FC = () => {
     };
 
     return (
-        <div className="space-y-6 max-w-2xl mx-auto">
-            <div className="text-center space-y-2">
-                <h1 className="text-3xl font-bold tracking-tight">Passkeys</h1>
-                <p className="text-muted-foreground">Go passwordless with biometric authentication.</p>
-            </div>
+        <div className="space-y-12 max-w-2xl mx-auto animate-in fade-in duration-700">
+            <PageHeader
+                icon={<Fingerprint className="w-10 h-10 text-primary" />}
+                title="Passkeys"
+                description="Go passwordless with biometric authentication. Use TouchID, FaceID, or a hardware security key."
+            />
 
-            <Card className="border-2 border-muted/40 shadow-sm">
-                <CardHeader>
-                    <div className="mx-auto bg-primary/10 p-4 rounded-full w-fit mb-4">
-                        <Fingerprint className="w-12 h-12 text-primary" />
+            <GlassCard className="border-none shadow-2xl shadow-on-surface/5 overflow-hidden rounded-[32px] bg-card">
+                <GlassCardHeader className="bg-primary py-14 px-10 text-white relative overflow-hidden">
+                    <div className="absolute top-0 right-0 opacity-10 p-8">
+                        <Fingerprint className="w-40 h-40 -mr-10 -mt-10" />
                     </div>
-                    <CardTitle className="text-center">Register a New Passkey</CardTitle>
-                    <CardDescription className="text-center max-w-sm mx-auto">
-                        Use TouchID, FaceID, or a hardware security key (YubiKey) to sign in faster and more securely.
-                    </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6 pb-8">
+                    <div className="relative z-10 flex flex-col items-center text-center gap-6">
+                        <div className="w-20 h-20 bg-card/20 rounded-3xl flex items-center justify-center backdrop-blur-md shadow-inner">
+                            <Fingerprint className="w-10 h-10 text-white" />
+                        </div>
+                        <div>
+                            <GlassCardTitle className="text-3xl font-bold tracking-tight text-white">Register a Passkey</GlassCardTitle>
+                            <GlassCardDescription className="text-on-inverse/60 font-medium text-sm mt-3 max-w-sm mx-auto leading-relaxed">
+                                Use TouchID, FaceID, or a hardware security key (YubiKey) to sign in faster and more securely.
+                            </GlassCardDescription>
+                        </div>
+                    </div>
+                </GlassCardHeader>
+                <GlassCardContent className="p-10 space-y-8">
                     {message && (
-                        <div className="bg-green-50 border border-green-200 text-green-700 p-4 rounded-md flex items-center gap-2 dark:bg-green-900/20 dark:border-green-800 dark:text-green-300">
-                            <Check className="h-5 w-5" /> {message}
+                        <div className="bg-success-subtle border border-success/20 text-success p-5 rounded-2xl flex items-center gap-3 font-bold text-sm animate-in slide-in-from-bottom-4">
+                            <Check className="h-5 w-5 shrink-0" />
+                            {message}
                         </div>
                     )}
                     {error && (
-                        <div className="bg-destructive/10 border border-destructive/20 text-destructive p-4 rounded-md flex items-center gap-2">
-                            <AlertTriangle className="h-5 w-5" /> {error}
+                        <div className="bg-destructive/10 border border-destructive/20 text-destructive p-5 rounded-2xl flex items-center gap-3 font-bold text-sm animate-in slide-in-from-bottom-4">
+                            <AlertTriangle className="h-5 w-5 shrink-0" />
+                            {error}
                         </div>
                     )}
 
                     <Button
                         onClick={handleRegister}
                         size="lg"
-                        className="w-full h-12 text-base"
+                        className="w-full h-16 rounded-2xl text-base font-bold tracking-tight shadow-xl shadow-primary/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
                         disabled={isRegistering}
                     >
                         {isRegistering ? (
                             <>
-                                <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Waiting for device...
+                                <Loader2 className="mr-3 h-5 w-5 animate-spin" /> Waiting for device...
                             </>
                         ) : (
                             <>
-                                <Fingerprint className="mr-2 h-5 w-5" /> Register Passkey
+                                <Fingerprint className="mr-3 h-5 w-5" /> Register Passkey
                             </>
                         )}
                     </Button>
-                    <p className="text-xs text-center text-muted-foreground">
+                    <p className="text-xs text-center text-on-surface-variant/40 font-medium">
                         Supported on modern browsers (Chrome, Safari, Edge, Firefox) on macOS, Windows, iOS, and Android.
                     </p>
-                </CardContent>
-            </Card>
+                </GlassCardContent>
+            </GlassCard>
         </div>
     );
 };

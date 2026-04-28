@@ -116,6 +116,9 @@ func (f *fakeDirectoryService) ListUserOrganizations(ctx context.Context, tenant
 func (f *fakeDirectoryService) ListGroupMembers(ctx context.Context, tenantID, groupID string) ([]directory.User, error) {
 	return nil, nil
 }
+func (f *fakeDirectoryService) ListUserGroups(ctx context.Context, tenantID, userID string) ([]directory.Group, error) {
+	return nil, nil
+}
 func TestCreateUserPrefersPrimaryEmail(t *testing.T) {
 	fake := &fakeDirectoryService{createUserID: "user-123"}
 	svc := NewService(fake, nil)
@@ -154,9 +157,13 @@ func TestCreateUserUsesProvidedPassword(t *testing.T) {
 		Active:   true,
 	}
 
-	_, err := svc.CreateUser(context.Background(), "tenant-1", req)
+	created, err := svc.CreateUser(context.Background(), "tenant-1", req)
 	if err != nil {
 		t.Fatalf("CreateUser returned error: %v", err)
+	}
+
+	if created.Password != "" {
+		t.Fatalf("expected password to be cleared in response")
 	}
 
 	if fake.lastCreate.Password != "MyStrongP@ssword123" {

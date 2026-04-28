@@ -21,6 +21,7 @@ import { getGovernanceStats, DashboardStats } from '../api';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend, BarChart, Bar, XAxis, YAxis } from 'recharts';
 import { PageHeader, GlassCard, GlassCardHeader, GlassCardTitle, GlassCardContent, GlassTable, GlassTableHeader, GlassTableHead, GlassTableRow } from '@/components/layout';
 import { cn } from '@/lib/utils';
+import { colors, chartTooltipStyle } from '@/components/theme';
 // import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
 const Dashboard: React.FC = () => {
@@ -62,14 +63,15 @@ const Dashboard: React.FC = () => {
         value
     })) : [];
 
-    const COLORS = ['#10b981', '#f59e0b', '#ef4444'];
+    const COLORS = colors.chart;
 
     return (
         <div className="space-y-12 animate-in fade-in duration-700">
             <PageHeader
                 icon={
-                    <div className="p-3 bg-primary rounded-2xl shadow-lg shadow-primary/20">
-                        <ShieldCheck className="w-8 h-8 text-white" />
+                    <div className="p-3">
+                        {/* <ShieldCheck className="w-8 h-8 text-primary-foreground" /> */}
+                        <img src="/wardseal.svg" alt="WardSeal" className="w-12 h-12" />
                     </div>
                 }
                 title="Dashboard"
@@ -77,7 +79,7 @@ const Dashboard: React.FC = () => {
                 actions={
                     <Button
                         onClick={() => navigate('/users/new')}
-                        className="h-11 rounded-xl bg-primary text-white font-bold text-[12px] tracking-tight px-8 shadow-xl shadow-primary/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                        className="h-11 rounded-xl bg-primary text-primary-foreground font-bold text-[12px] tracking-tight px-8 shadow-xl shadow-primary/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
                     >
                         <UserPlus className="mr-3 h-4 w-4" /> Add user
                     </Button>
@@ -92,55 +94,55 @@ const Dashboard: React.FC = () => {
 
             {/* Stats Cards */}
             <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-4">
-                 <GlassCard className="border-none shadow-2xl shadow-on-surface/5 bg-white overflow-hidden rounded-[32px]">
+                <GlassCard className="shadow-on-surface/5">
                     <GlassCardHeader className="flex flex-row items-center justify-between pb-4">
-                        <GlassCardTitle className="text-sm font-bold tracking-tight text-on-surface-variant/40">Total identities</GlassCardTitle>
+                        <GlassCardTitle className="text-sm font-bold tracking-tight text-on-surface-variant/40">Total Users</GlassCardTitle>
                         <div className="p-2 bg-primary/5 rounded-lg">
                             <Users className="h-4 w-4 text-primary" />
                         </div>
                     </GlassCardHeader>
                     <GlassCardContent>
                         <div className="text-5xl font-bold tracking-tighter text-on-surface tabular-nums">{stats?.active_users ?? users.length}</div>
-                        <p className="text-[11px] font-bold text-emerald-500 mt-4 tracking-tight italic">Operational units</p>
+                        <p className="text-[11px] font-bold text-success mt-4 tracking-tight italic">Active accounts</p>
                     </GlassCardContent>
                 </GlassCard>
 
-                <GlassCard className="bg-primary text-white border-none shadow-2xl shadow-primary/20 overflow-hidden rounded-[32px]">
+                <GlassCard className="bg-primary text-primary-foreground shadow-primary/20 ring-primary/20">
                     <GlassCardHeader className="flex flex-row items-center justify-between pb-4">
-                        <GlassCardTitle className="text-sm font-bold tracking-tight text-white/40">Pending governance</GlassCardTitle>
-                        <div className="p-2 bg-white/10 rounded-lg">
+                        <GlassCardTitle className="text-sm font-bold tracking-tight text-on-inverse/40">Pending Approvals</GlassCardTitle>
+                        <div className="p-2 bg-card/10 rounded-lg">
                             <Clock className="h-4 w-4 text-white" />
                         </div>
                     </GlassCardHeader>
                     <GlassCardContent>
                         <div className="text-5xl font-bold tracking-tighter tabular-nums">{stats?.pending_requests ?? '--'}</div>
-                        <p className="text-[11px] font-bold text-white/40 mt-4 tracking-tight italic">Awaiting review</p>
+                        <p className="text-[11px] font-bold text-on-inverse/40 mt-4 tracking-tight italic">Needs your attention</p>
                     </GlassCardContent>
                 </GlassCard>
 
-                <GlassCard className="border-none shadow-2xl shadow-on-surface/5 bg-white overflow-hidden rounded-[32px]">
+                <GlassCard className="shadow-on-surface/5">
                     <GlassCardHeader className="flex flex-row items-center justify-between pb-4">
-                        <GlassCardTitle className="text-sm font-bold tracking-tight text-on-surface-variant/40">Network rules</GlassCardTitle>
+                        <GlassCardTitle className="text-sm font-bold tracking-tight text-on-surface-variant/40">IP Policies</GlassCardTitle>
                         <div className="p-2 bg-primary/5 rounded-lg">
                             <Globe className="h-4 w-4 text-primary" />
                         </div>
                     </GlassCardHeader>
                     <GlassCardContent>
                         <div className="text-5xl font-bold tracking-tighter text-on-surface tabular-nums">{stats?.active_ip_policies ?? '--'}</div>
-                        <p className="text-[11px] font-bold text-primary mt-4 tracking-tight italic">Active guardrails</p>
+                        <p className="text-[11px] font-bold text-primary mt-4 tracking-tight italic">Security rules</p>
                     </GlassCardContent>
                 </GlassCard>
 
-                <GlassCard className="border-none shadow-2xl shadow-on-surface/5 bg-white overflow-hidden rounded-[32px]">
+                <GlassCard className="shadow-on-surface/5">
                     <GlassCardHeader className="flex flex-row items-center justify-between pb-4">
-                        <GlassCardTitle className="text-sm font-bold tracking-tight text-on-surface-variant/40">Hygiene rating</GlassCardTitle>
+                        <GlassCardTitle className="text-sm font-bold tracking-tight text-on-surface-variant/40">Security Score</GlassCardTitle>
                         <div className="p-2 bg-primary/5 rounded-lg">
                             <ShieldCheck className="h-4 w-4 text-primary" />
                         </div>
                     </GlassCardHeader>
                     <GlassCardContent>
                         <div className="text-5xl font-bold tracking-tighter text-on-surface tabular-nums">{stats?.hygiene_score ?? '--'}<span className="text-2xl ml-1 opacity-20">%</span></div>
-                        <p className="text-[11px] font-bold text-emerald-500 mt-4 tracking-tight italic">System posture</p>
+                        <p className="text-[11px] font-bold text-success mt-4 tracking-tight italic">Overall health</p>
                     </GlassCardContent>
                 </GlassCard>
             </div>
@@ -150,7 +152,7 @@ const Dashboard: React.FC = () => {
                     <GlassCardHeader>
                         <GlassCardTitle className="flex items-center gap-2">
                             <Database className="w-4 h-4 opacity-20" />
-                            Provisioning load telemetry
+                            System Activity
                         </GlassCardTitle>
                     </GlassCardHeader>
                     <GlassCardContent className="p-8">
@@ -175,7 +177,7 @@ const Dashboard: React.FC = () => {
                     <GlassCardHeader>
                         <GlassCardTitle className="flex items-center gap-2">
                             <AlertTriangle className="w-4 h-4 opacity-20" />
-                            Risk distribution matrix
+                            Security Risks
                         </GlassCardTitle>
                     </GlassCardHeader>
                     <GlassCardContent className="p-8">
@@ -196,7 +198,7 @@ const Dashboard: React.FC = () => {
                                             <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                                         ))}
                                     </Pie>
-                                    <Tooltip contentStyle={{ fontSize: '11px', fontWeight: 'bold', border: '1px solid #E2E8F0', borderRadius: '12px', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', padding: '12px' }} />
+                                    <Tooltip {...chartTooltipStyle} />
                                     <Legend iconType="circle" iconSize={8} verticalAlign="bottom" height={36} formatter={(value) => <span className="text-[11px] font-semibold text-on-surface-variant pl-2">{value}</span>} />
                                 </PieChart>
                             </ResponsiveContainer>
@@ -206,15 +208,15 @@ const Dashboard: React.FC = () => {
             </div>
 
             {/* Content Table */}
-            <GlassCard className="overflow-hidden border-none shadow-xl shadow-on-surface/5 bg-white rounded-[32px]">
+            <GlassCard className="shadow-on-surface/5">
                 <GlassCardHeader className="py-8 px-10">
                     <div className="flex items-center gap-5">
                         <div className="p-3.5 bg-primary/5 rounded-2xl">
                             <Users className="w-6 h-6 text-primary" />
                         </div>
                         <div>
-                            <GlassCardTitle className="text-2xl font-bold tracking-tight text-on-surface">Synchronized identity stream</GlassCardTitle>
-                            <p className="text-on-surface-variant/60 font-medium text-[11px] mt-1.5 italic">Real-time directory feed</p>
+                            <GlassCardTitle className="text-2xl font-bold tracking-tight text-on-surface">Recent Users</GlassCardTitle>
+                            <p className="text-on-surface-variant/40 font-semibold text-[12px] mt-1 tracking-tight">Latest identity updates</p>
                         </div>
                     </div>
                 </GlassCardHeader>
@@ -223,17 +225,17 @@ const Dashboard: React.FC = () => {
                         <GlassTable>
                             <GlassTableHeader>
                                 <GlassTableRow className="hover:bg-transparent border-b border-on-surface/5">
-                                    <GlassTableHead className="py-6 pl-10">Identity profile</GlassTableHead>
-                                    <GlassTableHead>Access status</GlassTableHead>
-                                    <GlassTableHead>Synchronization</GlassTableHead>
-                                    <GlassTableHead className="text-right pr-10">Directives</GlassTableHead>
+                                    <GlassTableHead className="py-6 pl-10">User</GlassTableHead>
+                                    <GlassTableHead>Status</GlassTableHead>
+                                    <GlassTableHead>Date Added</GlassTableHead>
+                                    <GlassTableHead className="text-right pr-10">Actions</GlassTableHead>
                                 </GlassTableRow>
                             </GlassTableHeader>
                             <TableBody>
                                 {users.length === 0 ? (
                                     <GlassTableRow>
                                         <TableCell colSpan={4} className="py-32 text-center text-sm font-medium text-on-surface-variant/40">
-                                            No active identities detected in the current telemetry span.
+                                            No users found.
                                         </TableCell>
                                     </GlassTableRow>
                                 ) : (
@@ -252,8 +254,8 @@ const Dashboard: React.FC = () => {
                                                 </div>
                                             </TableCell>
                                             <TableCell className="py-6">
-                                                <Badge className={cn("rounded-lg font-bold text-[10px] tracking-tight px-3 py-1 shadow-none border-none", user.active ? "bg-emerald-50 text-emerald-600" : "bg-red-50 text-red-600")}>
-                                                    {user.active ? 'Operational' : 'Inert'}
+                                                <Badge className={cn("rounded-lg font-bold text-[10px] tracking-tight px-3 py-1 shadow-none border-none", user.active ? "bg-success-subtle text-success" : "bg-destructive/10 text-destructive")}>
+                                                    {user.active ? 'Active' : 'Inactive'}
                                                 </Badge>
                                             </TableCell>
                                             <TableCell className="py-6 text-on-surface-variant text-xs font-medium">

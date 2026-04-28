@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { getDeveloperAnalytics, getAppLogs, getAPIKeyLogs } from '../api';
-import { Activity, BarChart2, Clock, Terminal, AlertCircle, RefreshCw } from 'lucide-react';
+import { getDeveloperAnalytics } from '../api';
+import { Activity, BarChart2, Clock, Terminal, AlertCircle, RefreshCw, Loader2, Zap } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { Button } from '@/components/ui/button';
+import { PageHeader, GlassCard, GlassCardHeader, GlassCardTitle, GlassCardContent } from '@/components/layout';
 
 interface AnalyticPoint {
     date: string;
@@ -10,26 +12,10 @@ interface AnalyticPoint {
     errors: number;
 }
 
-interface APILog {
-    id: string;
-    client_id: string;
-    method: string;
-    path: string;
-    status_code: number;
-    latency_ms: number;
-    ip_address: string;
-    request_payload: string;
-    response_payload: string;
-    created_at: string;
-}
-
 export function DeveloperAnalytics() {
     const [analytics, setAnalytics] = useState<AnalyticPoint[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-
-    // Selected entry for viewing raw payloads
-    const [selectedLog, setSelectedLog] = useState<APILog | null>(null);
 
     useEffect(() => {
         fetchAnalytics();
@@ -42,122 +28,150 @@ export function DeveloperAnalytics() {
             const data = await getDeveloperAnalytics();
             setAnalytics(data.analytics || []);
         } catch (err: any) {
-            setError(err.response?.data?.error || 'Failed to load analytics platform');
+            setError(err.response?.data?.error || 'Failed to load API analytics.');
         } finally {
             setLoading(false);
         }
     };
 
-    const getStatusColor = (status: number) => {
-        if (status >= 200 && status < 300) return 'text-green-500 bg-green-500/10 font-medium px-2 py-0.5 rounded';
-        if (status >= 400 && status < 500) return 'text-yellow-500 bg-yellow-500/10 font-medium px-2 py-0.5 rounded';
-        return 'text-red-500 bg-red-500/10 font-medium px-2 py-0.5 rounded';
-    };
-
-    const formatJSON = (payload: string) => {
-        try {
-            const parsed = JSON.parse(payload);
-            return JSON.stringify(parsed, null, 2);
-        } catch {
-            return payload;
-        }
-    };
-
-    if (loading) {
-        return <div className="p-8 flex items-center justify-center"><RefreshCw className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
-    }
-
-    if (error) {
-        return (
-            <div className="p-8">
-                <div className="bg-red-500/10 text-red-500 p-4 rounded flex items-center gap-2">
-                    <AlertCircle className="h-5 w-5" />
-                    {error}
-                </div>
-            </div>
-        );
-    }
-
     const totalCalls = analytics.reduce((sum, p) => sum + p.total_calls, 0);
     const totalErrors = analytics.reduce((sum, p) => sum + p.errors, 0);
-    const avgLatency = analytics.length ? (analytics.reduce((sum, p) => sum + p.avg_latency, 0) / analytics.length).toFixed(0) : 0;
+    const avgLatency = analytics.length
+        ? (analytics.reduce((sum, p) => sum + p.avg_latency, 0) / analytics.length).toFixed(0)
+        : 0;
 
-    // Formatting date helper
     const formatDate = (dateStr: string) => {
         const d = new Date(dateStr);
         return `${d.getMonth() + 1}/${d.getDate()}`;
     };
 
     return (
-        <div className="space-y-6">
-            <div className="flex justify-between items-center">
-                <h1 className="text-2xl font-bold tracking-tight">API Analytics</h1>
-                <button onClick={fetchAnalytics} className="flex items-center gap-2 px-3 py-1.5 text-sm rounded bg-accent hover:bg-accent/80 transition-colors">
-                    <RefreshCw className="h-4 w-4" /> Refresh
-                </button>
-            </div>
+        <div className="space-y-10 animate-in fade-in duration-700">
+            <PageHeader
+                icon={<BarChart2 className="w-10 h-10 text-primary" />}
+                title="API Analytics"
+                description="Monitor your API usage, latency, and error rates across the platform over the last 7 days."
+                actions={
+                    <Button
+                        onClick={fetchAnalytics}
+                        variant="outline"
+                        className="h-11 rounded-xl font-bold text-[11px] px-6 border-none ring-1 ring-on-surface/10 hover:bg-surface-container transition-all"
+                        disabled={loading}
+                    >
+                        {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <RefreshCw className="h-4 w-4 mr-2" />}
+                        Refresh
+                    </Button>
+                }
+            />
+
+            {error && (
+                <div className="bg-destructive/10 text-destructive p-5 rounded-2xl flex items-center gap-3 font-bold text-sm">
+                    <AlertCircle className="h-5 w-5 shrink-0" />
+                    {error}
+                </div>
+            )}
 
             {/* KPI Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="bg-card border rounded-lg p-6">
-                    <div className="flex items-center justify-between">
-                        <h3 className="text-sm font-medium text-muted-foreground flex items-center gap-2"><Activity className="h-4 w-4 text-primary" /> Total Calls (7d)</h3>
-                    </div>
-                    <div className="mt-2 text-3xl font-bold">{totalCalls.toLocaleString()}</div>
-                </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <GlassCard className="border-none shadow-xl shadow-on-surface/5 bg-card rounded-[24px] overflow-hidden">
+                    <GlassCardContent className="p-8 flex flex-col gap-3">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2.5 bg-primary/10 rounded-xl">
+                                <Activity className="h-5 w-5 text-primary" />
+                            </div>
+                            <span className="text-[12px] font-bold tracking-tight text-on-surface-variant/40">Total Calls (7d)</span>
+                        </div>
+                        <p className="text-5xl font-bold tracking-tight text-on-surface tabular-nums">{loading ? '—' : totalCalls.toLocaleString()}</p>
+                    </GlassCardContent>
+                </GlassCard>
 
-                <div className="bg-card border rounded-lg p-6">
-                    <div className="flex items-center justify-between">
-                        <h3 className="text-sm font-medium text-muted-foreground flex items-center gap-2"><Clock className="h-4 w-4 text-primary" /> Avg Latency</h3>
-                    </div>
-                    <div className="mt-2 text-3xl font-bold">{avgLatency} ms</div>
-                </div>
+                <GlassCard className="border-none shadow-xl shadow-on-surface/5 bg-card rounded-[24px] overflow-hidden">
+                    <GlassCardContent className="p-8 flex flex-col gap-3">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2.5 bg-primary/10 rounded-xl">
+                                <Clock className="h-5 w-5 text-primary" />
+                            </div>
+                            <span className="text-[12px] font-bold tracking-tight text-on-surface-variant/40">Avg Latency</span>
+                        </div>
+                        <p className="text-5xl font-bold tracking-tight text-on-surface tabular-nums">
+                            {loading ? '—' : <>{avgLatency}<span className="text-2xl ml-2 text-on-surface-variant/40">ms</span></>}
+                        </p>
+                    </GlassCardContent>
+                </GlassCard>
 
-                <div className="bg-card border rounded-lg p-6">
-                    <div className="flex items-center justify-between">
-                        <h3 className="text-sm font-medium text-muted-foreground flex items-center gap-2"><AlertCircle className="h-4 w-4 text-primary" /> Total Errors (7d)</h3>
-                    </div>
-                    <div className="mt-2 text-3xl font-bold">{totalErrors.toLocaleString()}</div>
-                </div>
+                <GlassCard className="border-none shadow-xl shadow-on-surface/5 bg-card rounded-[24px] overflow-hidden">
+                    <GlassCardContent className="p-8 flex flex-col gap-3">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2.5 bg-destructive/10 rounded-xl">
+                                <AlertCircle className="h-5 w-5 text-destructive" />
+                            </div>
+                            <span className="text-[12px] font-bold tracking-tight text-on-surface-variant/40">Total Errors (7d)</span>
+                        </div>
+                        <p className={`text-5xl font-bold tracking-tight tabular-nums ${totalErrors > 0 ? 'text-destructive' : 'text-on-surface'}`}>
+                            {loading ? '—' : totalErrors.toLocaleString()}
+                        </p>
+                    </GlassCardContent>
+                </GlassCard>
             </div>
 
-            {/* Chart */}
-            <div className="bg-card border rounded-lg p-6">
-                <h3 className="text-sm font-medium text-muted-foreground flex items-center gap-2 mb-6"><BarChart2 className="h-4 w-4" /> API Traffic</h3>
-                {analytics.length === 0 ? (
-                    <div className="text-center py-10 text-muted-foreground">No traffic recorded yet. Make some API requests to see data here.</div>
-                ) : (
-                    <div className="h-[300px] w-full">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <LineChart data={analytics}>
-                                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" vertical={false} />
-                                <XAxis dataKey="date" tickFormatter={formatDate} stroke="#888888" fontSize={12} tickLine={false} axisLine={false} />
-                                <YAxis stroke="#888888" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value: any) => `${value}`} />
-                                <Tooltip
-                                    contentStyle={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--border))', borderRadius: '8px' }}
-                                    itemStyle={{ color: 'hsl(var(--foreground))' }}
-                                    labelStyle={{ color: 'hsl(var(--muted-foreground))' }}
-                                    labelFormatter={(label: any) => `Date: ${formatDate(label)}`}
-                                />
-                                <Line type="monotone" dataKey="total_calls" name="Total Calls" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 6 }} />
-                                <Line type="monotone" dataKey="errors" name="Errors" stroke="#ef4444" strokeWidth={2} dot={{ r: 4 }} />
-                            </LineChart>
-                        </ResponsiveContainer>
+            {/* Traffic Chart */}
+            <GlassCard className="border-none shadow-2xl shadow-on-surface/5 bg-card rounded-[32px] overflow-hidden">
+                <GlassCardHeader className="py-8 px-10 border-b border-on-surface/5">
+                    <div className="flex items-center gap-4">
+                        <div className="p-3 bg-primary/10 rounded-xl">
+                            <Zap className="w-5 h-5 text-primary" />
+                        </div>
+                        <GlassCardTitle className="text-xl font-bold tracking-tight text-on-surface">API Traffic</GlassCardTitle>
                     </div>
-                )}
-            </div>
+                </GlassCardHeader>
+                <GlassCardContent className="p-10">
+                    {loading ? (
+                        <div className="h-[300px] flex items-center justify-center">
+                            <Loader2 className="h-10 w-10 animate-spin text-primary opacity-20" />
+                        </div>
+                    ) : analytics.length === 0 ? (
+                        <div className="h-[300px] flex flex-col items-center justify-center gap-4 opacity-20">
+                            <BarChart2 className="h-16 w-16" />
+                            <p className="text-sm font-bold tracking-tight text-center">No API traffic recorded yet.</p>
+                        </div>
+                    ) : (
+                        <div className="h-[300px] w-full">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <LineChart data={analytics}>
+                                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" vertical={false} />
+                                    <XAxis dataKey="date" tickFormatter={formatDate} stroke="#888888" fontSize={12} tickLine={false} axisLine={false} />
+                                    <YAxis stroke="#888888" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(v: any) => `${v}`} />
+                                    <Tooltip
+                                        contentStyle={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--border))', borderRadius: '12px' }}
+                                        itemStyle={{ color: 'hsl(var(--foreground))' }}
+                                        labelStyle={{ color: 'hsl(var(--muted-foreground))' }}
+                                        labelFormatter={(label: any) => `Date: ${formatDate(label)}`}
+                                    />
+                                    <Line type="monotone" dataKey="total_calls" name="Total Calls" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                                    <Line type="monotone" dataKey="errors" name="Errors" stroke="#ef4444" strokeWidth={2} dot={{ r: 4 }} />
+                                </LineChart>
+                            </ResponsiveContainer>
+                        </div>
+                    )}
+                </GlassCardContent>
+            </GlassCard>
 
-            {/* Guidance box on finding the interactive logs */}
-            <div className="bg-primary/5 border border-primary/20 rounded-lg p-4 flex gap-4">
-                <Terminal className="h-6 w-6 text-primary shrink-0" />
-                <div>
-                    <h4 className="font-medium">Interactive API Logs</h4>
-                    <p className="text-sm text-muted-foreground mt-1">
-                        Looking for specific request payloads? Navigate to <a href="/developer/apps" className="text-primary hover:underline">OAuth Apps</a> or your API Keys to view detailed, interactive logs specific to those credentials.
-                    </p>
-                </div>
-            </div>
-
+            {/* Guidance */}
+            <GlassCard className="border-none shadow-xl shadow-on-surface/5 bg-primary/5 rounded-[24px] overflow-hidden">
+                <GlassCardContent className="p-8 flex gap-6 items-start">
+                    <div className="p-3 bg-primary/10 rounded-xl shrink-0">
+                        <Terminal className="h-6 w-6 text-primary" />
+                    </div>
+                    <div>
+                        <h4 className="font-bold text-base tracking-tight text-on-surface">Interactive API Logs</h4>
+                        <p className="text-sm text-on-surface-variant/60 mt-1 leading-relaxed">
+                            Looking for specific request payloads? Go to{' '}
+                            <a href="/developer/apps" className="text-primary hover:underline font-bold">OAuth Apps</a>{' '}
+                            or your API Keys to view detailed, interactive logs tied to each credential.
+                        </p>
+                    </div>
+                </GlassCardContent>
+            </GlassCard>
         </div>
     );
 }

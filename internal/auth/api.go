@@ -225,9 +225,9 @@ func (h *HTTPHandler) RegisterRoutes(router *gin.Engine) {
 	// Use the same signing secret as the service (signer)
 	// Use the service's ValidateToken method
 	userAPI.Use(middleware.RequireUserAuth(h.svc.ValidateToken))
-	userAPI.GET("/apps", h.getUserApps)
-	userAPI.GET("/profile", h.getUserProfile)
-	userAPI.POST("/profile", h.updateUserProfile)
+	userAPI.GET("/apps", middleware.RequireScope("openid"), h.getUserApps)
+	userAPI.GET("/profile", middleware.RequireScope("profile"), h.getUserProfile)
+	userAPI.POST("/profile", middleware.RequireScope("profile"), h.updateUserProfile)
 
 	setupAPI := tenantProtected.Group("/api/v1/setup")
 	setupAPI.Use(middleware.RequireUserAuth(h.svc.ValidateToken))
@@ -423,15 +423,38 @@ func (h *HTTPHandler) login(c *gin.Context) {
 
 		if errors.Is(err, ErrInvalidCredentials) {
 			h.respondOAuthError(c, ErrInvalidCredentials)
-		} else if errors.Is(err, ErrMFARequired) {
+		} else if errors.Is(err, ErrMFASetupRequired) {
+			var userID string
+			claims, parseErr := h.svc.ValidateStepUpToken(token)
+			if parseErr == nil {
+				userID = claims.Subject
+			}
 			c.JSON(http.StatusAccepted, gin.H{
 				"mfa_required":  true,
+				"mfa_enrolled":  false,
+				"user_id":       userID,
 				"step_up_token": token,
+				"pending_token": token,
+				"error":         "mfa_setup_required",
+				"message":       "MFA setup required",
+			})
+		} else if errors.Is(err, ErrMFARequired) {
+			var userID string
+			claims, parseErr := h.svc.ValidateStepUpToken(token)
+			if parseErr == nil {
+				userID = claims.Subject
+			}
+			c.JSON(http.StatusAccepted, gin.H{
+				"mfa_required":  true,
+				"mfa_enrolled":  true,
+				"user_id":       userID,
+				"step_up_token": token,
+				"pending_token": token,
 				"error":         "mfa_required",
-				"message":       "Additional authentication required due to risk assessment",
+				"message":       "Additional authentication required",
 			})
 		} else {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
 		}
 		return
 	}
@@ -442,19 +465,7 @@ func (h *HTTPHandler) login(c *gin.Context) {
 		_ = h.loginAttemptStore.UnlockAccount(c.Request.Context(), tenantID, req.Username)
 	}
 
-	// Check if user has TOTP enabled
-	if h.svc.TOTP() != nil && tenantID != "" {
-		totpSecret, _ := h.svc.TOTP().GetByIdentity(c.Request.Context(), tenantID, req.Username)
-		if totpSecret != nil && totpSecret.Verified {
-			// MFA required - return pending token and mfa_required flag
-			c.JSON(http.StatusOK, gin.H{
-				"mfa_required":  true,
-				"pending_token": token,
-				"user_id":       req.Username,
-			})
-			return
-		}
-	}
+
 
 	// Set httpOnly cookies for session security
 	setAuthCookies(c, token, "")
@@ -689,6 +700,13 @@ func (h *HTTPHandler) authorize(c *gin.Context) {
 		return
 	}
 
+	// Enforce tenant isolation
+	if tenantID != "" && claims.Tenant != "" && claims.Tenant != tenantID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "tenant context mismatch"})
+		return
+	}
+
+
 	if tenantID != "" && h.appStore != nil {
 		app, err := h.appStore.GetByClientID(c.Request.Context(), req.ClientID)
 		if err != nil {
@@ -735,7 +753,7 @@ func (h *HTTPHandler) authorize(c *gin.Context) {
 			h.respondOAuthError(c, svcErr)
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
 		return
 	}
 
@@ -767,7 +785,7 @@ func (h *HTTPHandler) token(c *gin.Context) {
 			h.respondOAuthError(c, svcErr)
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
 		return
 	}
 
@@ -848,7 +866,7 @@ func (h *HTTPHandler) introspect(c *gin.Context) {
 	resp, err := h.svc.Introspect(c.Request.Context(), req)
 	if err != nil {
 		h.logger.Error("Token introspection failed", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
 		return
 	}
 
@@ -871,7 +889,7 @@ func (h *HTTPHandler) revoke(c *gin.Context) {
 
 	if err := h.svc.Revoke(c.Request.Context(), req); err != nil {
 		h.logger.Error("Token revocation failed", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
 		return
 	}
 

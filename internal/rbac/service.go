@@ -70,7 +70,16 @@ func (s *service) GetRole(ctx context.Context, tenantID, id string) (Role, error
 }
 
 func (s *service) ListRoles(ctx context.Context, tenantID string) ([]Role, error) {
-	return s.store.ListRoles(ctx, tenantID)
+	roles, err := s.store.ListRoles(ctx, tenantID)
+	if err != nil {
+		return nil, err
+	}
+	if len(roles) == 0 {
+		if err := s.seedDefaultRolesAndPermissions(ctx, tenantID); err == nil {
+			return s.store.ListRoles(ctx, tenantID)
+		}
+	}
+	return roles, nil
 }
 
 func (s *service) UpdateRole(ctx context.Context, tenantID, id, name, description string) (Role, error) {
@@ -100,7 +109,16 @@ func (s *service) CreatePermission(ctx context.Context, tenantID, resource, acti
 }
 
 func (s *service) ListPermissions(ctx context.Context, tenantID string) ([]Permission, error) {
-	return s.store.ListPermissions(ctx, tenantID)
+	perms, err := s.store.ListPermissions(ctx, tenantID)
+	if err != nil {
+		return nil, err
+	}
+	if len(perms) == 0 {
+		if err := s.seedDefaultRolesAndPermissions(ctx, tenantID); err == nil {
+			return s.store.ListPermissions(ctx, tenantID)
+		}
+	}
+	return perms, nil
 }
 
 func (s *service) AssignPermissionToRole(ctx context.Context, roleID, permissionID string) error {
@@ -197,4 +215,83 @@ func (s *service) HasPermission(ctx context.Context, tenantID, userID, resource,
 	}
 
 	return false, nil
+}
+
+func (s *service) seedDefaultRolesAndPermissions(ctx context.Context, tenantID string) error {
+	type permDef struct {
+		resource    string
+		action      string
+		description string
+	}
+	type roleDef struct {
+		name        string
+		description string
+		perms       []string
+	}
+
+	defaultPerms := []permDef{
+		{"*", "*", "Full administrative access to all resources"},
+		{"users", "read", "Read user profiles"},
+		{"users", "write", "Create and edit user profiles"},
+		{"users", "delete", "Delete user profiles"},
+		{"groups", "read", "Read access groups"},
+		{"groups", "write", "Create and edit access groups"},
+		{"groups", "delete", "Delete access groups"},
+		{"roles", "read", "Read roles and permission mappings"},
+		{"roles", "write", "Create and edit roles and permission mappings"},
+		{"roles", "delete", "Delete roles"},
+		{"policies", "read", "Read zero-trust access policies"},
+		{"policies", "write", "Create and edit zero-trust access policies"},
+		{"policies", "delete", "Delete zero-trust access policies"},
+		{"audit", "read", "Read system audit logs"},
+		{"applications", "read", "View application mappings"},
+		{"applications", "write", "Create and edit application mappings"},
+		{"applications", "delete", "Delete application mappings"},
+	}
+
+	defaultRoles := []roleDef{
+		{"super-admin", "Full access to all system administrative tasks and configurations", []string{"*:*"}},
+		{"security-admin", "Manage and configure security parameters and policies", []string{
+			"users:read", "groups:read", "roles:read", "policies:read", "audit:read", "applications:read",
+		}},
+		{"user-admin", "Create, manage, and configure user profiles and access groups", []string{
+			"users:read", "users:write", "users:delete", "groups:read", "groups:write", "groups:delete",
+		}},
+		{"standard-user", "Basic access privileges assigned to normal organizational members", []string{
+			"applications:read",
+		}},
+	}
+
+	permIDs := make(map[string]string)
+	for _, pd := range defaultPerms {
+		pid, err := s.store.CreatePermission(ctx, Permission{
+			TenantID:    tenantID,
+			Resource:    pd.resource,
+			Action:      pd.action,
+			Description: pd.description,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to seed permission %s:%s: %w", pd.resource, pd.action, err)
+		}
+		permIDs[fmt.Sprintf("%s:%s", pd.resource, pd.action)] = pid
+	}
+
+	for _, rd := range defaultRoles {
+		rid, err := s.store.CreateRole(ctx, Role{
+			TenantID:    tenantID,
+			Name:        rd.name,
+			Description: rd.description,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to seed role %s: %w", rd.name, err)
+		}
+
+		for _, pkey := range rd.perms {
+			if pid, ok := permIDs[pkey]; ok {
+				_ = s.store.AssignPermissionToRole(ctx, rid, pid)
+			}
+		}
+	}
+
+	return nil
 }

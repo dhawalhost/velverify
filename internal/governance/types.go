@@ -55,26 +55,30 @@ type updateOAuthClientRequest struct {
 // Access Request types
 
 type AccessRequest struct {
-	ID           string `json:"id"`
-	TenantID     string `json:"tenant_id"`
-	RequesterID  string `json:"requester_id"`
-	ResourceType string `json:"resource_type"`
-	ResourceID   string `json:"resource_id"`
-	Status       string `json:"status"`
-	Reason       string `json:"reason"`
-	Duration     string `json:"duration,omitempty"` // e.g. "4h", "1d"
-	CreatedAt    string `json:"created_at"`         // ISO8601
-	UpdatedAt    string `json:"updated_at"`
-	DeviceID     string `json:"device_id,omitempty"`
+	ID            string          `json:"id"`
+	TenantID      string          `json:"tenant_id"`
+	RequesterID   string          `json:"requester_id"`
+	RequesterType string          `json:"requester_type"` // user, workload
+	ResourceType  string          `json:"resource_type"`
+	ResourceID    string          `json:"resource_id"`
+	Status        string          `json:"status"`
+	Reason        string          `json:"reason"`
+	Duration      string          `json:"duration,omitempty"` // e.g. "4h", "1d"
+	CreatedAt     string          `json:"created_at"`         // ISO8601
+	UpdatedAt     string          `json:"updated_at"`
+	DeviceID      string          `json:"device_id,omitempty"`
+	Metadata      json.RawMessage `json:"metadata,omitempty"`
 }
 
 type CreateAccessRequest struct {
-	RequesterID  string `json:"requester_id,omitempty"`
-	ResourceType string `json:"resource_type"`
-	ResourceID   string `json:"resource_id"`
-	Reason       string `json:"reason"`
-	Duration     string `json:"duration,omitempty"` // "1h", "4h", "24h", etc.
-	DeviceID     string `json:"device_id,omitempty"`
+	RequesterID   string          `json:"requester_id,omitempty"`
+	RequesterType string          `json:"requester_type,omitempty"` // Default: user
+	ResourceType  string          `json:"resource_type"`
+	ResourceID    string          `json:"resource_id"`
+	Reason        string          `json:"reason"`
+	Duration      string          `json:"duration,omitempty"` // "1h", "4h", "24h", etc.
+	DeviceID      string          `json:"device_id,omitempty"`
+	Metadata      json.RawMessage `json:"metadata,omitempty"`
 }
 
 type AccessRequestList struct {

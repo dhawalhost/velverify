@@ -16,13 +16,15 @@ import (
 type DiscoveredResource struct {
 	ID               string    `json:"id" db:"id"`
 	TenantID         string    `json:"tenant_id" db:"tenant_id"`
-	ConnectorID      string    `json:"connector_id" db:"connector_id"`
+	ConnectorID      *string   `json:"connector_id" db:"connector_id"`
 	Type             string    `json:"type" db:"type"`
 	Name             string    `json:"name" db:"name"`
 	ExternalID       string    `json:"external_id" db:"external_id"`
 	Metadata         JSONMap   `json:"metadata" db:"metadata"`
 	Status           string    `json:"status" db:"status"`
 	LastDiscoveredAt time.Time `json:"last_discovered_at" db:"last_discovered_at"`
+	CreatedAt        time.Time `json:"created_at" db:"created_at"`
+	UpdatedAt        time.Time `json:"updated_at" db:"updated_at"`
 }
 
 // Repository defines the storage interface for discovered resources.
@@ -153,10 +155,10 @@ func (s *discoveryService) RunDiscoveryJob(ctx context.Context, jobID, tenantID 
 				for k, v := range res.Metadata {
 					metadata[k] = v
 				}
-
+				connectorID := c.ID()
 				dr := DiscoveredResource{
 					TenantID:         tenantID,
-					ConnectorID:      c.ID(),
+					ConnectorID:      &connectorID,
 					Type:             res.Type,
 					Name:             res.Name,
 					ExternalID:       res.ExternalID,

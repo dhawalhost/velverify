@@ -122,6 +122,7 @@ func main() {
 	totpStore := auth.NewTOTPRepository(db)
 	appStore := auth.NewDeveloperAppRepository(db)
 	workloadStore := auth.NewWorkloadRepository(db)
+	loginAttemptStore := auth.NewLoginAttemptRepository(db)
 
 	// Initialize Key Management Service
 	kmsConfig := kms.Config{
@@ -181,6 +182,7 @@ func main() {
 		AppStore:         appStore,
 		WorkloadStore:    workloadStore,
 		UIURL:            cfg.Auth.UIURL,
+		LoginAttemptStore: loginAttemptStore,
 		DeploymentMode:   cfg.Auth.DeploymentMode,
 	})
 	if err != nil {
@@ -223,6 +225,7 @@ func main() {
 
 	// Security Middleware
 	router.Use(middleware.Wrap(gokitmiddleware.SecureHeaders()))
+	router.Use(middleware.SoftwareWAFMiddleware())
 
 	var rateLimitRedisClient *redis.Client
 	if cfg.Auth.RedisAddr != "" {
@@ -274,8 +277,7 @@ func main() {
 	// API Logger Middleware
 	router.Use(middleware.APILogger(db, log))
 
-	// Initialize login attempt repository for brute-force protection
-	loginAttemptStore := auth.NewLoginAttemptRepository(db)
+
 
 	authHandlers := auth.NewHTTPHandler(svc, log, loginAttemptStore, appStore)
 	if cfg.Auth.RedisAddr != "" {

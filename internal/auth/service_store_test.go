@@ -18,7 +18,7 @@ func TestPKCEFlowWithClientStore(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	store := newStubClientStore()
 	store.addClient(oauthclient.Client{
-		TenantID:      "11111111-1111-1111-1111-111111111111",
+		TenantID:      "admin-system",
 		ClientID:      "db-client",
 		ClientType:    "public",
 		Name:          "DB Client",
@@ -30,7 +30,7 @@ func TestPKCEFlowWithClientStore(t *testing.T) {
 	})
 
 	svc := newServiceWithStore(t, store)
-	ctx := contextWithTenant(t, "11111111-1111-1111-1111-111111111111")
+	ctx := contextWithTenant(t, "admin-system")
 
 	verifier := "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNO1234567890abcd"
 	challenge := pkceChallenge(verifier)
@@ -67,7 +67,7 @@ func TestPKCEFlowWithClientStore(t *testing.T) {
 func TestAuthorizeRejectsCrossTenantClientFromStore(t *testing.T) {
 	store := newStubClientStore()
 	store.addClient(oauthclient.Client{
-		TenantID:      "11111111-1111-1111-1111-111111111111",
+		TenantID:      "admin-system",
 		ClientID:      "db-client",
 		ClientType:    "public",
 		Name:          "DB Client",
@@ -96,7 +96,7 @@ func TestAuthorizeRejectsCrossTenantClientFromStore(t *testing.T) {
 
 func TestAuthorizeRejectsUnknownClientFromStore(t *testing.T) {
 	svc := newServiceWithStore(t, newStubClientStore())
-	ctx := contextWithTenant(t, "11111111-1111-1111-1111-111111111111")
+	ctx := contextWithTenant(t, "admin-system")
 
 	_, err := svc.Authorize(ctx, "", AuthorizeRequest{
 		ResponseType:        "code",

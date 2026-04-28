@@ -11,14 +11,18 @@ const PortalProfile = () => {
     const { toast } = useToast();
     const [loading, setLoading] = useState(true);
     const [userId, setUserId] = useState("");
+    const [userName, setUserName] = useState("");
+    const [userEmail, setUserEmail] = useState("");
     const [password, setPassword] = useState("");
     const [saving, setSaving] = useState(false);
 
     useEffect(() => {
         const fetchProfile = async () => {
             try {
-                const res = await api.get('/user/profile');
+                const res = await api.get('/api/v1/user/profile');
                 setUserId(res.data.id);
+                setUserName(res.data.name || "");
+                setUserEmail(res.data.email || "");
             } catch (err) {
                 console.error("Failed to fetch profile", err);
             } finally {
@@ -34,7 +38,7 @@ const PortalProfile = () => {
 
         setSaving(true);
         try {
-            await api.post('/user/profile', { password });
+            await api.post('/api/v1/user/profile', { password });
             toast({
                 title: "Password Updated",
                 description: "Your password has been changed successfully.",
@@ -67,15 +71,27 @@ const PortalProfile = () => {
                             <User className="w-8 h-8 text-primary" />
                         </div>
                         <div>
-                            <CardTitle>My Account</CardTitle>
-                            <CardDescription>Manage your account settings</CardDescription>
+                            <CardTitle>{userName || "My Account"}</CardTitle>
+                            <CardDescription>{userEmail || "Manage your account settings"}</CardDescription>
                         </div>
                     </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
+                    {userName && (
+                        <div className="grid gap-1">
+                            <Label>Full Name</Label>
+                            <div className="text-sm bg-muted p-2 rounded border font-medium">{userName}</div>
+                        </div>
+                    )}
+                    {userEmail && (
+                        <div className="grid gap-1">
+                            <Label>Email Address</Label>
+                            <div className="text-sm bg-muted p-2 rounded border font-medium">{userEmail}</div>
+                        </div>
+                    )}
                     <div className="grid gap-1">
                         <Label>User ID</Label>
-                        <div className="font-mono text-sm bg-muted p-2 rounded border">{userId}</div>
+                        <div className="font-mono text-xs bg-muted/50 p-2 rounded border text-muted-foreground">{userId}</div>
                     </div>
                 </CardContent>
             </Card>

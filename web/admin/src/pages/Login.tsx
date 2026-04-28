@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { login, getBranding, completeMfaLogin, lookupUser, beginLogin, finishLogin, getSetupStatus, getUserRoles } from '../api';
+import { login, getBranding, completeMfaLogin, lookupUser, beginLogin, finishLogin, getSetupStatus, getUserRoles, api } from '../api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -93,6 +93,10 @@ const Login: React.FC = () => {
     const [pendingToken, setPendingToken] = useState('');
     const [mfaUserId, setMfaUserId] = useState('');
     const [totpCode, setTotpCode] = useState('');
+    const [mfaEnrolled, setMfaEnrolled] = useState(true);
+    const [qrCode, setQrCode] = useState('');
+    const [secret, setSecret] = useState('');
+    const [enrolling, setEnrolling] = useState(false);
 
     const fetchBranding = async (tid: string) => {
         if (!tid) return;
@@ -213,7 +217,20 @@ const Login: React.FC = () => {
                 setMfaRequired(true);
                 setPendingToken(data.pending_token);
                 setMfaUserId(data.user_id);
+                setMfaEnrolled(data.mfa_enrolled !== false);
                 setLoading(false);
+                
+                if (data.mfa_enrolled === false) {
+                    localStorage.setItem('token', data.pending_token);
+                    try {
+                        const response = await api.post('/api/v1/mfa/totp/enroll', { user_id: data.user_id });
+                        setQrCode(response.data.qr_code);
+                        setSecret(response.data.secret);
+                    } catch (err) {
+                        console.error("Failed to enroll MFA", err);
+                        setError('Failed to initialize MFA setup');
+                    }
+                }
                 return;
             }
 
@@ -285,11 +302,95 @@ const Login: React.FC = () => {
             setLoading(false);
         }
     };
+    const handleMfaSetupVerify = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setError('');
+        setLoading(true);
+        try {
+            await api.post('/api/v1/mfa/totp/verify', { user_id: mfaUserId, code: totpCode });
+            const data = await completeMfaLogin(pendingToken, totpCode, mfaUserId);
+            
+            localStorage.setItem('token', data.token);
+            const tokenUserID = getTokenUserID(data.token) || email;
+            localStorage.setItem('userId', tokenUserID);
+            if (data.tenant_id) {
+                localStorage.setItem('tenantID', data.tenant_id);
+            }
+            if (data.tenant_slug) {
+                localStorage.setItem('tenantSlug', data.tenant_slug);
+            }
 
+            await performRedirection();
+        } catch (err: any) {
+            console.error(err);
+            setError(err.response?.data?.error || 'Invalid TOTP code or setup failure');
+            setLoading(false);
+        }
+    };
     if (mfaRequired) {
+        if (!mfaEnrolled) {
+            return (
+                <div className="flex items-center justify-center min-h-screen bg-background px-6">
+                    <GlassCard className="w-full max-w-[450px] border-none shadow-2xl bg-card overflow-hidden animate-in zoom-in duration-500">
+                        <GlassCardHeader className="pt-12 pb-6 px-10 text-center">
+                            <div className="mx-auto w-9 h-9 bg-primary rounded-[14px] flex items-center justify-center mb-6 shadow-sm">
+                                <ShieldCheck className="w-5 h-5 text-white" />
+                            </div>
+                            <GlassCardTitle className="text-2xl font-bold tracking-tight">Setup MFA</GlassCardTitle>
+                            <GlassCardDescription className="text-[11px] font-bold uppercase tracking-widest mt-2 opacity-50">MFA is required to access the platform</GlassCardDescription>
+                        </GlassCardHeader>
+                        <GlassCardContent className="px-10 pb-12">
+                            <form onSubmit={handleMfaSetupVerify} className="space-y-6">
+                                <div className="flex flex-col items-center justify-center gap-6">
+                                    {qrCode ? (
+                                        <div className="bg-white p-4 rounded-2xl flex justify-center shadow-inner max-w-[200px]">
+                                            <img src={`data:image/png;base64,${qrCode}`} alt="TOTP QR Code" className="w-full aspect-square mix-blend-multiply" />
+                                        </div>
+                                    ) : (
+                                        <div className="flex items-center justify-center h-[200px]">
+                                            <Loader2 className="w-8 h-8 animate-spin text-primary opacity-20" />
+                                        </div>
+                                    )}
+                                    {secret && (
+                                        <div className="text-center space-y-2 w-full bg-surface-container/30 p-4 rounded-xl">
+                                            <Label className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/40 italic">Manual Seed Identifier</Label>
+                                            <div className="font-mono text-xs font-bold tracking-widest select-all text-primary">{secret}</div>
+                                        </div>
+                                    )}
+                                </div>
+                                
+                                <div className="space-y-4 text-center">
+                                    <Label className="text-[11px] font-bold uppercase tracking-widest text-on-surface-variant/40 ml-1">Authentication code</Label>
+                                    <Input
+                                        value={totpCode}
+                                        onChange={(e) => setTotpCode(e.target.value)}
+                                        placeholder="000 000"
+                                        className="h-14 text-center text-3xl font-bold tracking-[0.2em] border-none bg-surface-container/30 rounded-xl focus-visible:ring-2 focus-visible:ring-primary/20"
+                                        maxLength={6}
+                                        autoFocus
+                                    />
+                                </div>
+
+                                {error && (
+                                    <div className="p-4 bg-destructive/10 text-destructive rounded-xl flex items-center gap-3 border border-destructive/20 animate-in fade-in slide-in-from-top-2">
+                                        <ShieldAlert className="w-5 h-5 shrink-0" />
+                                        <span className="text-xs font-bold uppercase tracking-tight">{error}</span>
+                                    </div>
+                                )}
+
+                                <Button type="submit" className="w-full h-14 rounded-xl font-bold text-xs uppercase tracking-widest shadow-lg shadow-primary/20 transition-all" disabled={loading}>
+                                    {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Verify and Login'}
+                                </Button>
+                            </form>
+                        </GlassCardContent>
+                    </GlassCard>
+                </div>
+            );
+        }
+
         return (
-            <div className="flex items-center justify-center min-h-screen bg-slate-50 px-6">
-                <GlassCard className="w-full max-w-[400px] border-none shadow-2xl bg-white overflow-hidden animate-in zoom-in duration-500">
+            <div className="flex items-center justify-center min-h-screen bg-background px-6">
+                <GlassCard className="w-full max-w-[400px] border-none shadow-2xl bg-card overflow-hidden animate-in zoom-in duration-500">
                     <GlassCardHeader className="pt-12 pb-6 px-10 text-center">
                         <div className="mx-auto w-9 h-9 bg-primary rounded-[14px] flex items-center justify-center mb-6 shadow-sm">
                             <ShieldCheck className="w-5 h-5 text-white" />
@@ -311,7 +412,7 @@ const Login: React.FC = () => {
                                 />
                             </div>
                             {error && (
-                                <div className="p-4 bg-red-50 text-red-600 rounded-xl flex items-center gap-3 border border-red-100 animate-in fade-in slide-in-from-top-2">
+                                <div className="p-4 bg-destructive/10 text-destructive rounded-xl flex items-center gap-3 border border-destructive/20 animate-in fade-in slide-in-from-top-2">
                                     <ShieldAlert className="w-5 h-5 shrink-0" />
                                     <span className="text-xs font-bold uppercase tracking-tight">{error}</span>
                                 </div>
@@ -323,13 +424,13 @@ const Login: React.FC = () => {
                     </GlassCardContent>
                 </GlassCard>
             </div>
-        )
+        );
     }
 
     return (
-        <div className="flex min-h-screen bg-white font-sans selection:bg-primary/10">
+        <div className="flex min-h-screen bg-card font-sans selection:bg-primary/10">
             {/* Left Side: Brand & Visual */}
-            <div className="hidden lg:flex lg:w-1/2 relative bg-[#0f172a] overflow-hidden flex-col justify-between p-16">
+            <div className="hidden lg:flex lg:w-1/2 relative bg-surface-container-high overflow-hidden flex-col justify-between p-16">
                 {/* Abstract Pattern / Background */}
                 <div className="absolute inset-0 opacity-20 pointer-events-none">
                     <div className="absolute -top-[10%] -left-[10%] w-[60%] h-[60%] bg-primary rounded-full blur-[120px]" />
@@ -350,7 +451,7 @@ const Login: React.FC = () => {
                         Enterprise identity for <br />
                         <span className="text-primary-foreground/60 italic">modern workspaces.</span>
                     </h1>
-                    <p className="text-lg text-slate-400 font-medium leading-relaxed">
+                    <p className="text-lg text-on-surface-variant/40 font-medium leading-relaxed">
                         Secure your organizational infrastructure with the industry standard for OIDC, SAML, and Adaptive MFA.
                     </p>
                 </div>
@@ -358,8 +459,8 @@ const Login: React.FC = () => {
                 <div className="relative z-10 flex items-center gap-10 opacity-40 grayscale group hover:grayscale-0 hover:opacity-100 transition-all duration-700">
                     <div className="text-white font-bold text-xs tracking-widest uppercase">Trusted by</div>
                     <div className="flex gap-8">
-                        <div className="h-6 w-24 bg-white/10 rounded-md" />
-                        <div className="h-6 w-24 bg-white/10 rounded-md" />
+                        <div className="h-6 w-24 bg-card/10 rounded-md" />
+                        <div className="h-6 w-24 bg-card/10 rounded-md" />
                     </div>
                 </div>
             </div>
@@ -373,10 +474,10 @@ const Login: React.FC = () => {
                     </div>
 
                     <div className="mb-10 text-center lg:text-left">
-                        <h2 className="text-3xl font-bold tracking-tight text-slate-900">
+                        <h2 className="text-3xl font-bold tracking-tight text-on-surface">
                             {step === 'identifier' ? 'Welcome back' : 'Verify identity'}
                         </h2>
-                        <p className="text-slate-500 font-medium mt-2">
+                        <p className="text-on-surface-variant font-medium mt-2">
                             {step === 'identifier' 
                                 ? 'Please enter your credentials to continue' 
                                 : `Authentication required for ${email}`}
@@ -386,14 +487,14 @@ const Login: React.FC = () => {
                     {step === 'identifier' ? (
                         <form onSubmit={handleIdentifierSubmit} className="space-y-6">
                             <div className="space-y-2">
-                                <Label htmlFor="email" className="text-sm font-semibold text-slate-700 ml-1">Email address</Label>
+                                <Label htmlFor="email" className="text-sm font-semibold text-on-surface ml-1">Email address</Label>
                                 <div className="relative group">
-                                    <UserIcon className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-300 group-focus-within:text-primary transition-colors" />
+                                    <UserIcon className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-on-surface-variant/40 group-focus-within:text-primary transition-colors" />
                                     <Input
                                         id="email"
                                         type="email"
                                         placeholder="name@company.com"
-                                        className="h-14 pl-12 rounded-xl border-slate-200 bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-primary/10 focus:border-primary transition-all text-base"
+                                        className="h-14 pl-12 rounded-xl border-border bg-background/50 focus:bg-card focus:ring-2 focus:ring-primary/10 focus:border-primary transition-all text-base"
                                         value={email}
                                         onChange={(e) => setEmail(e.target.value)}
                                         required
@@ -403,13 +504,13 @@ const Login: React.FC = () => {
                             </div>
 
                             {error && (
-                                <div className="p-4 bg-red-50 text-red-600 rounded-xl flex items-center gap-3 border border-red-100">
+                                <div className="p-4 bg-destructive/10 text-destructive rounded-xl flex items-center gap-3 border border-destructive/20">
                                     <ShieldAlert className="w-5 h-5 shrink-0" />
                                     <span className="text-xs font-bold uppercase tracking-tight">{error}</span>
                                 </div>
                             )}
 
-                            <Button type="submit" className="w-full h-14 rounded-xl bg-primary text-white font-bold text-base shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all hover:-translate-y-0.5 active:translate-y-0 group" disabled={loading}>
+                            <Button type="submit" className="w-full h-14 rounded-xl bg-primary text-primary-foreground font-bold text-base shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all hover:-translate-y-0.5 active:translate-y-0 group" disabled={loading}>
                                 {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : (
                                     <>Continue <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" /></>
                                 )}
@@ -432,10 +533,10 @@ const Login: React.FC = () => {
                             {webAuthnEnabled && (
                                 <div className="relative py-2">
                                     <div className="absolute inset-0 flex items-center">
-                                        <span className="w-full border-t border-slate-100" />
+                                        <span className="w-full border-t border-border" />
                                     </div>
                                     <div className="relative flex justify-center text-[10px] font-bold uppercase tracking-widest">
-                                        <span className="bg-white px-4 text-slate-400">or use password</span>
+                                        <span className="bg-card px-4 text-on-surface-variant/40">or use password</span>
                                     </div>
                                 </div>
                             )}
@@ -443,16 +544,16 @@ const Login: React.FC = () => {
                             <form onSubmit={handlePasswordLogin} className="space-y-6">
                                 <div className="space-y-2">
                                     <div className="flex justify-between items-center px-1">
-                                        <Label htmlFor="password" className="text-sm font-semibold text-slate-700">Password</Label>
+                                        <Label htmlFor="password" className="text-sm font-semibold text-on-surface">Password</Label>
                                         <button type="button" onClick={() => setStep('identifier')} className="text-xs font-bold text-primary hover:opacity-70 transition-opacity">Change email</button>
                                     </div>
                                     <div className="relative group">
-                                        <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-300 group-focus-within:text-primary transition-colors" />
+                                        <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-on-surface-variant/40 group-focus-within:text-primary transition-colors" />
                                         <Input
                                             id="password"
                                             type="password"
                                             placeholder="••••••••"
-                                            className="h-14 pl-12 rounded-xl border-slate-200 bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-primary/10 focus:border-primary transition-all text-base"
+                                            className="h-14 pl-12 rounded-xl border-border bg-background/50 focus:bg-card focus:ring-2 focus:ring-primary/10 focus:border-primary transition-all text-base"
                                             value={password}
                                             onChange={(e) => setPassword(e.target.value)}
                                             required
@@ -462,13 +563,13 @@ const Login: React.FC = () => {
                                 </div>
 
                                 {error && (
-                                    <div className="p-4 bg-red-50 text-red-600 rounded-xl flex items-center gap-3 border border-red-100">
+                                    <div className="p-4 bg-destructive/10 text-destructive rounded-xl flex items-center gap-3 border border-destructive/20">
                                         <ShieldAlert className="w-5 h-5 shrink-0" />
                                         <span className="text-xs font-bold uppercase tracking-tight">{error}</span>
                                     </div>
                                 )}
 
-                                <Button type="submit" className="w-full h-14 rounded-xl bg-primary text-white font-bold text-base shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all hover:-translate-y-0.5" disabled={loading}>
+                                <Button type="submit" className="w-full h-14 rounded-xl bg-primary text-primary-foreground font-bold text-base shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all hover:-translate-y-0.5" disabled={loading}>
                                     {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Confirm Identity'}
                                 </Button>
                             </form>
@@ -476,15 +577,15 @@ const Login: React.FC = () => {
                     )}
 
                     <div className="mt-12 text-center">
-                        <p className="text-sm font-medium text-slate-500">
+                        <p className="text-sm font-medium text-on-surface-variant">
                             Don't have an account? <a href="/signup" className="text-primary font-bold hover:underline decoration-2 underline-offset-4">Get started</a>
                         </p>
                     </div>
 
-                    <div className="mt-24 pt-8 border-t border-slate-100 flex justify-center gap-8">
-                        <a href={`${policyBaseUrl}/policies#privacy`} target="_blank" rel="noreferrer" className="text-xs font-bold text-slate-400 hover:text-slate-600 transition-colors">Privacy</a>
-                        <a href={`${policyBaseUrl}/policies#terms`} target="_blank" rel="noreferrer" className="text-xs font-bold text-slate-400 hover:text-slate-600 transition-colors">Terms</a>
-                        <a href={`${policyBaseUrl}/support`} target="_blank" rel="noreferrer" className="text-xs font-bold text-slate-400 hover:text-slate-600 transition-colors">Support</a>
+                    <div className="mt-24 pt-8 border-t border-border flex justify-center gap-8">
+                        <a href={`${policyBaseUrl}/policies#privacy`} target="_blank" rel="noreferrer" className="text-xs font-bold text-on-surface-variant/40 hover:text-primary transition-colors">Privacy</a>
+                        <a href={`${policyBaseUrl}/policies#terms`} target="_blank" rel="noreferrer" className="text-xs font-bold text-on-surface-variant/40 hover:text-primary transition-colors">Terms</a>
+                        <a href={`${policyBaseUrl}/support`} target="_blank" rel="noreferrer" className="text-xs font-bold text-on-surface-variant/40 hover:text-primary transition-colors">Support</a>
                     </div>
                 </div>
             </div>

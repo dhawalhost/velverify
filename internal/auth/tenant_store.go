@@ -12,6 +12,7 @@ import (
 type TenantRepository interface {
 	GetIDBySlug(ctx context.Context, slug string) (string, error)
 	GetSlugByID(ctx context.Context, id string) (string, error)
+	IsMFAEnforcedForUserOrganizations(ctx context.Context, tenantID, userID string) (bool, error)
 }
 
 // sqlTenantRepository implements TenantRepository using sqlx.
@@ -48,4 +49,18 @@ func (r *sqlTenantRepository) GetSlugByID(ctx context.Context, id string) (strin
 		return "", err
 	}
 	return slug, nil
+}
+
+func (r *sqlTenantRepository) IsMFAEnforcedForUserOrganizations(ctx context.Context, tenantID, userID string) (bool, error) {
+	var count int
+	query := `
+		SELECT COUNT(*) FROM organizations o
+		JOIN user_organizations uo ON o.id = uo.org_id
+		WHERE o.tenant_id = $1 AND uo.user_id = $2 AND (o.settings->>'mfa_enforced')::boolean = true
+	`
+	err := r.db.GetContext(ctx, &count, query, tenantID, userID)
+	if err != nil {
+		return false, err
+	}
+	return count > 0, nil
 }

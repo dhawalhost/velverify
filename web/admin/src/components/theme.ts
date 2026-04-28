@@ -12,28 +12,28 @@
 // ── Color tokens ──────────────────────────────────────────────────────────────
 export const colors = {
     primary:   "hsl(var(--primary))",
-    success:   "hsl(152 69% 31%)",
-    warning:   "hsl(37 91% 40%)",
-    error:     "hsl(0 84% 60%)",
-    info:      "hsl(217 91% 55%)",
+    success:   "hsl(var(--success))",
+    warning:   "hsl(var(--warning))",
+    error:     "hsl(var(--destructive))",
+    info:      "hsl(var(--primary))",
 
     // Surface
     surface:           "hsl(var(--background))",
-    surfaceContainer:  "#f0ecf8",
-    surfaceContainerLow: "#f6f2fe",
-    onSurface:         "#1b1b23",
-    onSurfaceVariant:  "#464554",
+    surfaceContainer:  "hsl(var(--surface-container))",
+    surfaceContainerLow: "hsl(var(--surface-container-low))",
+    onSurface:         "hsl(var(--on-surface))",
+    onSurfaceVariant:  "hsl(var(--on-surface-variant))",
 
     // Chart palette (8 harmonious hues)
     chart: [
-        "hsl(243 75% 59%)",   // primary indigo
-        "hsl(217 91% 55%)",   // vibrant blue
-        "hsl(152 69% 40%)",   // emerald
-        "hsl(37 91% 50%)",    // amber
-        "hsl(271 76% 53%)",   // violet
-        "hsl(0 84% 60%)",     // red
-        "hsl(198 85% 48%)",   // cyan
-        "hsl(325 78% 56%)",   // pink
+        "hsl(var(--primary))",   // primary indigo
+        "hsl(217 91% 55%)",      // vibrant blue
+        "hsl(152 69% 40%)",      // emerald
+        "hsl(37 91% 50%)",       // amber
+        "hsl(271 76% 53%)",      // violet
+        "hsl(0 84% 60%)",        // red
+        "hsl(198 85% 48%)",      // cyan
+        "hsl(325 78% 56%)",      // pink
     ],
 } as const;
 
@@ -105,10 +105,10 @@ export const animation = {
 /** Standard recharts tooltip style */
 export const chartTooltipStyle = {
     contentStyle: {
-        backgroundColor: "white",
+        backgroundColor: "hsl(var(--card))",
         borderRadius: radii.card,
         border: "none",
-        boxShadow: "0 10px 40px -10px rgba(0,0,0,0.1)",
+        boxShadow: "0 10px 40px -10px hsla(var(--on-surface)/0.2)",
         padding: "16px",
     },
     itemStyle:  { color: colors.primary, fontWeight: "bold", fontSize: "12px" },

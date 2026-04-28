@@ -31,7 +31,7 @@ CLIENT_SECRET="secret"
 USER_HASH=$(go run cmd/tools/hashgen/main.go "$USER_PASS")
 CLIENT_HASH=$(go run cmd/tools/hashgen/main.go "$CLIENT_SECRET")
 
-TENANT_ID="11111111-1111-1111-1111-111111111111"
+TENANT_ID="admin-system"
 USER_ID=$(uuidgen || echo "00000000-0000-0000-0000-000000000001") # Fallback if uuidgen missing
 CLIENT_ID="admin-ui"
 

@@ -1,15 +1,15 @@
 # Admin Console Guide
 
-The Admin Console provides a web-based interface for managing WardSeal.
+The Admin Console provides a premium, "Clean Modernist" interface for platform administration, utilizing glassmorphism and real-time data visualization.
 
 ## Accessing the Console
 
-**URL:** http://localhost:5173
+**URL:** [http://manage.wardseal.local](http://manage.wardseal.local)
 
 **Default Credentials:**
-- Email: `admin@wardseal.com`
-- Password: `password123`
-- Tenant ID: `11111111-1111-1111-1111-111111111111`
+- **Email**: `admin@wardseal.com`
+- **Password**: `password123`
+- **Tenant ID**: `admin-system`
 
 ---
 

@@ -30,8 +30,8 @@ const SignUp: React.FC = () => {
 
     if (!Config.features.publicSignup) {
         return (
-            <div className="flex items-center justify-center min-h-screen bg-slate-50 p-4">
-                <GlassCard className="w-full max-w-md shadow-2xl border-none bg-white text-center p-12">
+            <div className="flex items-center justify-center min-h-screen bg-background p-4">
+                <GlassCard className="w-full max-w-md shadow-2xl border-none bg-card text-center p-12">
                     <div className="mx-auto w-9 h-9 flex items-center justify-center bg-on-surface/5 rounded-[14px] mb-8">
                         <Lock className="w-5 h-5 text-on-surface/20" />
                     </div>
@@ -74,9 +74,9 @@ const SignUp: React.FC = () => {
     };
 
     return (
-        <div className="flex min-h-screen bg-white font-sans selection:bg-primary/10">
+        <div className="flex min-h-screen bg-card font-sans selection:bg-primary/10">
             {/* Left Side: Brand & Visual */}
-            <div className="hidden lg:flex lg:w-1/2 relative bg-[#0f172a] overflow-hidden flex-col justify-between p-16">
+            <div className="hidden lg:flex lg:w-1/2 relative bg-surface-container-high overflow-hidden flex-col justify-between p-16">
                 {/* Abstract Pattern / Background */}
                 <div className="absolute inset-0 opacity-20 pointer-events-none">
                     <div className="absolute -top-[10%] -right-[10%] w-[60%] h-[60%] bg-primary rounded-full blur-[120px]" />
@@ -103,8 +103,8 @@ const SignUp: React.FC = () => {
                             { icon: <Fingerprint className="w-5 h-5" />, text: "Passkey & Biometric Authentication" },
                             { icon: <Activity className="w-5 h-5" />, text: "Automated Governance & Access Reviews" }
                         ].map((item, i) => (
-                            <div key={i} className="flex items-center gap-4 text-slate-300">
-                                <div className="p-2 bg-white/5 rounded-lg border border-white/10">{item.icon}</div>
+                            <div key={i} className="flex items-center gap-4 text-on-surface-variant/40">
+                                <div className="p-2 bg-card/5 rounded-lg border border-on-inverse/10">{item.icon}</div>
                                 <span className="text-base font-medium">{item.text}</span>
                             </div>
                         ))}
@@ -114,8 +114,8 @@ const SignUp: React.FC = () => {
                 <div className="relative z-10 flex items-center gap-10 opacity-40 grayscale group hover:grayscale-0 hover:opacity-100 transition-all duration-700">
                     <div className="text-white font-bold text-xs tracking-widest uppercase">Infrastructure for</div>
                     <div className="flex gap-8">
-                        <div className="h-6 w-24 bg-white/10 rounded-md" />
-                        <div className="h-6 w-24 bg-white/10 rounded-md" />
+                        <div className="h-6 w-24 bg-card/10 rounded-md" />
+                        <div className="h-6 w-24 bg-card/10 rounded-md" />
                     </div>
                 </div>
             </div>
@@ -129,19 +129,19 @@ const SignUp: React.FC = () => {
                     </div>
 
                     <div className="mb-10 text-center lg:text-left">
-                        <h2 className="text-3xl font-bold tracking-tight text-slate-900">Create your account</h2>
-                        <p className="text-slate-500 font-medium mt-2">Get started with your free organization</p>
+                        <h2 className="text-3xl font-bold tracking-tight text-on-surface">Create your account</h2>
+                        <p className="text-on-surface-variant font-medium mt-2">Get started with your free organization</p>
                     </div>
 
                     <form onSubmit={handleSubmit} className="space-y-6">
                         <div className="space-y-2">
-                            <Label htmlFor="companyName" className="text-sm font-semibold text-slate-700 ml-1">Company name</Label>
+                            <Label htmlFor="companyName" className="text-sm font-semibold text-on-surface ml-1">Company name</Label>
                             <div className="relative group">
-                                <Building className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-300 group-focus-within:text-primary transition-colors" />
+                                <Building className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-on-surface-variant/40 group-focus-within:text-primary transition-colors" />
                                 <Input
                                     id="companyName"
                                     placeholder="Acme Corp"
-                                    className="h-14 pl-12 rounded-xl border-slate-200 bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-primary/10 focus:border-primary transition-all text-base"
+                                    className="h-14 pl-12 rounded-xl border-border bg-background/50 focus:bg-card focus:ring-2 focus:ring-primary/10 focus:border-primary transition-all text-base"
                                     value={companyName}
                                     onChange={(e) => setCompanyName(e.target.value)}
                                     required
@@ -150,14 +150,14 @@ const SignUp: React.FC = () => {
                         </div>
 
                         <div className="space-y-2">
-                            <Label htmlFor="email" className="text-sm font-semibold text-slate-700 ml-1">Work email</Label>
+                            <Label htmlFor="email" className="text-sm font-semibold text-on-surface ml-1">Work email</Label>
                             <div className="relative group">
-                                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-300 group-focus-within:text-primary transition-colors" />
+                                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-on-surface-variant/40 group-focus-within:text-primary transition-colors" />
                                 <Input
                                     id="email"
                                     type="email"
                                     placeholder="name@company.com"
-                                    className="h-14 pl-12 rounded-xl border-slate-200 bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-primary/10 focus:border-primary transition-all text-base"
+                                    className="h-14 pl-12 rounded-xl border-border bg-background/50 focus:bg-card focus:ring-2 focus:ring-primary/10 focus:border-primary transition-all text-base"
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
                                     required
@@ -166,14 +166,14 @@ const SignUp: React.FC = () => {
                         </div>
 
                         <div className="space-y-2">
-                            <Label htmlFor="password" className="text-sm font-semibold text-slate-700 ml-1">Create password</Label>
+                            <Label htmlFor="password" className="text-sm font-semibold text-on-surface ml-1">Create password</Label>
                             <div className="relative group">
-                                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-300 group-focus-within:text-primary transition-colors" />
+                                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-on-surface-variant/40 group-focus-within:text-primary transition-colors" />
                                 <Input
                                     id="password"
                                     type="password"
                                     placeholder="••••••••"
-                                    className="h-14 pl-12 rounded-xl border-slate-200 bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-primary/10 focus:border-primary transition-all text-base"
+                                    className="h-14 pl-12 rounded-xl border-border bg-background/50 focus:bg-card focus:ring-2 focus:ring-primary/10 focus:border-primary transition-all text-base"
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
                                     required
@@ -181,7 +181,7 @@ const SignUp: React.FC = () => {
                             </div>
                         </div>
 
-                        <Button type="submit" className="w-full h-14 rounded-xl bg-primary text-white font-bold text-base shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all hover:-translate-y-0.5 active:translate-y-0 group" disabled={loading}>
+                        <Button type="submit" className="w-full h-14 rounded-xl bg-primary text-primary-foreground font-bold text-base shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all hover:-translate-y-0.5 active:translate-y-0 group" disabled={loading}>
                             {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : (
                                 <>Create organization <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" /></>
                             )}
@@ -189,15 +189,15 @@ const SignUp: React.FC = () => {
                     </form>
 
                     <div className="mt-12 text-center">
-                        <p className="text-sm font-medium text-slate-500">
+                        <p className="text-sm font-medium text-on-surface-variant">
                             Already have an account? <Link to="/login" className="text-primary font-bold hover:underline decoration-2 underline-offset-4">Sign in</Link>
                         </p>
                     </div>
 
-                    <div className="mt-16 pt-8 border-t border-slate-100 flex justify-center gap-8">
-                        <a href="#" className="text-xs font-bold text-slate-400 hover:text-slate-600 transition-colors">Privacy Policy</a>
-                        <a href="#" className="text-xs font-bold text-slate-400 hover:text-slate-600 transition-colors">Terms of Service</a>
-                        <a href="#" className="text-xs font-bold text-slate-400 hover:text-slate-600 transition-colors">Support</a>
+                    <div className="mt-16 pt-8 border-t border-border flex justify-center gap-8">
+                        <a href="#" className="text-xs font-bold text-on-surface-variant/40 hover:text-primary transition-colors">Privacy Policy</a>
+                        <a href="#" className="text-xs font-bold text-on-surface-variant/40 hover:text-primary transition-colors">Terms of Service</a>
+                        <a href="#" className="text-xs font-bold text-on-surface-variant/40 hover:text-primary transition-colors">Support</a>
                     </div>
                 </div>
             </div>

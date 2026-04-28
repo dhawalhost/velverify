@@ -5,33 +5,26 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
+
+	"github.com/dhawalhost/wardseal/pkg/middleware"
 )
 
 func (h *HTTPHandler) RegisterWebAuthnRoutes(rg *gin.RouterGroup) {
-	rg.POST("/mfa/webauthn/register/begin", h.beginWebAuthnRegistration)
-	rg.POST("/mfa/webauthn/register/finish", h.finishWebAuthnRegistration)
 	rg.POST("/mfa/webauthn/login/begin", h.beginWebAuthnLogin)
 	rg.POST("/mfa/webauthn/login/finish", h.finishWebAuthnLogin)
+
+	protected := rg.Group("/mfa/webauthn")
+	protected.Use(middleware.RequireUserAuth(h.svc.ValidateToken))
+	{
+		protected.POST("/register/begin", h.beginWebAuthnRegistration)
+		protected.POST("/register/finish", h.finishWebAuthnRegistration)
+	}
 }
 
 func (h *HTTPHandler) beginWebAuthnRegistration(c *gin.Context) {
-	// User must be authenticated to register a passkey
-	// We expect the user ID to be in the context or passed?
-	// For MVP, let's assume the user is calling this and we get ID from token/context.
-	// OR if this is a "bootstrap" phase, we might accept a user_id param if secured otherwise.
-	// But usually registration requires auth.
-	// Let's assume this endpoint is protected by a middleware that sets "user_id".
-	// Since we are adding this to `tenantProtected`, it verifies tenant but maybe not user?
-	// We need to know WHO is registering.
-	// Check if we can get user from context (e.g. from Bearer token if middleware parsed it).
-	// If not, we might need to rely on a passed ID, trusting the client? NO.
-	// For this exercise, let's assume we extract it from a "X-User-ID" header for simplicity in testing,
-	// OR better, we should have an Auth middleware.
-	// Let's use X-User-ID for now as we don't have full AuthN middleware on this specific route group yet?
-	// Actually we do have `tenantProtected` but that only checks tenant.
-	userID := c.Request.Header.Get("X-User-ID")
+	userID := c.GetString("user_id")
 	if userID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "user_id required"})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 		return
 	}
 
@@ -43,19 +36,19 @@ func (h *HTTPHandler) beginWebAuthnRegistration(c *gin.Context) {
 	}
 
 	// Store session
-	h.webAuthnSessions.Set(userID, *session)
+	h.webAuthnSessions.Set(c.Request.Context(), userID, *session)
 
 	c.JSON(http.StatusOK, options)
 }
 
 func (h *HTTPHandler) finishWebAuthnRegistration(c *gin.Context) {
-	userID := c.Request.Header.Get("X-User-ID")
+	userID := c.GetString("user_id")
 	if userID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "user_id required"})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 		return
 	}
 
-	session, ok := h.webAuthnSessions.Get(userID)
+	session, ok := h.webAuthnSessions.Get(c.Request.Context(), userID)
 	if !ok {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "session not found"})
 		return
@@ -68,7 +61,7 @@ func (h *HTTPHandler) finishWebAuthnRegistration(c *gin.Context) {
 		return
 	}
 
-	h.webAuthnSessions.Delete(userID)
+	h.webAuthnSessions.Delete(c.Request.Context(), userID)
 	c.JSON(http.StatusOK, gin.H{"message": "Registration successful"})
 }
 
@@ -101,7 +94,7 @@ func (h *HTTPHandler) beginWebAuthnLogin(c *gin.Context) {
 		return
 	}
 
-	h.webAuthnSessions.Set(req.UserID, *session)
+	h.webAuthnSessions.Set(c.Request.Context(), req.UserID, *session)
 	c.JSON(http.StatusOK, options)
 }
 
@@ -116,7 +109,7 @@ func (h *HTTPHandler) finishWebAuthnLogin(c *gin.Context) {
 		return
 	}
 
-	session, ok := h.webAuthnSessions.Get(userID)
+	session, ok := h.webAuthnSessions.Get(c.Request.Context(), userID)
 	if !ok {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "session not found"})
 		return
@@ -129,6 +122,6 @@ func (h *HTTPHandler) finishWebAuthnLogin(c *gin.Context) {
 		return
 	}
 
-	h.webAuthnSessions.Delete(userID)
+	h.webAuthnSessions.Delete(c.Request.Context(), userID)
 	c.JSON(http.StatusOK, gin.H{"access_token": token, "token_type": "Bearer"})
 }

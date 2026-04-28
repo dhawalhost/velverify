@@ -17,6 +17,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/dhawalhost/wardseal/internal/governance"
+	"github.com/dhawalhost/wardseal/pkg/llm"
 )
 
 // SlackHandler handles incoming Slack slash commands and interactions.
@@ -28,14 +29,16 @@ type SlackHandler struct {
 	client *http.Client
 	uiURL  string
 	env    string
+	llm    llm.Provider
 }
 
-// NewSlackHandler creates a new SlackHandler with dynamic repository lookups.
-func NewSlackHandler(govSvc governance.Service, dirSvc governance.DirectoryClient, repo Repository, uiURL string, env string, log *zap.Logger) *SlackHandler {
+// NewSlackHandler creates a new SlackHandler with dynamic repository lookups and LLM support.
+func NewSlackHandler(govSvc governance.Service, dirSvc governance.DirectoryClient, repo Repository, llm llm.Provider, uiURL string, env string, log *zap.Logger) *SlackHandler {
 	return &SlackHandler{
 		govSvc: govSvc,
 		dirSvc: dirSvc,
 		repo:   repo,
+		llm:    llm,
 		log:    log,
 		client: &http.Client{Timeout: 10 * time.Second},
 		uiURL:  uiURL,
@@ -116,8 +119,38 @@ func (h *SlackHandler) HandleCommand(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if parts[0] == "ask" {
+		if len(parts) < 2 {
+			h.sendEphemeralResponse(w, "Usage: `/wardseal ask <your question>`")
+			return
+		}
+		question := strings.Join(parts[1:], " ")
+		go h.HandleAskCommand(context.Background(), tenantID, question, r.FormValue("response_url"))
+		h.sendEphemeralResponse(w, "⌛ _Analyzing the identity graph..._")
+		return
+	}
+
+	if parts[0] == "agent" {
+		if len(parts) < 3 || parts[1] != "request" {
+			h.sendEphemeralResponse(w, "Usage: `/wardseal agent request <workload_id> <scopes...>`")
+			return
+		}
+		workloadID := parts[2]
+		scopes := parts[3:]
+		
+		req, err := h.govSvc.CreateAgentAccessRequest(r.Context(), tenantID, workloadID, scopes, "Requested via Slack agent command", "4h")
+		if err != nil {
+			h.log.Error("failed to create agent request", zap.Error(err))
+			h.sendEphemeralResponse(w, "❌ Failed to create agent access request.")
+			return
+		}
+		
+		h.sendEphemeralResponse(w, fmt.Sprintf("✅ *Agent Access Request Created*\nID: `%s`\nWorkload: `%s`\nScopes: `%s`", req.ID, workloadID, strings.Join(scopes, ", ")))
+		return
+	}
+
 	if len(parts) < 2 || parts[0] != "request" {
-		h.sendEphemeralResponse(w, "Usage: `/wardseal catalog` or `/wardseal request <app_name>`")
+		h.sendEphemeralResponse(w, "Usage: `/wardseal catalog`, `/wardseal request <app_name>`, or `/wardseal ask <question>`")
 		return
 	}
 
@@ -427,6 +460,78 @@ func (h *SlackHandler) NotifyProposedRevocation(ctx context.Context, action gove
 	return nil
 }
 
+// NotifyAccessRequest sends an interactive Slack message for a new access request.
+func (h *SlackHandler) NotifyAccessRequest(ctx context.Context, req governance.AccessRequest) error {
+	integ, err := h.repo.GetByTenant(ctx, req.TenantID)
+	if err != nil || !integ.IsEnabled {
+		return nil
+	}
+
+	blocks := []interface{}{
+		map[string]interface{}{
+			"type": "section",
+			"text": map[string]interface{}{
+				"type": "mrkdwn",
+				"text": fmt.Sprintf("🔔 *New Access Request*\n*Requester:* %s\n*Resource:* %s (%s)\n*Reason:* %s",
+					req.RequesterID, req.ResourceID, req.ResourceType, req.Reason),
+			},
+		},
+		map[string]interface{}{
+			"type": "actions",
+			"elements": []interface{}{
+				map[string]interface{}{
+					"type": "button",
+					"text": map[string]interface{}{
+						"type": "plain_text",
+						"text": "Approve",
+					},
+					"style":     "primary",
+					"action_id": "approve_request",
+					"value":     req.ID,
+				},
+				map[string]interface{}{
+					"type": "button",
+					"text": map[string]interface{}{
+						"type": "plain_text",
+						"text": "Reject",
+					},
+					"style":     "danger",
+					"action_id": "reject_request",
+					"value":     req.ID,
+				},
+			},
+		},
+	}
+
+	payload := map[string]interface{}{
+		"blocks": blocks,
+	}
+
+	if integ.WebhookURL == "" {
+		h.log.Warn("Slack integration active but no WebhookURL for tenant", zap.String("tenant_id", req.TenantID))
+		return nil
+	}
+
+	body, _ := json.Marshal(payload)
+	httpReq, err := http.NewRequestWithContext(ctx, "POST", integ.WebhookURL, bytes.NewBuffer(body))
+	if err != nil {
+		return err
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := h.client.Do(httpReq)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("slack returned status %d", resp.StatusCode)
+	}
+
+	return nil
+}
+
 // NotifyAccessAvailable pushes a proactive suggestion to a user when new matching resources are found.
 func (h *SlackHandler) NotifyAccessAvailable(ctx context.Context, tenantID, slackUserID, resourceName, reason string) error {
 	integ, err := h.repo.GetByTenant(ctx, tenantID)
@@ -485,6 +590,65 @@ func (h *SlackHandler) NotifyAccessAvailable(ctx context.Context, tenantID, slac
 
 	return nil
 }
+// HandleAskCommand performs a conversational audit using LLM.
+func (h *SlackHandler) HandleAskCommand(ctx context.Context, tenantID, question, responseURL string) {
+	if h.llm == nil {
+		h.sendDelayedResponse(responseURL, "❌ LLM support is not configured for this environment.")
+		return
+	}
+
+	// 1. Gather Context from platform services
+	contextData, err := h.govSvc.GatherAuditContext(ctx, tenantID)
+	if err != nil {
+		h.log.Error("failed to gather audit context", zap.Error(err))
+		h.sendDelayedResponse(responseURL, "❌ Failed to analyze identity data. Please try again later.")
+		return
+	}
+
+	// 2. Build System Prompt
+	systemPrompt := fmt.Sprintf(`
+You are WardSeal AI, an expert Identity & Governance auditor. 
+You have access to the identity relationship graph and governance state for tenant "%s".
+Use the following context to answer the user's question accurately. 
+
+SAFETY RULES:
+- NEVER disclose passwords, secret keys, tokens, or any literal authentication credentials.
+- If the user asks for credentials, inform them that you do not have access to secrets, only governance metadata.
+- If you see any data that appears to be a raw secret in the context, redact it as [REDACTED].
+
+If you don't know the answer, say so. Keep responses concise and use slack markdown.
+
+CONTEXT:
+%s
+`, tenantID, contextData)
+
+	// 3. Generate Response
+	answer, err := h.llm.GenerateResponse(ctx, systemPrompt, question)
+	if err != nil {
+		h.log.Error("llm generation failed", zap.Error(err))
+		h.sendDelayedResponse(responseURL, "❌ I encountered an error while processing your request.")
+		return
+	}
+
+	// 4. Send Response back to Slack
+	h.sendDelayedResponse(responseURL, answer)
+}
+
+
+func (h *SlackHandler) sendDelayedResponse(responseURL, text string) {
+	payload := map[string]interface{}{
+		"replace_original": false,
+		"text":             text,
+	}
+	body, _ := json.Marshal(payload)
+	resp, err := h.client.Post(responseURL, "application/json", bytes.NewBuffer(body))
+	if err != nil {
+		h.log.Error("failed to send delayed slack response", zap.Error(err))
+		return
+	}
+	defer resp.Body.Close()
+}
+
 func (h *SlackHandler) verifySignature(r *http.Request, body []byte, secret string) error {
 	signature := r.Header.Get("X-Slack-Signature")
 	timestamp := r.Header.Get("X-Slack-Request-Timestamp")

@@ -177,33 +177,33 @@ const Groups: React.FC = () => {
         <div className="space-y-10 animate-in fade-in duration-700">
             <PageHeader
                 icon={<Users className="w-10 h-10 text-primary" />}
-                title="Identity Groups"
-                description="Manage organizational resource access by bundling subjects into logical architectural clusters. Orchestrate group-based policy application."
+                title="Groups"
+                description="Manage how users access resources by grouping them together. Create groups to apply security rules to many users at once."
                 actions={
                     <Dialog open={showCreate} onOpenChange={setShowCreate}>
                         <DialogTrigger asChild>
-                            <Button className="h-11 rounded-xl bg-primary text-white font-bold tracking-tight text-[11px] px-8 shadow-xl shadow-primary/20 transition-all hover:scale-[1.02] active:scale-[0.98]">
-                                <Plus className="w-4 h-4 mr-3" /> Initialize New Group
+                            <Button className="h-11 rounded-xl bg-primary text-primary-foreground font-bold tracking-tight text-[11px] px-8 shadow-xl shadow-primary/20 transition-all hover:scale-[1.02] active:scale-[0.98]">
+                                <Plus className="w-4 h-4 mr-3" /> Add New Group
                             </Button>
                         </DialogTrigger>
-                        <DialogContent className="sm:max-w-[480px] p-0 border-none rounded-[32px] shadow-2xl shadow-on-surface/10 bg-white overflow-hidden">
+                        <DialogContent className="sm:max-w-[480px] p-0 border-none rounded-[32px] shadow-2xl shadow-on-surface/10 bg-card overflow-hidden">
                             <div className="bg-primary p-12 text-white">
                                 <DialogHeader>
                                     <DialogTitle className="text-3xl font-bold tracking-tight flex items-center gap-4">
-                                        <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center backdrop-blur-md">
+                                        <div className="w-12 h-12 bg-card/20 rounded-2xl flex items-center justify-center backdrop-blur-md">
                                             <Plus className="w-6 h-6 text-white" />
                                         </div>
-                                        Provision Group
+                                        Create Group
                                     </DialogTitle>
-                                    <DialogDescription className="text-white/70 font-medium text-sm mt-3 tracking-tight">
-                                        Initialize a new architectural identity bundle for resource orchestration.
+                                    <DialogDescription className="text-on-inverse/70 font-medium text-sm mt-3 tracking-tight">
+                                        Create a new group to manage user access.
                                     </DialogDescription>
                                 </DialogHeader>
                             </div>
-                            <form onSubmit={handleCreateGroup} className="p-10 space-y-8 bg-white">
+                            <form onSubmit={handleCreateGroup} className="p-10 space-y-8 bg-card">
                                 <div className="space-y-6">
                                     <div className="space-y-2.5">
-                                        <Label htmlFor="name" className="text-[12px] font-bold tracking-tight text-on-surface-variant/40 ml-1">Group Identifier</Label>
+                                        <Label htmlFor="name" className="text-[12px] font-bold tracking-tight text-on-surface-variant/40 ml-1">Group Name</Label>
                                         <Input
                                             id="name"
                                             value={newGroupName}
@@ -214,19 +214,19 @@ const Groups: React.FC = () => {
                                         />
                                     </div>
                                     <div className="space-y-2.5">
-                                        <Label htmlFor="desc" className="text-[12px] font-bold tracking-tight text-on-surface-variant/40 ml-1">Architectural Context</Label>
+                                        <Label htmlFor="desc" className="text-[12px] font-bold tracking-tight text-on-surface-variant/40 ml-1">Description</Label>
                                         <Input
                                             id="desc"
                                             value={newGroupDesc}
                                             onChange={(e) => setNewGroupDesc(e.target.value)}
                                             className="h-12 rounded-xl bg-surface-container/30 border-none ring-1 ring-on-surface/5 focus-visible:ring-2 focus-visible:ring-primary/20 font-medium transition-all"
-                                            placeholder="System-wide administrative privileges..."
+                                            placeholder="Purpose of this group..."
                                         />
                                     </div>
                                 </div>
                                 <DialogFooter className="pt-4">
                                     <Button type="submit" disabled={creating} className="w-full h-12 rounded-xl font-bold text-sm shadow-md shadow-primary/10">
-                                        {creating ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Commit Group Matrix'}
+                                        {creating ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Create Group'}
                                     </Button>
                                 </DialogFooter>
                             </form>
@@ -235,16 +235,16 @@ const Groups: React.FC = () => {
                 }
             />
 
-            <GlassCard className="overflow-hidden border-none shadow-xl shadow-on-surface/5 bg-white">
+            <GlassCard className="overflow-hidden border-none shadow-xl shadow-on-surface/5 bg-card">
                 <GlassCardHeader className="py-8 px-10">
                     <div className="flex items-center gap-5">
                         <div className="p-3.5 bg-primary/5 rounded-2xl">
                             <UsersIcon className="w-6 h-6 text-primary" />
                         </div>
                         <div>
-                            <GlassCardTitle className="text-2xl font-bold tracking-tight text-on-surface">Group Registry</GlassCardTitle>
+                            <GlassCardTitle className="text-2xl font-bold tracking-tight text-on-surface">All Groups</GlassCardTitle>
                             <p className="text-on-surface-variant/40 font-bold text-[12px] mt-1 tracking-tight">
-                                {total} Verified Cluster Hubs
+                                {total} Total Groups
                             </p>
                         </div>
                     </div>
@@ -254,17 +254,17 @@ const Groups: React.FC = () => {
                         <GlassTable>
                             <GlassTableHeader>
                                 <GlassTableRow className="hover:bg-transparent border-b border-on-surface/5">
-                                    <GlassTableHead className="py-6 pl-10 font-bold text-[12px] tracking-tight text-on-surface-variant/40">Cluster Identity</GlassTableHead>
-                                    <GlassTableHead className="font-bold text-[12px] tracking-tight text-on-surface-variant/40">Core UID</GlassTableHead>
-                                    <GlassTableHead className="font-bold text-[12px] tracking-tight text-on-surface-variant/40">Established</GlassTableHead>
-                                    <GlassTableHead className="text-right font-bold text-[12px] tracking-tight text-on-surface-variant/40 pr-10">Orchestration</GlassTableHead>
+                                    <GlassTableHead className="py-6 pl-10 font-bold text-[12px] tracking-tight text-on-surface-variant/40">Group Name</GlassTableHead>
+                                    <GlassTableHead className="font-bold text-[12px] tracking-tight text-on-surface-variant/40">Group ID</GlassTableHead>
+                                    <GlassTableHead className="font-bold text-[12px] tracking-tight text-on-surface-variant/40">Created On</GlassTableHead>
+                                    <GlassTableHead className="text-right font-bold text-[12px] tracking-tight text-on-surface-variant/40 pr-10">Actions</GlassTableHead>
                                 </GlassTableRow>
                             </GlassTableHeader>
                             <TableBody>
                                 {groups.length === 0 ? (
                                     <GlassTableRow>
                                         <TableCell colSpan={4} className="py-32 text-center text-sm font-medium text-on-surface-variant/40">
-                                            No cluster groups have been initialized.
+                                            No groups found.
                                         </TableCell>
                                     </GlassTableRow>
                                 ) : (
@@ -291,22 +291,22 @@ const Groups: React.FC = () => {
                                                 <Sheet onOpenChange={() => handleManageMembers(group)}>
                                                     <SheetTrigger asChild>
                                                         <Button variant="ghost" className="h-10 rounded-xl px-5 font-bold text-[11px] tracking-tight text-primary hover:bg-primary/5 transition-all">
-                                                            <Users className="w-4 h-4 mr-2.5 opacity-60" /> Roster Management
+                                                            <Users className="w-4 h-4 mr-2.5 opacity-60" /> Manage Members
                                                         </Button>
                                                     </SheetTrigger>
-                                                    <SheetContent className="sm:max-w-2xl p-0 border-none rounded-l-[40px] shadow-2xl shadow-on-surface/20 bg-white overflow-hidden">
+                                                    <SheetContent className="sm:max-w-2xl p-0 border-none rounded-l-[40px] shadow-2xl shadow-on-surface/20 bg-card overflow-hidden">
                                                         <div className="bg-primary p-12 text-white">
                                                             <SheetHeader>
                                                                 <div className="flex items-center gap-8">
-                                                                    <div className="w-20 h-20 bg-white/20 rounded-3xl flex items-center justify-center backdrop-blur-md">
+                                                                    <div className="w-20 h-20 bg-card/20 rounded-3xl flex items-center justify-center backdrop-blur-md">
                                                                         <Users className="w-9 h-9 text-white" />
                                                                     </div>
                                                                     <div>
                                                                         <SheetTitle className="text-4xl font-bold tracking-tight text-white">
                                                                             {group.name}
                                                                         </SheetTitle>
-                                                                        <SheetDescription className="text-white/50 font-bold text-[12px] mt-4 tracking-tight">
-                                                                            Roster management pool — {group.id?.substring(0, 8).toLowerCase() || 'arch-hub'}
+                                                                        <SheetDescription className="text-on-inverse/50 font-bold text-[12px] mt-4 tracking-tight">
+                                                                            Manage the members of this group.
                                                                         </SheetDescription>
                                                                     </div>
                                                                 </div>
@@ -319,11 +319,11 @@ const Groups: React.FC = () => {
                                                                 <section>
                                                                     <div className="flex items-center justify-between mb-8">
                                                                         <h3 className="text-[12px] font-bold tracking-tight text-on-surface-variant/40 flex items-center gap-3">
-                                                                            <ShieldCheck className="w-4.5 h-4.5 text-emerald-500" />
-                                                                            Current Identity Assignments
+                                                                            <ShieldCheck className="w-4.5 h-4.5 text-success" />
+                                                                            Current Members
                                                                         </h3>
                                                                         <Badge className="bg-primary/5 text-primary border-none rounded-xl h-8 px-4 text-xs font-bold shadow-none">
-                                                                            {members.length} Subjects
+                                                                            {members.length} Members
                                                                         </Badge>
                                                                     </div>
 
@@ -335,12 +335,12 @@ const Groups: React.FC = () => {
                                                                         ) : members.length === 0 ? (
                                                                             <div className="py-20 text-center border-2 border-dashed rounded-[32px] bg-surface-container/10">
                                                                                 <ShieldAlert className="w-10 h-10 mx-auto text-on-surface-variant/10 mb-4" />
-                                                                                <p className="text-sm font-medium text-on-surface-variant/40">No system subjects assigned to this cluster.</p>
+                                                                                <p className="text-sm font-medium text-on-surface-variant/40">No users are in this group.</p>
                                                                             </div>
                                                                         ) : (
                                                                             <div className="grid gap-3">
                                                                                 {members.map(member => (
-                                                                                    <div key={member.id} className="flex items-center justify-between p-5 bg-white border border-on-surface/5 rounded-2xl hover:border-primary/20 hover:shadow-lg hover:shadow-primary/5 transition-all group/member">
+                                                                                    <div key={member.id} className="flex items-center justify-between p-5 bg-card border border-on-surface/5 rounded-2xl hover:border-primary/20 hover:shadow-lg hover:shadow-primary/5 transition-all group/member">
                                                                                         <div className="flex items-center gap-5">
                                                                                             {(() => {
                                                                                                 const email = member.email || (member.emails && member.emails.length > 0 ? member.emails[0].value : '');
@@ -351,9 +351,9 @@ const Groups: React.FC = () => {
                                                                                                             <AvatarFallback className="text-[11px] font-bold uppercase bg-primary/5 text-primary">{email ? email.substring(0, 2) : '??'}</AvatarFallback>
                                                                                                         </Avatar>
                                                                                                         <div>
-                                                                                                            <p className="text-sm font-bold text-on-surface">{email || 'Anonymous Subject'}</p>
+                                                                                                            <p className="text-sm font-bold text-on-surface">{email || 'Unknown User'}</p>
                                                                                                             <p className="text-[10px] font-bold text-on-surface-variant/20 mt-1 flex items-center gap-1.5 tracking-tight">
-                                                                                                                <div className={`h-1.5 w-1.5 rounded-full ${member.status === 'active' ? 'bg-emerald-500' : 'bg-red-500'}`} />
+                                                                                                                <div className={`h-1.5 w-1.5 rounded-full ${member.status === 'active' ? 'bg-success' : 'bg-destructive/100'}`} />
                                                                                                                 {member.status === 'active' ? 'Active' : 'Offline'}
                                                                                                             </p>
                                                                                                         </div>
@@ -364,7 +364,7 @@ const Groups: React.FC = () => {
                                                                                         <Button
                                                                                             variant="ghost"
                                                                                             size="icon"
-                                                                                            className="h-10 w-10 rounded-xl hover:bg-red-50 hover:text-red-500 transition-all opacity-0 group-hover/member:opacity-100"
+                                                                                            className="h-10 w-10 rounded-xl hover:bg-destructive/10 hover:text-destructive transition-all opacity-0 group-hover/member:opacity-100"
                                                                                             onClick={() => handleRemoveUser(member.id)}
                                                                                         >
                                                                                             <Trash2 className="w-4.5 h-4.5" />
@@ -381,12 +381,12 @@ const Groups: React.FC = () => {
                                                                     <div className="flex flex-col gap-6">
                                                                         <h3 className="text-[12px] font-bold tracking-tight text-on-surface-variant/40 flex items-center gap-3">
                                                                             <UserPlus className="w-4.5 h-4.5 text-primary" />
-                                                                            Enroll New Subjects
+                                                                            Add More Members
                                                                         </h3>
                                                                         <div className="relative group">
                                                                             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-on-surface-variant/40 group-focus-within:text-primary transition-colors" />
                                                                             <Input
-                                                                                placeholder="Lookup identity to enroll..."
+                                                                                placeholder="Search for users to add..."
                                                                                 className="h-12 border-none rounded-2xl font-medium text-sm pl-11 bg-surface-container/30 ring-1 ring-on-surface/5 focus-visible:ring-2 focus-visible:ring-primary/20 transition-all"
                                                                                 value={searchUser}
                                                                                 onChange={(e) => setSearchUser(e.target.value)}
@@ -397,11 +397,11 @@ const Groups: React.FC = () => {
                                                                     <div className="grid gap-3 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
                                                                         {filteredAvailableUsers.length === 0 ? (
                                                                             <div className="py-12 text-center bg-surface-container/10 rounded-[32px] border-2 border-dashed">
-                                                                                <p className="text-[11px] font-bold text-on-surface-variant/20 tracking-tight">No available subjects matching query</p>
+                                                                                <p className="text-[11px] font-bold text-on-surface-variant/20 tracking-tight">No users found matching your search.</p>
                                                                             </div>
                                                                         ) : (
                                                                             filteredAvailableUsers.map(user => (
-                                                                                <div key={user.id} className="flex items-center justify-between p-4 bg-white border border-on-surface/5 rounded-2xl hover:border-primary/20 hover:shadow-lg hover:shadow-primary/5 transition-all group/add">
+                                                                                <div key={user.id} className="flex items-center justify-between p-4 bg-card border border-on-surface/5 rounded-2xl hover:border-primary/20 hover:shadow-lg hover:shadow-primary/5 transition-all group/add">
                                                                                     <div className="flex items-center gap-4">
                                                                                         {(() => {
                                                                                             const email = user.email || (user.emails && user.emails.length > 0 ? user.emails[0].value : '');
@@ -419,7 +419,7 @@ const Groups: React.FC = () => {
                                                                                     <Button
                                                                                         size="icon"
                                                                                         variant="ghost"
-                                                                                        className="h-9 w-9 rounded-xl text-primary hover:bg-primary hover:text-white transition-all"
+                                                                                        className="h-9 w-9 rounded-xl text-primary hover:bg-primary hover:text-primary-foreground transition-all"
                                                                                         onClick={() => handleAddUser(user)}
                                                                                     >
                                                                                         <ArrowRight className="w-4 h-4" />
@@ -436,7 +436,7 @@ const Groups: React.FC = () => {
                                                 <Button
                                                     variant="ghost"
                                                     size="icon"
-                                                    className="h-9 w-9 rounded-xl hover:bg-red-50 hover:text-red-500 transition-all opacity-40 hover:opacity-100"
+                                                    className="h-9 w-9 rounded-xl hover:bg-destructive/10 hover:text-destructive transition-all opacity-40 hover:opacity-100"
                                                     onClick={() => handleDeleteGroup(group.id)}
                                                 >
                                                     <Trash2 className="w-4.5 h-4.5" />

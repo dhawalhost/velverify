@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/rsa"
 	"context"
 	"fmt"
 	"net/http"
@@ -9,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	gokitconfig "github.com/dhawalhost/gokit/config"
 	"github.com/dhawalhost/gokit/health"
 	"github.com/dhawalhost/gokit/logger"
@@ -31,6 +33,7 @@ import (
 	"github.com/dhawalhost/wardseal/internal/connector/scim"
 	"github.com/dhawalhost/wardseal/internal/discovery"
 	"github.com/dhawalhost/wardseal/internal/governance"
+	"github.com/dhawalhost/wardseal/internal/mcp"
 	"github.com/dhawalhost/wardseal/internal/oauthclient"
 	"github.com/dhawalhost/wardseal/internal/policy"
 	"github.com/dhawalhost/wardseal/internal/rbac"
@@ -41,6 +44,7 @@ import (
 	"github.com/dhawalhost/wardseal/pkg/eventbus"
 	"github.com/dhawalhost/wardseal/pkg/eventbus/redisbus"
 	"github.com/dhawalhost/wardseal/pkg/kms"
+	"github.com/dhawalhost/wardseal/pkg/llm"
 	"github.com/dhawalhost/wardseal/pkg/middleware"
 	wardsealobs "github.com/dhawalhost/wardseal/pkg/observability"
 )
@@ -135,7 +139,7 @@ func main() {
 	svc := governance.NewService(clientRepo, reqRepo, orgRepo, endpointRepo, workloadRepo, dirClient, policyEngine, rbacSvc, authzEngine, bus)
 
 	router := gin.Default()
-	
+
 	// Standardized CORS configuration (Must be at the TOP for Pre-flights)
 	origins := cfg.Governance.CORSAllowedOrigins
 	if len(origins) == 0 {
@@ -200,6 +204,10 @@ func main() {
 				Requests: cfg.Auth.RateLimitWebhook.Requests,
 				Window:   cfg.Auth.RateLimitWebhook.Window,
 			},
+			"ask": {
+				Requests: 5,
+				Window:   1 * time.Minute,
+			},
 		},
 		DegradedProfile: middleware.RateLimitWindowProfile{
 			Requests: cfg.Auth.RateLimitDegraded.Requests,
@@ -220,13 +228,56 @@ func main() {
 	campaignSvc.SetGovernanceService(svc) // Link services
 	webhookSvc := webhook.NewService(db)
 
-	govHandlers := governance.NewHTTPHandler(svc, campaignSvc, webhookSvc, log)
+	// Initialize LLM Provider for Conversational Audit
+	llmProvider, err := llm.NewProvider()
+	if err != nil {
+		log.Warn("Failed to initialize LLM provider; conversational audit will be disabled", zap.Error(err))
+	}
+
+	// Initialize MCP Tool Manager for Agentic Copilot
+	mcpManager := mcp.NewToolManager(svc, nil)
+
+	// Load JWT Public Key for verification
+	var pubKey *rsa.PublicKey
+	if cfg.Auth.JWTPublicKeyPath != "" {
+		keyBytes, err := os.ReadFile(cfg.Auth.JWTPublicKeyPath)
+		if err != nil {
+			log.Fatal("Failed to read JWT public key file", zap.Error(err))
+		}
+		pubKey, err = jwt.ParseRSAPublicKeyFromPEM(keyBytes)
+		if err != nil {
+			log.Fatal("Failed to parse JWT public key", zap.Error(err))
+		}
+	} else {
+		log.Fatal("JWT public key path is required")
+	}
+
+	tokenValidator := func(tokenString string) (*middleware.Claims, error) {
+		token, err := jwt.ParseWithClaims(tokenString, &middleware.Claims{}, func(token *jwt.Token) (interface{}, error) {
+			if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
+				return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+			}
+			return pubKey, nil
+		})
+		if err != nil {
+			log.Error("JWT validation failed", zap.Error(err))
+			return nil, err
+		}
+		if claims, ok := token.Claims.(*middleware.Claims); ok && token.Valid {
+			return claims, nil
+		}
+		log.Error("JWT is invalid (valid=false)")
+		return nil, fmt.Errorf("invalid token")
+	}
+
+	govHandlers := governance.NewHTTPHandler(svc, campaignSvc, webhookSvc, llmProvider, mcpManager, tokenValidator, log)
 	govHandlers.RegisterRoutes(router)
 
 	apiGroup := router.Group("/api/v1")
 	apiGroup.Use(middleware.TenantExtractor(middleware.TenantConfig{
 		SlugResolver: dirClient.ResolveTenantSlug,
 	}))
+	apiGroup.Use(middleware.RequireUserAuth(tokenValidator))
 
 	// apiGroup is already handled above the RBAC and Audit handlers
 	rbacHandlers := rbac.NewHTTPHandler(rbacSvc, log)
@@ -275,8 +326,12 @@ func main() {
 	provSvc.Start(context.Background()) // Start the worker loop
 
 	// Autonomous Risk Response (The Edge)
-	riskGovernor := governance.NewRiskGovernor(signalStore, provSvc, log)
+	riskGovernor := governance.NewRiskGovernor(signalStore, provSvc, svc, log)
 	riskGovernor.Start(context.Background())
+
+	// Autonomous Least-Privilege Pruning
+	pruningGovernor := governance.NewPruningGovernor(svc, log)
+	pruningGovernor.Start(context.Background())
 
 	// Resource Discovery Framework
 	discoveryRepo := discovery.NewRepository(db)
@@ -290,7 +345,7 @@ func main() {
 	discoverySvc.Start(context.Background())
 
 	// Slack ChatOps integration (Dynamic/Multi-tenant)
-	slackHandler := chatops.NewSlackHandler(svc, dirClient, chatOpsRepo, cfg.Auth.UIURL, string(cfg.Environment), log)
+	slackHandler := chatops.NewSlackHandler(svc, dirClient, chatOpsRepo, llmProvider, cfg.Auth.UIURL, string(cfg.Environment), log)
 
 	// Dashboard Management API
 	chatOpsHandlers.RegisterRoutes(apiGroup)

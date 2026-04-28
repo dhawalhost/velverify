@@ -3,13 +3,47 @@ package auth
 import (
 	"context"
 	"fmt"
-	"strings"
+	"math"
 	"time"
 
 	"go.uber.org/zap"
 
 	"github.com/dhawalhost/wardseal/pkg/middleware"
 )
+
+type coord struct {
+	lat float64
+	lon float64
+}
+
+var countryCoords = map[string]coord{
+	"US": {37.0902, -95.7129},
+	"GB": {55.3781, -3.4360},
+	"IN": {20.5937, 78.9629},
+	"DE": {51.1657, 10.4515},
+	"FR": {46.2276, 2.2137},
+	"CN": {35.8617, 104.1954},
+	"JP": {36.2048, 138.2529},
+	"AU": {-25.2744, 133.7751},
+	"BR": {-14.2350, -51.9253},
+	"CA": {56.1304, -106.3468},
+}
+
+func haversine(lat1, lon1, lat2, lon2 float64) float64 {
+	const R = 3958.8 // Earth radius in miles
+	
+	dLat := (lat2 - lat1) * math.Pi / 180.0
+	dLon := (lon2 - lon1) * math.Pi / 180.0
+	
+	lat1Rad := lat1 * math.Pi / 180.0
+	lat2Rad := lat2 * math.Pi / 180.0
+	
+	a := math.Sin(dLat/2)*math.Sin(dLat/2) +
+		math.Sin(dLon/2)*math.Sin(dLon/2)*math.Cos(lat1Rad)*math.Cos(lat2Rad)
+	c := 2 * math.Atan2(math.Sqrt(a), math.Sqrt(1-a))
+	
+	return R * c
+}
 
 // RiskLevel enum
 type RiskLevel string
@@ -181,21 +215,32 @@ func (e *RiskEngine) Evaluate(ctx context.Context, userID, deviceID, ip string) 
 // calculateVelocity estimates travel speed between two IPs in miles per hour.
 func (e *RiskEngine) calculateVelocity(ip1, ip2 string, t1, t2 time.Time) (float64, error) {
 	duration := t2.Sub(t1).Hours()
-	if duration <= 0 {
+	if duration <= 0 || ip1 == ip2 {
 		return 0, nil
 	}
 
-	// This is where GeoClient would provide lat/lon.
-	// For this Phase 1 implementation, we simulate distance based on IP "distance"
-	// until a proper GeoDB is wired in.
-	// Mock: if IPs differ in first octet, assume 3000 miles.
 	distance := 0.0
-	o1 := ip1[:strings.Index(ip1, ".")]
-	o2 := ip2[:strings.Index(ip2, ".")]
-	if o1 != o2 {
-		distance = 3000 // Across continents approx
-	} else {
-		distance = 100 // Same region approx
+	if e.geoClient != nil {
+		country1, err1 := e.geoClient.LookupCountry(ip1)
+		country2, err2 := e.geoClient.LookupCountry(ip2)
+		if err1 == nil && err2 == nil && country1 != "" && country2 != "" {
+			c1, ok1 := countryCoords[country1]
+			c2, ok2 := countryCoords[country2]
+			if ok1 && ok2 {
+				distance = haversine(c1.lat, c1.lon, c2.lat, c2.lon)
+			} else {
+				// Fallback to standard country-to-country distance if not mapped
+				if country1 != country2 {
+					distance = 1000.0
+				}
+			}
+		}
+	}
+
+	if distance == 0.0 && ip1 != ip2 {
+		e.logger.Warn("Impossible Travel velocity check bypassed - coordinate resolution not fully implemented",
+			zap.String("ip1", ip1),
+			zap.String("ip2", ip2))
 	}
 
 	return distance / duration, nil

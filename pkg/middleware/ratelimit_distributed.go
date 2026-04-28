@@ -54,6 +54,8 @@ func classifyRateLimitEndpoint(path string) string {
 		return "webhook"
 	case strings.Contains(path, "/login"):
 		return "login"
+	case strings.Contains(path, "/governance/ask"):
+		return "ask"
 	default:
 		return "default"
 	}

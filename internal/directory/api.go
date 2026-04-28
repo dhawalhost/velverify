@@ -4,9 +4,11 @@ import (
 	"database/sql"
 	"errors"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
+	jwtlib "github.com/golang-jwt/jwt/v5"
 	"go.uber.org/zap"
 
 	"github.com/dhawalhost/wardseal/pkg/middleware"
@@ -35,6 +37,68 @@ type HTTPHandlerConfig struct {
 	ServiceAuthHeader string
 }
 
+func (h *HTTPHandler) requireUserOrServiceAuth() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// 1. Check Service Auth
+		serviceHeaderName := h.serviceAuth.HeaderName
+		if serviceHeaderName == "" {
+			serviceHeaderName = middleware.DefaultServiceAuthHeader
+		}
+		providedServiceToken := c.GetHeader(serviceHeaderName)
+		if h.serviceAuth.Token != "" && providedServiceToken != "" && providedServiceToken == h.serviceAuth.Token {
+			c.Next()
+			return
+		}
+
+		// 2. Check User Auth
+		authHeader := c.GetHeader("Authorization")
+		if authHeader == "" {
+			token, err := c.Cookie("wardseal_access_token")
+			if err == nil {
+				authHeader = "Bearer " + token
+			}
+		}
+
+		if authHeader != "" && strings.HasPrefix(authHeader, "Bearer ") {
+			tokenString := strings.TrimPrefix(authHeader, "Bearer ")
+			if strings.Count(tokenString, ".") == 2 {
+				loadPublicKey(h.logger)
+				if jwtPublicKey != nil {
+					claims := jwtlib.MapClaims{}
+					parsedToken, err := jwtlib.ParseWithClaims(tokenString, claims, func(t *jwtlib.Token) (interface{}, error) {
+						if _, ok := t.Method.(*jwtlib.SigningMethodRSA); !ok {
+							return nil, errors.New("unexpected signing method")
+						}
+						return jwtPublicKey, nil
+					})
+
+					if err == nil && parsedToken.Valid {
+						var jwtTenantID string
+						if tid, ok := claims["tenant_id"].(string); ok && tid != "" {
+							jwtTenantID = tid
+						} else if tid, ok := claims["tenant"].(string); ok && tid != "" {
+							jwtTenantID = tid
+						}
+						
+						tenantID, _ := middleware.TenantIDFromGinContext(c)
+						if tenantID != "" && jwtTenantID != "" && jwtTenantID != tenantID {
+							c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "tenant context mismatch"})
+							return
+						}
+
+						c.Next()
+						return
+					} else {
+						h.logger.Warn("User token verification failed", zap.Error(err))
+					}
+				}
+			}
+		}
+
+		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "authentication required"})
+	}
+}
+
 // RegisterRoutes registers the directory routes.
 func (h *HTTPHandler) RegisterRoutes(router *gin.Engine) {
 	// Health check
@@ -44,6 +108,7 @@ func (h *HTTPHandler) RegisterRoutes(router *gin.Engine) {
 	tenantProtected.Use(middleware.TenantExtractor(middleware.TenantConfig{
 		SlugResolver: h.svc.GetTenantIDBySlug,
 	}))
+	tenantProtected.Use(h.requireUserOrServiceAuth())
 
 	internalRoutes := router.Group("/internal")
 	internalRoutes.Use(middleware.ServiceAuthenticator(h.serviceAuth))

@@ -72,29 +72,30 @@ func stringValue(s *string) string {
 
 // getUserProfile returns the current logged-in user's profile info.
 func (h *HTTPHandler) getUserProfile(c *gin.Context) {
-	_, err := middleware.TenantIDFromContext(c.Request.Context())
+	tenantID, err := middleware.TenantIDFromContext(c.Request.Context())
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "tenant context required"})
 		return
 	}
-	userID := c.GetString("user_id") // Middleware should populate this from token
+	userID := c.GetString("user_id")
 	if userID == "" {
-		// Fallback to trying to parse from claims if middleware didn't set it (it should though)
-		// For now assuming middleware logic:
-		// We can call LookupUser with email if we have it?
-		// Or parse JWT manually?
-		// Assuming for now standard JWT middleware puts sub -> user_id
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "user context required"})
 		return
 	}
 
-	// For MVP, just return what we have (ID, email often in sub/claims, but better to fetch fresh)
-	// We don't have GetUserByID exposed in authService yet.
-	// We can add it or just return basic info for now.
-	// Let's implement full fetch later, for now return ID.
+	profile, err := h.svc.GetUserByID(c.Request.Context(), tenantID, userID)
+	if err != nil {
+		h.logger.Error("Failed to fetch user profile", zap.String("user_id", userID), zap.Error(err))
+		c.JSON(http.StatusOK, gin.H{
+			"id": userID,
+		})
+		return
+	}
+
 	c.JSON(http.StatusOK, gin.H{
-		"id": userID,
-		// "email": ... // need to fetch
+		"id":    profile.ID,
+		"email": profile.Email,
+		"name":  profile.Name,
 	})
 }
 

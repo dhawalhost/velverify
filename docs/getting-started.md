@@ -17,27 +17,31 @@ git clone https://github.com/your-org/wardseal.git
 cd wardseal
 ```
 
-### 2. Start Infrastructure & Run Services
+### 2. Start Orchestration
 
 ```bash
-./scripts/run_local.sh
+# Spins up the full identity and governance stack
+make dev
 ```
 
-This script:
-- Starts PostgreSQL and Redis containers
-- Applies database migrations
-- Starts authsvc (port 8080), dirsvc (port 8081), govsvc (port 8082)
-- Starts the Admin UI (port 5173)
+This command:
+- Starts Inframodal services: PostgreSQL, Redis, Traefik
+- Builds and starts backend services: `authsvc`, `dirsvc`, `govsvc`, `policysvc`, `provsvc`
+- Starts frontend applications: Admin Console and Landing UI
 
-### 3. Access the Admin UI
+### 3. Access the Platform
 
-Open [http://localhost:5173](http://localhost:5173) and login with:
+Open the **Admin Console** at [http://manage.wardseal.local](http://manage.wardseal.local) and login with:
 
 | Field | Value |
 |-------|-------|
 | Email | `admin@wardseal.com` |
 | Password | `password123` |
-| Tenant ID | `11111111-1111-1111-1111-111111111111` |
+| Tenant ID | `admin-system` |
+
+> [!IMPORTANT]
+> Ensure you have added the required local DNS entries to your `/etc/hosts` file:
+> `127.0.0.1 wardseal.local manage.wardseal.local auth.wardseal.local api.wardseal.local`
 
 ## Project Structure
 

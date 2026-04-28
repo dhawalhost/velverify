@@ -76,7 +76,8 @@ func NewRepository(db *sqlx.DB) Repository {
 func (s *sqlRepository) CreateRole(ctx context.Context, r Role) (string, error) {
 	var id string
 	err := s.db.QueryRowxContext(ctx,
-		`INSERT INTO roles (tenant_id, name, description) VALUES ($1, $2, $3) RETURNING id`,
+		`INSERT INTO roles (tenant_id, name, description) VALUES ($1, $2, $3) 
+		 ON CONFLICT (tenant_id, name) DO UPDATE SET description = EXCLUDED.description RETURNING id`,
 		r.TenantID, r.Name, r.Description,
 	).Scan(&id)
 	return id, err
@@ -116,7 +117,8 @@ func (s *sqlRepository) CreatePermission(ctx context.Context, p Permission) (str
 	var id string
 	err := s.db.QueryRowxContext(ctx,
 		`INSERT INTO permissions (tenant_id, resource, action, description) 
-		 VALUES ($1, $2, $3, $4) RETURNING id`,
+		 VALUES ($1, $2, $3, $4) 
+		 ON CONFLICT (tenant_id, resource, action) DO UPDATE SET description = EXCLUDED.description RETURNING id`,
 		p.TenantID, p.Resource, p.Action, p.Description,
 	).Scan(&id)
 	return id, err

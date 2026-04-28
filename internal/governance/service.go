@@ -32,6 +32,8 @@ type Service interface {
 
 	// Access Requests
 	CreateAccessRequest(ctx context.Context, tenantID string, input CreateAccessRequest) (AccessRequest, error)
+	CreateAgentAccessRequest(ctx context.Context, tenantID string, workloadID string, scopes []string, reason string, duration string) (AccessRequest, error)
+	GetAccessRequest(ctx context.Context, tenantID, id string) (AccessRequest, error)
 	ListAccessRequests(ctx context.Context, tenantID, status string) ([]AccessRequest, error)
 	ApproveAccessRequest(ctx context.Context, tenantID, requestID, approverID, comment string) error
 	RejectAccessRequest(ctx context.Context, tenantID, requestID, approverID, comment string) error
@@ -80,6 +82,19 @@ type Service interface {
 
 	// Graph Traversal
 	TraverseGraph(ctx context.Context, tenantID, subjectID string) ([]authz.RelationTuple, error)
+
+	// AI Audit Context
+	GatherAuditContext(ctx context.Context, tenantID string) (string, error)
+
+	// Machine Identity Support
+	GetApprovedScopes(ctx context.Context, tenantID, workloadID string) ([]string, time.Duration, error)
+
+	// Directory Integration
+	ListUsers(ctx context.Context, tenantID string) ([]User, error)
+	ListGroups(ctx context.Context, tenantID string) ([]Group, error)
+
+	// Policy Integration
+	EvaluatePolicy(ctx context.Context, input policy.Input) (bool, string, error)
 }
 
 type CreateOAuthClientInput struct {
@@ -132,6 +147,49 @@ func NewService(clientStore oauthclient.Repository, reqStore Repository, orgStor
 
 func (s *governanceService) HealthCheck(ctx context.Context) (bool, error) {
 	return true, nil
+}
+
+func (s *governanceService) CreateAgentAccessRequest(ctx context.Context, tenantID string, workloadID string, scopes []string, reason string, duration string) (AccessRequest, error) {
+	metadata, _ := json.Marshal(map[string]interface{}{
+		"requested_scopes": scopes,
+		"agent_workflow":   true,
+	})
+
+	return s.CreateAccessRequest(ctx, tenantID, CreateAccessRequest{
+		RequesterID:   workloadID,
+		RequesterType: "workload",
+		ResourceType:  "machine_access",
+		ResourceID:    workloadID,
+		Reason:        reason,
+		Duration:      duration,
+		Metadata:      metadata,
+	})
+}
+
+func (s *governanceService) GetApprovedScopes(ctx context.Context, tenantID, workloadID string) ([]string, time.Duration, error) {
+	requests, err := s.reqStore.ListRequests(ctx, tenantID, "approved")
+	if err != nil {
+		return nil, 0, err
+	}
+
+	for _, req := range requests {
+		if req.RequesterType == "workload" && req.RequesterID == workloadID {
+			var metadata struct {
+				RequestedScopes []string `json:"requested_scopes"`
+			}
+			if err := json.Unmarshal(req.Metadata, &metadata); err == nil && len(metadata.RequestedScopes) > 0 {
+				ttl := 1 * time.Hour
+				if req.Duration != "" {
+					if d, err := time.ParseDuration(req.Duration); err == nil {
+						ttl = d
+					}
+				}
+				return metadata.RequestedScopes, ttl, nil
+			}
+		}
+	}
+
+	return nil, 0, errors.New("no approved machine access request found")
 }
 
 func (s *governanceService) ListOAuthClients(ctx context.Context, tenantID string) ([]oauthclient.Client, error) {
@@ -240,14 +298,21 @@ func (s *governanceService) CreateAccessRequest(ctx context.Context, tenantID st
 		return AccessRequest{}, validationError("requester_id is required")
 	}
 
+	requesterType := input.RequesterType
+	if requesterType == "" {
+		requesterType = "user"
+	}
+
 	req := AccessRequest{
-		TenantID:     tenantID,
-		RequesterID:  requesterID,
-		ResourceType: input.ResourceType,
-		ResourceID:   input.ResourceID,
-		Reason:       input.Reason,
-		Duration:     input.Duration,
-		DeviceID:     input.DeviceID,
+		TenantID:      tenantID,
+		RequesterID:   requesterID,
+		RequesterType: requesterType,
+		ResourceType:  input.ResourceType,
+		ResourceID:    input.ResourceID,
+		Reason:        input.Reason,
+		Duration:      input.Duration,
+		DeviceID:      input.DeviceID,
+		Metadata:      input.Metadata,
 	}
 	id, err := s.reqStore.CreateRequest(ctx, req)
 	if err != nil {
@@ -263,6 +328,16 @@ func (s *governanceService) CreateAccessRequest(ctx context.Context, tenantID st
 		"device_id":     req.DeviceID,
 	})
 
+	return s.reqStore.GetRequest(ctx, tenantID, id)
+}
+
+func (s *governanceService) GetAccessRequest(ctx context.Context, tenantID, id string) (AccessRequest, error) {
+	if err := requireTenant(tenantID); err != nil {
+		return AccessRequest{}, err
+	}
+	if id == "" {
+		return AccessRequest{}, validationError("request_id is required")
+	}
 	return s.reqStore.GetRequest(ctx, tenantID, id)
 }
 
@@ -698,39 +773,84 @@ func (s *governanceService) GetDashboardStats(ctx context.Context, tenantID stri
 		RiskProfile: make(map[string]int),
 	}
 
-	// 1. OAuth Clients
-	clients, err := s.clientStore.ListClientsByTenant(ctx, tenantID)
+	// 1. Directory Metrics (Users & Groups)
+	users, err := s.dirClient.ListUsers(ctx, tenantID)
 	if err == nil {
-		count := 0
-		for _, c := range clients {
-			if c.ClientType == "confidential" {
-				count++
-			}
-		}
-		stats.ConnectedOrgs = len(clients) // Using organizations from client store context
+		stats.ActiveUsers = len(users)
+	}
+	groups, err := s.dirClient.ListGroups(ctx, tenantID)
+	if err == nil {
+		stats.TotalGroups = len(groups)
 	}
 
-	// 2. Pending Requests
+	// 2. OAuth Clients & Organizations
+	clients, _ := s.clientStore.ListClientsByTenant(ctx, tenantID)
+	orgs, _ := s.orgStore.List(ctx, tenantID, 1000, 0)
+	stats.ConnectedOrgs = len(orgs)
+	if stats.ConnectedOrgs == 0 && len(clients) > 0 {
+		stats.ConnectedOrgs = len(clients)
+	}
+
+	// 3. Pending Requests
 	reqs, err := s.reqStore.ListRequests(ctx, tenantID, "pending")
 	if err == nil {
 		stats.PendingRequests = len(reqs)
 	}
 
-	// 3. Active IP Policies
+	// 4. Active IP Policies
 	policies, err := s.reqStore.ListIPPolicies(ctx, tenantID)
 	if err == nil {
 		stats.ActiveIPPolicies = len(policies)
 	}
 
-	// 4. Identities & Hygiene (Mocked logic for now, using Directory metrics)
-	// In a full implementation, these would come from the directory client
-	stats.ActiveUsers = 42    // Mock
-	stats.TotalGroups = 12    // Mock
-	stats.ActiveWorkloads = 8 // Mock
-	stats.HygieneScore = 88   // Mock
-	stats.RiskProfile["low"] = 35
-	stats.RiskProfile["medium"] = 5
-	stats.RiskProfile["high"] = 2
+	// 5. Workloads
+	if s.workloadStore != nil {
+		workloads, err := s.workloadStore.List(ctx, tenantID)
+		if err == nil {
+			stats.ActiveWorkloads = len(workloads)
+		}
+	}
+
+	// 6. Security Posture (Devices & Hygiene)
+	devices, err := s.endpointStore.ListDevices(ctx, tenantID)
+	if err == nil {
+		trusted := 0
+		pending := 0
+		untrusted := 0
+		for _, d := range devices {
+			d.DeriveTrustStatus()
+			switch d.TrustStatus {
+			case "trusted":
+				trusted++
+			case "pending":
+				pending++
+			case "untrusted":
+				untrusted++
+			}
+		}
+
+		// Calculate Hygiene Score (0-100) based on device trust and pending requests
+		totalEntities := len(users) + len(devices)
+		if totalEntities > 0 {
+			defectPoints := (untrusted * 20) + (pending * 5) + (stats.PendingRequests * 2)
+			score := 100 - (defectPoints * 100 / (totalEntities * 20))
+			if score < 0 {
+				score = 0
+			}
+			stats.HygieneScore = score
+		} else {
+			stats.HygieneScore = 100
+		}
+
+		stats.RiskProfile["low"] = trusted
+		stats.RiskProfile["medium"] = pending
+		stats.RiskProfile["high"] = untrusted
+	} else {
+		stats.HygieneScore = 100
+		stats.RiskProfile["low"] = len(users)
+		stats.RiskProfile["medium"] = stats.PendingRequests
+		stats.RiskProfile["high"] = 0
+	}
 
 	return stats, nil
 }
@@ -822,4 +942,60 @@ func (s *governanceService) publishEvent(ctx context.Context, topic string, data
 		return
 	}
 	_ = s.bus.Publish(ctx, topic, payload)
+}
+func (s *governanceService) GatherAuditContext(ctx context.Context, tenantID string) (string, error) {
+	var sb strings.Builder
+
+	// 1. Dashboard Stats
+	stats, err := s.GetDashboardStats(ctx, tenantID)
+	if err == nil {
+		sb.WriteString("DASHBOARD STATS:\n")
+		sb.WriteString(fmt.Sprintf("- Active Users: %d\n", stats.ActiveUsers))
+		sb.WriteString(fmt.Sprintf("- Pending Requests: %d\n", stats.PendingRequests))
+		sb.WriteString(fmt.Sprintf("- Active Workloads: %d\n", stats.ActiveWorkloads))
+		sb.WriteString(fmt.Sprintf("- Hygiene Score: %d/100\n", stats.HygieneScore))
+		sb.WriteString("\n")
+	}
+
+	// 2. Pending Requests (Extended Context)
+	requests, err := s.ListAccessRequests(ctx, tenantID, "pending")
+	if err == nil && len(requests) > 0 {
+		sb.WriteString("RECENT PENDING ACCESS REQUESTS:\n")
+		for i, r := range requests {
+			if i >= 10 {
+				break
+			}
+			sb.WriteString(fmt.Sprintf("- [%s] %s (%s) requested access to %s (%s) for reason: %s\n",
+				r.ID, r.RequesterID, r.RequesterType, r.ResourceID, r.ResourceType, r.Reason))
+		}
+		sb.WriteString("\n")
+	}
+
+	// 3. Identity Graph Relationships
+	relationships, err := s.ListRelationships(ctx, tenantID, authz.Query{})
+	if err == nil && len(relationships) > 0 {
+		sb.WriteString("IDENTITY RELATIONSHIP GRAPH (SAMPLE):\n")
+		for i, r := range relationships {
+			if i >= 20 {
+				break
+			}
+			sb.WriteString(fmt.Sprintf("- %s:%s --(%s)--> %s:%s\n",
+				r.SubjectType, r.SubjectID, r.Relation, r.Namespace, r.ObjectID))
+		}
+		sb.WriteString("\n")
+	}
+
+	return sb.String(), nil
+}
+
+func (s *governanceService) ListUsers(ctx context.Context, tenantID string) ([]User, error) {
+	return s.dirClient.ListUsers(ctx, tenantID)
+}
+
+func (s *governanceService) ListGroups(ctx context.Context, tenantID string) ([]Group, error) {
+	return s.dirClient.ListGroups(ctx, tenantID)
+}
+
+func (s *governanceService) EvaluatePolicy(ctx context.Context, input policy.Input) (bool, string, error) {
+	return s.policyEngine.Evaluate(ctx, input)
 }

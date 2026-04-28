@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/lib/pq"
@@ -16,12 +17,14 @@ import (
 	"github.com/dhawalhost/wardseal/internal/auth"
 	"github.com/dhawalhost/wardseal/internal/authz"
 	"github.com/dhawalhost/wardseal/internal/oauthclient"
+	"github.com/dhawalhost/wardseal/internal/policy"
 	"github.com/dhawalhost/wardseal/internal/webhook"
+	"github.com/dhawalhost/wardseal/pkg/llm"
 	"github.com/dhawalhost/wardseal/pkg/middleware"
 )
 
 func TestListOAuthClientsReturnsClients(t *testing.T) {
-	tenantID := "11111111-1111-1111-1111-111111111111"
+	tenantID := "admin-system"
 	stub := &stubService{
 		listOAuthClientsFn: func(ctx context.Context, gotTenant string) ([]oauthclient.Client, error) {
 			if gotTenant != tenantID {
@@ -90,7 +93,7 @@ func TestCreateOAuthClientValidationErrorPropagates(t *testing.T) {
 	})
 
 	resp := performRequest(router, http.MethodPost, "/api/v1/oauth/clients", body, map[string]string{
-		middleware.DefaultTenantHeader: "11111111-1111-1111-1111-111111111111",
+		middleware.DefaultTenantHeader: "admin-system",
 		"Content-Type":                 "application/json",
 	})
 
@@ -116,7 +119,7 @@ func TestGetOAuthClientNotFound(t *testing.T) {
 	router := newTestRouter(t, stub)
 
 	resp := performRequest(router, http.MethodGet, "/api/v1/oauth/clients/missing", nil, map[string]string{
-		middleware.DefaultTenantHeader: "11111111-1111-1111-1111-111111111111",
+		middleware.DefaultTenantHeader: "admin-system",
 	})
 
 	if resp.Code != http.StatusNotFound {
@@ -139,7 +142,13 @@ func newTestRouter(t *testing.T, svc Service) *gin.Engine {
 	t.Helper()
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
-	handler := NewHTTPHandler(svc, &stubCampaignService{}, &stubWebhookService{}, zap.NewNop())
+	dummyValidator := func(token string) (*middleware.Claims, error) {
+		return &middleware.Claims{
+			Tenant: "admin-system",
+			Roles:  []string{"admin"},
+		}, nil
+	}
+	handler := NewHTTPHandler(svc, &stubCampaignService{}, &stubWebhookService{}, &stubLLMProvider{}, nil, dummyValidator, zap.NewNop())
 	handler.RegisterRoutes(router)
 	return router
 }
@@ -186,11 +195,11 @@ func (s *stubCampaignService) ListReviewItems(ctx context.Context, tenantID, rev
 	return []CertificationItem{}, nil
 }
 
-func (s *stubCampaignService) ApproveItem(ctx context.Context, itemID, comment string) error {
+func (s *stubCampaignService) ApproveItem(ctx context.Context, tenantID, itemID, comment string) error {
 	return nil
 }
 
-func (s *stubCampaignService) RevokeItem(ctx context.Context, itemID, comment string) error {
+func (s *stubCampaignService) RevokeItem(ctx context.Context, tenantID, itemID, comment string) error {
 	return nil
 }
 
@@ -223,6 +232,23 @@ func (s *stubWebhookService) GetWebhooksForEvent(ctx context.Context, tenantID, 
 	return []webhook.Webhook{}, nil
 }
 
+type stubLLMProvider struct {
+	generateResponseFn func(ctx context.Context, systemPrompt, userQuery string) (string, error)
+}
+
+func (p *stubLLMProvider) GenerateResponse(ctx context.Context, systemPrompt, userQuery string) (string, error) {
+	if p.generateResponseFn != nil {
+		return p.generateResponseFn(ctx, systemPrompt, userQuery)
+	}
+	return "I am a stub AI", nil
+}
+
+func (p *stubLLMProvider) Chat(ctx context.Context, messages []llm.Message, tools []llm.Tool) (llm.Message, error) {
+	return llm.Message{Role: "assistant", Content: "I am a stub AI"}, nil
+}
+
+var _ llm.Provider = (*stubLLMProvider)(nil)
+
 func performRequest(router *gin.Engine, method, path string, body []byte, headers map[string]string) *httptest.ResponseRecorder {
 	var reader *bytes.Reader
 	if body != nil {
@@ -234,6 +260,7 @@ func performRequest(router *gin.Engine, method, path string, body []byte, header
 	if err != nil {
 		panic(err)
 	}
+	req.Header.Set("Authorization", "Bearer dummy-token")
 	for k, v := range headers {
 		req.Header.Set(k, v)
 	}
@@ -282,12 +309,20 @@ type stubService struct {
 	createIPPolicyFn        func(ctx context.Context, tenantID string, req CreateIPPolicyRequest) (IPPolicy, error)
 	listIPPoliciesFn        func(ctx context.Context, tenantID string) ([]IPPolicy, error)
 	deleteIPPolicyFn        func(ctx context.Context, tenantID, ipPolicyID string) error
-	confirmSafetyActionFn   func(ctx context.Context, tenantID, userID, actionID, comment string) error
+	confirmSafetyActionFn   func(ctx context.Context, tenantID, actionID, approverID, comment string) error
+	rejectSafetyActionFn    func(ctx context.Context, tenantID, actionID, approverID, comment string) error
 
-	listWorkloadsFn    func(ctx context.Context, tenantID string) ([]auth.Workload, error)
-	getDashboardStatsFn func(ctx context.Context, tenantID string) (DashboardStats, error)
-	createWorkloadFn   func(ctx context.Context, tenantID string, w auth.Workload) (string, error)
-	listRelationshipsFn func(ctx context.Context, tenantID string, query authz.Query) ([]authz.RelationTuple, error)
+	listWorkloadsFn      func(ctx context.Context, tenantID string) ([]auth.Workload, error)
+	getDashboardStatsFn  func(ctx context.Context, tenantID string) (DashboardStats, error)
+	createWorkloadFn     func(ctx context.Context, tenantID string, w auth.Workload) (string, error)
+	listRelationshipsFn  func(ctx context.Context, tenantID string, query authz.Query) ([]authz.RelationTuple, error)
+	traverseGraphFn      func(ctx context.Context, tenantID, subjectID string) ([]authz.RelationTuple, error)
+	gatherAuditContextFn func(ctx context.Context, tenantID string) (string, error)
+	getApprovedScopesFn  func(ctx context.Context, tenantID, workloadID string) ([]string, time.Duration, error)
+	getAccessRequestFn   func(ctx context.Context, tenantID, id string) (AccessRequest, error)
+	listUsersFn          func(ctx context.Context, tenantID string) ([]User, error)
+	listGroupsFn         func(ctx context.Context, tenantID string) ([]Group, error)
+	evaluatePolicyFn     func(ctx context.Context, input policy.Input) (bool, string, error)
 }
 
 // GetDevice implements [Service].
@@ -317,12 +352,26 @@ func (s *stubService) RegisterDevice(ctx context.Context, tenantID string, d Dev
 
 // RejectSafetyAction implements [Service].
 func (s *stubService) RejectSafetyAction(ctx context.Context, tenantID string, actionID string, approverID string, comment string) error {
-	panic("unimplemented")
+	if s.rejectSafetyActionFn != nil {
+		return s.rejectSafetyActionFn(ctx, tenantID, actionID, approverID, comment)
+	}
+	return nil
 }
 
 // UpdateDeviceStatus implements [Service].
 func (s *stubService) UpdateDeviceStatus(ctx context.Context, tenantID string, id string, status string) error {
 	panic("unimplemented")
+}
+
+func (s *stubService) CreateAgentAccessRequest(ctx context.Context, tenantID string, workloadID string, scopes []string, reason string, duration string) (AccessRequest, error) {
+	panic("unimplemented")
+}
+
+func (s *stubService) GetAccessRequest(ctx context.Context, tenantID, id string) (AccessRequest, error) {
+	if s.getAccessRequestFn != nil {
+		return s.getAccessRequestFn(ctx, tenantID, id)
+	}
+	return AccessRequest{}, nil
 }
 
 func (s *stubService) HealthCheck(ctx context.Context) (bool, error) {
@@ -519,4 +568,46 @@ func (s *stubService) ListRelationships(ctx context.Context, tenantID string, qu
 		return s.listRelationshipsFn(ctx, tenantID, query)
 	}
 	return nil, nil
+}
+
+func (s *stubService) TraverseGraph(ctx context.Context, tenantID, subjectID string) ([]authz.RelationTuple, error) {
+	if s.traverseGraphFn != nil {
+		return s.traverseGraphFn(ctx, tenantID, subjectID)
+	}
+	return nil, nil
+}
+
+func (s *stubService) GatherAuditContext(ctx context.Context, tenantID string) (string, error) {
+	if s.gatherAuditContextFn != nil {
+		return s.gatherAuditContextFn(ctx, tenantID)
+	}
+	return "", nil
+}
+
+func (s *stubService) GetApprovedScopes(ctx context.Context, tenantID, workloadID string) ([]string, time.Duration, error) {
+	if s.getApprovedScopesFn != nil {
+		return s.getApprovedScopesFn(ctx, tenantID, workloadID)
+	}
+	return nil, 0, nil
+}
+
+func (s *stubService) ListUsers(ctx context.Context, tenantID string) ([]User, error) {
+	if s.listUsersFn != nil {
+		return s.listUsersFn(ctx, tenantID)
+	}
+	return nil, nil
+}
+
+func (s *stubService) ListGroups(ctx context.Context, tenantID string) ([]Group, error) {
+	if s.listGroupsFn != nil {
+		return s.listGroupsFn(ctx, tenantID)
+	}
+	return nil, nil
+}
+
+func (s *stubService) EvaluatePolicy(ctx context.Context, input policy.Input) (bool, string, error) {
+	if s.evaluatePolicyFn != nil {
+		return s.evaluatePolicyFn(ctx, input)
+	}
+	return true, "Allowed", nil
 }

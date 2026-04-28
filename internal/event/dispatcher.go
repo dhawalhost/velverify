@@ -7,6 +7,8 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
+	"net"
 	"net/http"
 	"time"
 
@@ -31,12 +33,78 @@ type Dispatcher struct {
 	httpClient *http.Client
 }
 
+var privateIPBlocks []*net.IPNet
+
+func init() {
+	for _, cidr := range []string{
+		"0.0.0.0/8",      // Current network (broadcast scopes)
+		"127.0.0.0/8",    // IPv4 loopback
+		"10.0.0.0/8",     // RFC1918
+		"172.16.0.0/12",  // RFC1918
+		"192.168.0.0/16", // RFC1918
+		"169.254.0.0/16", // IPv4 link-local (AWS metadata)
+		"100.64.0.0/10",  // Shared Address Space
+		"198.18.0.0/15",  // Benchmarking
+		"::/128",         // Unspecified IPv6
+		"::1/128",        // IPv6 loopback
+		"fe80::/10",      // IPv6 link-local
+		"fc00::/7",       // IPv6 unique local addr
+	} {
+		_, block, _ := net.ParseCIDR(cidr)
+		privateIPBlocks = append(privateIPBlocks, block)
+	}
+}
+
+func isPrivateIP(ip net.IP) bool {
+	if ip.IsLoopback() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() {
+		return true
+	}
+	for _, block := range privateIPBlocks {
+		if block.Contains(ip) {
+			return true
+		}
+	}
+	return false
+}
+
 // NewDispatcher creates a new event dispatcher.
 func NewDispatcher(webhookSvc webhook.Service, logger *zap.Logger) *Dispatcher {
+	safeDialContext := func(ctx context.Context, network, addr string) (net.Conn, error) {
+		host, port, err := net.SplitHostPort(addr)
+		if err != nil {
+			return nil, err
+		}
+
+		ips, err := net.DefaultResolver.LookupIP(ctx, "ip", host)
+		if err != nil {
+			return nil, err
+		}
+
+		if len(ips) == 0 {
+			return nil, fmt.Errorf("no IP addresses found for host: %s", host)
+		}
+
+		ip := ips[0]
+		if isPrivateIP(ip) {
+			return nil, fmt.Errorf("connection to private IP address rejected: %s", ip)
+		}
+
+		dialer := &net.Dialer{
+			Timeout:   30 * time.Second,
+			KeepAlive: 30 * time.Second,
+		}
+		return dialer.DialContext(ctx, network, net.JoinHostPort(ip.String(), port))
+	}
+
 	return &Dispatcher{
 		webhookSvc: webhookSvc,
 		logger:     logger,
-		httpClient: &http.Client{Timeout: 10 * time.Second},
+		httpClient: &http.Client{
+			Timeout: 10 * time.Second,
+			Transport: &http.Transport{
+				DialContext: safeDialContext,
+			},
+		},
 	}
 }
 

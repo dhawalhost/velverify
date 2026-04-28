@@ -133,7 +133,12 @@ build-all: ## Build all backend service binaries and CLI tools locally
 	go build -o bin/policysvc ./cmd/policysvc
 	go build -o bin/provsvc ./cmd/provsvc
 	go build -o bin/wardseal ./cmd/wardseal
+	go build -o bin/mcpsvc ./cmd/mcpsvc
 	go build -o bin/migrate_patch ./cmd/migrate_patch
+
+.PHONY: mcp
+mcp: ## Run the MCP server locally
+	go run cmd/mcpsvc/main.go
 
 .PHONY: images
 images: ## Build all Docker images

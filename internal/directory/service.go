@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"strings"
+	"sync"
 
 	"github.com/dhawalhost/wardseal/pkg/eventbus"
 
@@ -35,6 +36,7 @@ type Service interface {
 	AddUserToGroup(ctx context.Context, tenantID, userID, groupID string) error
 	RemoveUserFromGroup(ctx context.Context, tenantID, userID, groupID string) error
 	ListGroupMembers(ctx context.Context, tenantID, groupID string) ([]User, error)
+	ListUserGroups(ctx context.Context, tenantID, userID string) ([]Group, error)
 
 	// Credential validation
 	VerifyCredentials(ctx context.Context, tenantID, email, password string) (User, error)
@@ -55,15 +57,75 @@ type Service interface {
 type directoryService struct {
 	repo Repository
 	bus  eventbus.EventBus
+	passwordHistory map[string][]string
+	mu sync.RWMutex
 }
 
 var ErrInvalidCredentials = errors.New("invalid credentials")
 var ErrAlreadyExists = errors.New("already exists")
 var ErrEmailAlreadyExistsGlobally = errors.New("email already in use globally")
 
+var commonPasswords = map[string]bool{
+	"password":     true,
+	"12345678":     true,
+	"qwertyuiop":   true,
+	"admin123":     true,
+	"welcome1":     true,
+	"wardseal123":  true,
+}
+
+func validatePasswordPolicy(password string) error {
+	if len(password) < 8 {
+		return errors.New("password must be at least 8 characters long")
+	}
+	
+	if commonPasswords[strings.ToLower(password)] {
+		return errors.New("password is too common")
+	}
+	
+	var (
+		hasUpper   bool
+		hasLower   bool
+		hasNumber  bool
+		hasSpecial bool
+	)
+	
+	for _, char := range password {
+		switch {
+		case 'a' <= char && char <= 'z':
+			hasLower = true
+		case 'A' <= char && char <= 'Z':
+			hasUpper = true
+		case '0' <= char && char <= '9':
+			hasNumber = true
+		case strings.ContainsRune(`!@#$%^&*()-_=+[]{};:'",.<>/?\|~`, char):
+			hasSpecial = true
+		}
+	}
+	
+	if !hasUpper {
+		return errors.New("password must contain at least one uppercase letter")
+	}
+	if !hasLower {
+		return errors.New("password must contain at least one lowercase letter")
+	}
+	if !hasNumber {
+		return errors.New("password must contain at least one number")
+	}
+	if !hasSpecial {
+		return errors.New("password must contain at least one special character")
+	}
+	
+	return nil
+}
+
 // NewService creates a new directory service.
 func NewService(repo Repository, bus eventbus.EventBus) Service {
-	return &directoryService{repo: repo, bus: bus}
+	return &directoryService{
+		repo:            repo,
+		bus:             bus,
+		passwordHistory: make(map[string][]string),
+	}
 }
 
 func (s *directoryService) HealthCheck(ctx context.Context) (bool, error) {
@@ -74,6 +136,10 @@ func (s *directoryService) HealthCheck(ctx context.Context) (bool, error) {
 }
 
 func (s *directoryService) CreateUser(ctx context.Context, tenantID string, user User) (string, error) {
+	if err := validatePasswordPolicy(user.Password); err != nil {
+		return "", err
+	}
+
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
 	if err != nil {
 		return "", err
@@ -116,12 +182,32 @@ func (s *directoryService) GetUserByEmail(ctx context.Context, tenantID, email s
 	return s.repo.GetUserByEmail(ctx, tenantID, email)
 }
 
+func (s *directoryService) ListUserGroups(ctx context.Context, tenantID, userID string) ([]Group, error) {
+	return s.repo.ListUserGroups(ctx, tenantID, userID)
+}
+
 func (s *directoryService) ListUsers(ctx context.Context, tenantID string, limit, offset int) ([]User, int, error) {
 	return s.repo.ListUsers(ctx, tenantID, limit, offset)
 }
 
 func (s *directoryService) UpdateUser(ctx context.Context, tenantID, id string, user User) error {
-	return s.repo.WithTransaction(ctx, func(tx *sqlx.Tx) error {
+	if user.Password != "" {
+		if err := validatePasswordPolicy(user.Password); err != nil {
+			return err
+		}
+		
+		s.mu.RLock()
+		history := s.passwordHistory[id]
+		s.mu.RUnlock()
+		
+		for _, oldHash := range history {
+			if err := bcrypt.CompareHashAndPassword([]byte(oldHash), []byte(user.Password)); err == nil {
+				return errors.New("password has been used recently")
+			}
+		}
+	}
+
+	err := s.repo.WithTransaction(ctx, func(tx *sqlx.Tx) error {
 		var passwordHash string
 		if user.Password != "" {
 			hp, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
@@ -131,12 +217,25 @@ func (s *directoryService) UpdateUser(ctx context.Context, tenantID, id string, 
 			passwordHash = string(hp)
 		}
 
-		if err := s.repo.UpdateIdentity(ctx, tx, tenantID, id, user.Status); err != nil {
+		if err := s.repo.UpdateIdentity(ctx, tx, tenantID, id, user.Status, user.MFAEnforced); err != nil {
 			return err
 		}
 
 		return s.repo.UpdateAccount(ctx, tx, tenantID, id, user.Email, passwordHash)
 	})
+
+	if err == nil && user.Password != "" {
+		s.mu.Lock()
+		history := s.passwordHistory[id]
+		if len(history) >= 5 {
+			history = history[1:]
+		}
+		hp, _ := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
+		s.passwordHistory[id] = append(history, string(hp))
+		s.mu.Unlock()
+	}
+
+	return err
 }
 
 func (s *directoryService) DeleteUser(ctx context.Context, tenantID, id string) error {
