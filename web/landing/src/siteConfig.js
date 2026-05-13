@@ -14,15 +14,15 @@ const environment = detectEnvironment()
 const defaults = {
   local: {
     siteBaseUrl: 'http://wardseal.local',
-    consoleBaseUrl: 'http://manage.wardseal.local',
+    consoleBaseUrl: 'http://app.wardseal.local',
   },
   staging: {
     siteBaseUrl: 'https://staging.wardseal.com',
-    consoleBaseUrl: 'https://manage-staging.wardseal.com',
+    consoleBaseUrl: 'https://app-staging.wardseal.com',
   },
   production: {
     siteBaseUrl: 'https://wardseal.com',
-    consoleBaseUrl: 'https://manage.wardseal.com',
+    consoleBaseUrl: 'https://app.wardseal.com',
   },
 }
 

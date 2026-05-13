@@ -9,6 +9,7 @@ import (
 	"go.uber.org/zap"
 	"time"
 
+	"github.com/dhawalhost/gokit/health"
 	"github.com/dhawalhost/wardseal/internal/provisioning"
 	"github.com/dhawalhost/wardseal/pkg/config"
 )
@@ -44,6 +45,11 @@ func main() {
 
 	provHandlers := provisioning.NewHTTPHandler(svc, log)
 	provHandlers.RegisterRoutes(router)
+
+	// Health check
+	healthHandler := health.NewHandler()
+	router.GET("/healthz", gin.WrapF(healthHandler.LiveHandler()))
+	router.GET("/provisioning/healthz", gin.WrapF(healthHandler.LiveHandler()))
 
 	log.Info("Provisioning service starting", zap.String("addr", ":8084"))
 	if err := router.Run(":8084"); err != nil {

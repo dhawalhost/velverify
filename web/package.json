@@ -1,0 +1,22 @@
+{
+  "name": "wardseal-web",
+  "private": true,
+  "workspaces": [
+    "shared",
+    "admin",
+    "app",
+    "developer",
+    "id",
+    "landing",
+    "status"
+  ],
+  "scripts": {
+    "build:admin": "npm run build --workspace=admin",
+    "build:app": "npm run build --workspace=app",
+    "build:developer": "npm run build --workspace=developer",
+    "build:id": "npm run build --workspace=id",
+    "build:landing": "npm run build --workspace=landing",
+    "build:status": "npm run build --workspace=status",
+    "build:all": "npm run build --workspaces --if-present"
+  }
+}

@@ -116,7 +116,7 @@ const PortalLayout = () => {
         <div className="min-h-screen bg-surface flex flex-col font-sans selection:bg-primary/10 selection:text-primary">
             {/* Top Navigation Bar: Modernist */}
             <header className="sticky top-0 z-50 w-full border-b bg-card/80 backdrop-blur-md">
-                <div className="container mx-auto px-10 h-20 flex items-center justify-between">
+                <div className="container mx-auto px-6 h-16 flex items-center justify-between">
                     {/* Logo Area */}
                     <div className="flex items-center gap-6">
                         <Link to="/portal" className="flex items-center gap-3 group">
@@ -136,7 +136,7 @@ const PortalLayout = () => {
                             <Button
                                 variant="outline"
                                 onClick={() => navigate('/dashboard')}
-                                className="hidden md:flex gap-2 h-10 border-outline/20 rounded-xl font-semibold text-xs px-5 hover:bg-surface-container transition-all"
+                                className="hidden md:flex gap-2 h-9 border-outline/20 rounded-lg font-semibold text-[11px] px-4 hover:bg-surface-container transition-all"
                             >
                                 <ShieldCheck className="w-4 h-4 text-primary" />
                                 <span>Admin Panel</span>
@@ -156,7 +156,7 @@ const PortalLayout = () => {
                                         </Avatar>
                                     </Button>
                                 </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end" className="w-64 rounded-xl border p-1 shadow-lg overflow-hidden">
+                                <DropdownMenuContent align="end" className="w-64 rounded-lg border p-1 shadow-lg overflow-hidden">
                                     <DropdownMenuLabel className="p-4">
                                         <div className="flex flex-col">
                                             <span className="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant/50 mb-1">Authenticated Account</span>
@@ -198,9 +198,9 @@ const PortalLayout = () => {
             </header>
 
             {/* Main Content Area */}
-            <main className="flex-1 container mx-auto px-10 py-12 relative">
+            <main className="flex-1 container mx-auto px-6 py-8 relative">
                 {/* Live Status Indicators */}
-                <div className="flex items-center justify-between mb-10 border-b pb-6">
+                <div className="flex items-center justify-between mb-6 border-b pb-4">
                     <div className="flex items-center gap-6">
                         <div className="flex items-center gap-3">
                             <div className="h-2 w-2 bg-success rounded-full animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.4)]" />
@@ -220,7 +220,7 @@ const PortalLayout = () => {
             </main>
 
             <footer className="border-t py-10 bg-card">
-                <div className="container mx-auto px-10 flex flex-col md:flex-row items-center justify-between gap-8">
+                <div className="container mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-6">
                     <div className="flex flex-col gap-2">
                         <div className="flex items-center gap-3">
                             <img src="/wardseal.svg" alt="WardSeal" height={20} width={20} className="w-4 h-4" />

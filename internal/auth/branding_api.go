@@ -13,7 +13,7 @@ import (
 func (h *HTTPHandler) RegisterBrandingRoutes(router *gin.RouterGroup) {
 	// Public endpoint (no auth required, just tenant ID context or param)
 	// We allow fetching public branding by tenant ID
-	router.GET("/branding/public/:tenantID", h.getPublicBranding)
+	router.GET("/branding/public/:tenant", h.getPublicBranding)
 
 	// Protected management endpoints
 	mgmt := router.Group("/api/v1/branding")
@@ -25,10 +25,20 @@ func (h *HTTPHandler) RegisterBrandingRoutes(router *gin.RouterGroup) {
 }
 
 func (h *HTTPHandler) getPublicBranding(c *gin.Context) {
-	tenantID := c.Param("tenantID")
+	tenantID, _ := middleware.TenantIDFromGinContext(c)
 	if tenantID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "tenant ID required"})
+		tenantID = c.Param("tenant")
+	}
+
+	if tenantID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "tenant identifier required"})
 		return
+	}
+
+	// Resolve slug if needed
+	resolvedID, err := h.svc.ResolveTenantSlug(c.Request.Context(), tenantID)
+	if err == nil && resolvedID != "" {
+		tenantID = resolvedID
 	}
 
 	config, err := h.svc.GetBranding(c.Request.Context(), tenantID)

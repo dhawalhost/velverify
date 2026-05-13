@@ -10,7 +10,7 @@ export const GlassCard = React.forwardRef<HTMLDivElement, React.HTMLAttributes<H
         <Card
             ref={ref}
             className={cn(
-                "border-none bg-card/80 backdrop-blur-xl rounded-[32px] overflow-hidden transition-all duration-200 shadow-card ring-1 ring-on-surface/5",
+                "border-none bg-card/80 backdrop-blur-xl rounded-xl overflow-hidden transition-all duration-200 shadow-card ring-1 ring-on-surface/5",
                 className
             )}
             {...props}
@@ -25,7 +25,7 @@ export const GlassCardHeader = React.forwardRef<HTMLDivElement, React.HTMLAttrib
     ({ className, ...props }, ref) => (
         <CardHeader
             ref={ref}
-            className={cn("bg-transparent border-b border-on-surface/5 p-8 px-10", className)}
+            className={cn("bg-transparent border-b border-on-surface/5 p-4 px-6", className)}
             {...props}
         />
     )
@@ -39,7 +39,7 @@ export const GlassCardTitle = React.forwardRef<HTMLParagraphElement, React.HTMLA
         <CardTitle
             ref={ref}
             className={cn(
-                "text-2xl font-bold tracking-tight text-on-surface flex items-center gap-2",
+                "text-base font-bold tracking-tight text-on-surface flex items-center gap-2",
                 className
             )}
             {...props}
@@ -52,7 +52,7 @@ GlassCardTitle.displayName = "GlassCardTitle";
 
 export const GlassCardContent = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
     ({ className, ...props }, ref) => (
-        <CardContent ref={ref} className={cn("p-10", className)} {...props} />
+        <CardContent ref={ref} className={cn("p-6", className)} {...props} />
     )
 );
 GlassCardContent.displayName = "GlassCardContent";
@@ -76,7 +76,7 @@ export const GlassCardFooter = React.forwardRef<HTMLDivElement, React.HTMLAttrib
     ({ className, ...props }, ref) => (
         <CardFooter
             ref={ref}
-            className={cn("px-10 py-6 bg-surface-container/10 border-t border-on-surface/5", className)}
+            className={cn("px-6 py-4 bg-surface-container/10 border-t border-on-surface/5", className)}
             {...props}
         />
     )
@@ -110,7 +110,7 @@ export const GlassTableHead = React.forwardRef<HTMLTableCellElement, React.ThHTM
         <TableHead
             ref={ref}
             className={cn(
-                "font-bold text-[12px] py-5 px-6 text-on-surface-variant/40 tracking-tight",
+                "font-bold text-[10px] py-2.5 px-6 text-on-surface-variant/40 tracking-tight uppercase",
                 className
             )}
             {...props}

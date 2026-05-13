@@ -58,8 +58,8 @@ authsvc:
 
   autoscaling:
     enabled: false
-    minReplicas: 2
-    maxReplicas: 10
+    minReplicas: 1
+    maxReplicas: 2
     targetCPUUtilizationPercentage: 80
 
 # =====================
@@ -67,7 +67,7 @@ authsvc:
 # =====================
 dirsvc:
   enabled: true
-  replicaCount: 2
+  replicaCount: 1
 
   image:
     repository: ghcr.io/dhawalhost/wardseal-dirsvc
@@ -94,7 +94,7 @@ dirsvc:
 # =====================
 govsvc:
   enabled: true
-  replicaCount: 2
+  replicaCount: 1
 
   image:
     repository: ghcr.io/dhawalhost/wardseal-govsvc
@@ -122,7 +122,7 @@ govsvc:
 # =====================
 policysvc:
   enabled: true
-  replicaCount: 2
+  replicaCount: 1
 
   image:
     repository: ghcr.io/dhawalhost/wardseal-policysvc
@@ -149,7 +149,7 @@ policysvc:
 # =====================
 provsvc:
   enabled: true
-  replicaCount: 2
+  replicaCount: 1
 
   image:
     repository: ghcr.io/dhawalhost/wardseal-provsvc
@@ -176,7 +176,7 @@ provsvc:
 # =====================
 adminui:
   enabled: true
-  replicaCount: 2
+  replicaCount: 1
 
   image:
     repository: ghcr.io/dhawalhost/wardseal-adminui
@@ -264,7 +264,43 @@ ingress:
           pathType: Prefix
           service: provsvc
           port: 8084
-    - host: manage.wardseal.com
+    - host: admin.wardseal.com
+      paths:
+        - path: /
+          pathType: Prefix
+          service: adminui
+          port: 80
+    - host: app.wardseal.com
+      paths:
+        - path: /
+          pathType: Prefix
+          service: adminui
+          port: 80
+    - host: id.wardseal.com
+      paths:
+        - path: /
+          pathType: Prefix
+          service: adminui
+          port: 80
+    - host: dev.wardseal.com
+      paths:
+        - path: /
+          pathType: Prefix
+          service: adminui
+          port: 80
+    - host: cdn.wardseal.com
+      paths:
+        - path: /
+          pathType: Prefix
+          service: adminui
+          port: 80
+    - host: hooks.wardseal.com
+      paths:
+        - path: /
+          pathType: Prefix
+          service: govsvc
+          port: 8082
+    - host: status.wardseal.com
       paths:
         - path: /
           pathType: Prefix
@@ -275,4 +311,11 @@ ingress:
       hosts:
         - auth.wardseal.com
         - api.wardseal.com
-        - manage.wardseal.com
+        - admin.wardseal.com
+        - app.wardseal.com
+        - id.wardseal.com
+        - developer.wardseal.com
+        - dev.wardseal.com
+        - cdn.wardseal.com
+        - hooks.wardseal.com
+        - status.wardseal.com

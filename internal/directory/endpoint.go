@@ -1,20 +1,56 @@
 package directory
 
 import (
+	"database/sql/driver"
+	"encoding/json"
+	"errors"
 	"time"
 )
 
 // User represents a user in the system.
 // User represents a user in the system.
 type User struct {
-	ID        string    `json:"id,omitempty" db:"id" validate:"omitempty,uuid"`
-	TenantID  string    `json:"tenant_id,omitempty" db:"tenant_id" validate:"omitempty,uuid"`
-	Email     string    `json:"email" db:"email" validate:"required,email"`
-	Password  string    `json:"password,omitempty" db:"-" validate:"omitempty,min=8"` // Ignore password for db scan, normally not selected or manual
-	Status      string    `json:"status,omitempty" db:"status" validate:"omitempty,oneof=active inactive suspended"`
-	MFAEnforced bool      `json:"mfa_enforced" db:"mfa_enforced"`
+	ID          string    `json:"id,omitempty" db:"id" validate:"omitempty,uuid"`
+	TenantID    string    `json:"tenant_id,omitempty" db:"tenant_id" validate:"omitempty,uuid"`
+	Email       string    `json:"email" db:"email" validate:"required,email"`
+	DisplayName *string    `json:"display_name,omitempty" db:"display_name" validate:"omitempty"`
+	Password    string    `json:"password,omitempty" db:"-" validate:"omitempty,min=8"` // Ignore password for db scan, normally not selected or manual
+	Status      string    `json:"status,omitempty" db:"status" validate:"omitempty,oneof=active inactive suspended pending_deletion"`
+	ExternalID   *string        `json:"external_id,omitempty" db:"external_id"`
+	PhoneNumbers PhoneNumbers `json:"phone_numbers,omitempty" db:"phone_numbers"`
+	Department   *string        `json:"department,omitempty" db:"department"`
+	Title        *string        `json:"title,omitempty" db:"title"`
+	Timezone     *string        `json:"timezone,omitempty" db:"timezone"`
+	MFAEnforced  *bool          `json:"mfa_enforced" db:"mfa_enforced"`
 	CreatedAt   time.Time `json:"created_at,omitempty" db:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at,omitempty" db:"updated_at"`
+}
+
+type PhoneNumber struct {
+	Value   string `json:"value"`
+	Type    string `json:"type,omitempty"`
+	Primary bool   `json:"primary,omitempty"`
+}
+
+type PhoneNumbers []PhoneNumber
+
+func (p *PhoneNumbers) Scan(value interface{}) error {
+	if value == nil {
+		*p = nil
+		return nil
+	}
+	bytes, ok := value.([]byte)
+	if !ok {
+		return errors.New("type assertion to []byte failed")
+	}
+	return json.Unmarshal(bytes, p)
+}
+
+func (p PhoneNumbers) Value() (driver.Value, error) {
+	if len(p) == 0 {
+		return nil, nil
+	}
+	return json.Marshal(p)
 }
 
 // Group represents a group in the system.

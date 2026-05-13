@@ -24,6 +24,11 @@ type fakeDirectoryService struct {
 	currentUser directory.User
 }
 
+// ListPendingDeletions implements [directory.Service].
+func (f *fakeDirectoryService) ListPendingDeletions(ctx context.Context, olderThan time.Time) ([]directory.User, error) {
+	panic("unimplemented")
+}
+
 func (f *fakeDirectoryService) HealthCheck(context.Context) (bool, error) { return true, nil }
 
 func (f *fakeDirectoryService) CreateUser(_ context.Context, _ string, user directory.User) (string, error) {

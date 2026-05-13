@@ -103,7 +103,7 @@ func TestZeroTrust_RBACClaimsInJWT(t *testing.T) {
 	}
 
 	// 2. Test ID Token
-	idToken, err := svc.generateIDToken(context.Background(), tenantID, "test-client", userID, "nonce-123")
+	idToken, err := svc.generateIDToken(context.Background(), tenantID, "test-client", userID, "openid profile", "nonce-123")
 	if err != nil {
 		t.Fatalf("failed to generate id token: %v", err)
 	}

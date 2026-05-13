@@ -26,6 +26,24 @@ type MockService struct {
 	mock.Mock
 }
 
+// SendPasswordSetupEmail implements [auth.Service].
+func (m *MockService) SendPasswordSetupEmail(ctx context.Context, tenantID string, userID string, mode string, expiresHours int) error {
+	args := m.Called(ctx, tenantID, userID, mode, expiresHours)
+	return args.Error(0)
+}
+
+// GetSSOAuthorizeURL implements [auth.Service].
+func (m *MockService) GetSSOAuthorizeURL(ctx context.Context, tenantID string, providerName string, redirectURI string) (string, error) {
+	args := m.Called(ctx, tenantID, providerName, redirectURI)
+	return args.String(0), args.Error(1)
+}
+
+// ListSSOProviders implements [auth.Service].
+func (m *MockService) ListSSOProviders(ctx context.Context, tenantID string) ([]auth.SSOProvider, error) {
+	args := m.Called(ctx, tenantID)
+	return args.Get(0).([]auth.SSOProvider), args.Error(1)
+}
+
 func (m *MockService) Login(ctx context.Context, username, password, deviceID, userAgent, ip, clientOSVersion string) (string, error) {
 	args := m.Called(ctx, username, password, deviceID, userAgent, ip, clientOSVersion)
 	return args.String(0), args.Error(1)
@@ -43,13 +61,16 @@ func (m *MockService) PerformSystemSetup(ctx context.Context, email, password st
 
 // ... other interface methods mocked as needed (stubbed for now to satisfy interface)
 func (m *MockService) Authorize(ctx context.Context, userID string, req auth.AuthorizeRequest) (auth.AuthorizeResponse, error) {
-	return auth.AuthorizeResponse{}, nil
+	args := m.Called(ctx, userID, req)
+	return args.Get(0).(auth.AuthorizeResponse), args.Error(1)
 }
 func (m *MockService) Token(ctx context.Context, req auth.TokenRequest) (auth.TokenResponse, error) {
-	return auth.TokenResponse{}, nil
+	args := m.Called(ctx, req)
+	return args.Get(0).(auth.TokenResponse), args.Error(1)
 }
 func (m *MockService) Introspect(ctx context.Context, req auth.IntrospectRequest) (auth.IntrospectResponse, error) {
-	return auth.IntrospectResponse{}, nil
+	args := m.Called(ctx, req)
+	return args.Get(0).(auth.IntrospectResponse), args.Error(1)
 }
 func (m *MockService) Revoke(ctx context.Context, req auth.RevokeRequest) error { return nil }
 func (m *MockService) SAML() *saml.Provider                                     { return nil }
@@ -90,6 +111,9 @@ func (m *MockService) ResolveTenantSlug(ctx context.Context, slug string) (strin
 }
 func (m *MockService) UIURL() string {
 	return "http://localhost:5173"
+}
+func (m *MockService) CookieDomain() string {
+	return "localhost"
 }
 func (m *MockService) GetOIDCConfiguration() auth.OpenIDConfiguration {
 	return auth.OpenIDConfiguration{}

@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/go-redis/redis/v8"
+	"github.com/redis/go-redis/v9"
 	"golang.org/x/time/rate"
 )
 
@@ -25,7 +25,7 @@ type RateLimitWindowProfile struct {
 }
 
 type DistributedRateLimitConfig struct {
-	RedisClient      *redis.Client
+	RedisClient      redis.UniversalClient
 	KeyPrefix        string
 	UseTenant        bool
 	DefaultProfile   RateLimitWindowProfile

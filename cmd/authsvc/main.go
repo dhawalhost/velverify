@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -16,7 +17,7 @@ import (
 	"github.com/dhawalhost/gokit/observability"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
-	"github.com/go-redis/redis/v8"
+	"github.com/redis/go-redis/v9"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 	"go.uber.org/zap"
 
@@ -107,11 +108,36 @@ func main() {
 	ipPolicyStore := auth.NewIPPolicyRepository(db)
 	rbacRepo := rbac.NewRepository(db)
 
+	// Initialize Redis Client
+	var globalRedisClient redis.UniversalClient
+	if cfg.Auth.RedisAddr != "" {
+		importStrings := func(s string) []string {
+			var res []string
+			for _, part := range strings.Split(s, ",") {
+				if trimmed := strings.TrimSpace(part); trimmed != "" {
+					res = append(res, trimmed)
+				}
+			}
+			return res
+		}
+
+		globalRedisClient = redis.NewUniversalClient(&redis.UniversalOptions{
+			Addrs:    importStrings(cfg.Auth.RedisAddr),
+			Password: cfg.Auth.RedisPassword.Raw(),
+			DB:       cfg.Auth.RedisDB,
+		})
+		if err := globalRedisClient.Ping(context.Background()).Err(); err != nil {
+			log.Warn("Redis unavailable; caches will degrade to in-memory fallbacks",
+				zap.Error(err),
+				zap.String("redis_addr", cfg.Auth.RedisAddr))
+			globalRedisClient = nil
+		}
+	}
+
 	// Phase 2: The Graph (ReBAC)
 	authzRepo := authz.NewRepository(db)
-	authzEngine := authz.NewEngine(authzRepo, log)
-	// rbacSvc := rbac.NewService(rbacRepo, authzEngine) // Currently unintegrated in authsvc logic
-	_ = rbacRepo // To avoid 'declared and not used' if rbacSvc is commented
+	authzEngine := authz.NewEngine(authzRepo, log, globalRedisClient)
+	rbacSvc := rbac.NewService(rbacRepo, authzEngine) 
 
 	authServiceURL := cfg.Auth.BaseURL
 
@@ -172,18 +198,20 @@ func main() {
 		IPPolicyStore:       ipPolicyStore,
 		RBACStore:           rbacRepo,
 		GraphEngine:         authzEngine,
+		RedisClient:         globalRedisClient,
 		// Use SQL stores for persistence
-		CodeStore:        codeStore,
-		RefreshStore:     refreshStore,
-		RevocationStore:  revocationStore,
-		TOTPStore:        totpStore,
-		SSOProviderStore: ssoProviderStore,
-		TenantStore:      tenantStore,
-		AppStore:         appStore,
-		WorkloadStore:    workloadStore,
-		UIURL:            cfg.Auth.UIURL,
+		CodeStore:         codeStore,
+		RefreshStore:      refreshStore,
+		RevocationStore:   revocationStore,
+		TOTPStore:         totpStore,
+		SSOProviderStore:  ssoProviderStore,
+		TenantStore:       tenantStore,
+		AppStore:          appStore,
+		WorkloadStore:     workloadStore,
+		UIURL:             cfg.Auth.UIURL,
 		LoginAttemptStore: loginAttemptStore,
-		DeploymentMode:   cfg.Auth.DeploymentMode,
+		DeploymentMode:    cfg.Auth.DeploymentMode,
+		CookieDomain:      cfg.Auth.CookieDomain,
 	})
 	if err != nil {
 		log.Error("Failed to create auth service", zap.Error(err))
@@ -227,23 +255,8 @@ func main() {
 	router.Use(middleware.Wrap(gokitmiddleware.SecureHeaders()))
 	router.Use(middleware.SoftwareWAFMiddleware())
 
-	var rateLimitRedisClient *redis.Client
-	if cfg.Auth.RedisAddr != "" {
-		rateLimitRedisClient = redis.NewClient(&redis.Options{
-			Addr:     cfg.Auth.RedisAddr,
-			Password: cfg.Auth.RedisPassword.Raw(),
-			DB:       cfg.Auth.RedisDB,
-		})
-		if err := rateLimitRedisClient.Ping(context.Background()).Err(); err != nil {
-			log.Warn("Distributed limiter Redis unavailable; will use strict degraded fallback",
-				zap.Error(err),
-				zap.String("redis_addr", cfg.Auth.RedisAddr))
-			rateLimitRedisClient = nil
-		}
-	}
-
 	router.Use(middleware.DistributedRateLimitMiddleware(middleware.DistributedRateLimitConfig{
-		RedisClient: rateLimitRedisClient,
+		RedisClient: globalRedisClient,
 		KeyPrefix:   cfg.Auth.RateLimitKeyPrefix,
 		UseTenant:   cfg.Auth.RateLimitUseTenant,
 		DefaultProfile: middleware.RateLimitWindowProfile{
@@ -277,8 +290,6 @@ func main() {
 	// API Logger Middleware
 	router.Use(middleware.APILogger(db, log))
 
-
-
 	authHandlers := auth.NewHTTPHandler(svc, log, loginAttemptStore, appStore)
 	if cfg.Auth.RedisAddr != "" {
 		webAuthnSessionStore, err := auth.NewRedisWebAuthnSessionRepository(auth.RedisWebAuthnSessionStoreConfig{
@@ -310,7 +321,6 @@ func main() {
 		log.Warn("REDIS_ADDR not set; using in-memory WebAuthn session repository (not suitable for multi-replica authsvc)")
 	}
 	authHandlers.RegisterRoutes(router)
-	authHandlers.RegisterBrandingRoutes(router.Group("/"))
 
 	// Register Prometheus metrics handler
 	router.GET("/metrics", gin.WrapH(wardsealobs.PrometheusHandler()))
@@ -329,6 +339,17 @@ func main() {
 	// Developer Portal API (self-service app registration, API keys)
 	developerHandlers := auth.NewDeveloperAPIHandler(db, log)
 	developerHandlers.RegisterRoutes(router.Group("/api/v1"))
+
+	// RBAC API (Roles and Permissions)
+	rbacHandlers := rbac.NewHTTPHandler(rbacSvc, log)
+	rbacGroup := router.Group("/api/v1")
+	rbacGroup.Use(middleware.TenantExtractor(middleware.TenantConfig{
+		HeaderName: "X-Tenant-ID",
+		SlugResolver: func(ctx context.Context, slug string) (string, error) {
+			return svc.ResolveTenantSlug(ctx, slug)
+		},
+	}))
+	rbacHandlers.RegisterRoutes(rbacGroup)
 
 	// Register IdP-initiated endpoint logic is handled inside authHandlers.RegisterRoutes -> svc.SAML()
 

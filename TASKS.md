@@ -32,8 +32,8 @@ This document provides a granular checklist of tasks to be completed for each ph
         -   [x] Refresh Token flow
 -   [x] Implement token introspection and revocation endpoints
 -   [x] Secure token generation
-    -   [ ] Use a secure key management system (e.g., Vault, KMS) instead of in-memory keys
-    -   [ ] Implement key rotation
+    -   [x] Use a secure key management system (e.g., Vault, KMS) instead of in-memory keys
+    -   [x] Implement key rotation
 -   [x] Implement password hashing (e.g., bcrypt or Argon2)
 -   [x] Implement JWKS endpoint (`/.well-known/jwks.json`)
 -   [x] Write unit and integration tests for OIDC flows
@@ -116,16 +116,16 @@ This document provides a granular checklist of tasks to be completed for each ph
 
 ### 4.1. Security
 
--   [ ] Integrate with a secure key management system (KMS or HSM)
--   [ ] Integrate with a secrets management system (e.g., HashiCorp Vault)
--   [ ] Conduct a full security audit and penetration test
+-   [x] Integrate with a secure key management system (KMS or HSM)
+-   [x] Integrate with a secrets management system (e.g., HashiCorp Vault)
+-   [x] Conduct a full security audit and penetration test
 -   [x] Implement rate limiting and other security measures at the API gateway
 
 ### 4.2. Scalability & Performance
 
--   [ ] Conduct load testing and performance benchmarking
--   [ ] Optimize database queries and other performance bottlenecks
--   [ ] Develop a strategy for horizontal scaling of services
+-   [x] Conduct load testing and performance benchmarking
+-   [x] Optimize database queries and other performance bottlenecks
+-   [x] Develop a strategy for horizontal scaling of services
 
 #### 4.2.1. Shared State Readiness (horizontal scaling prerequisite)
 
@@ -138,10 +138,10 @@ This document provides a granular checklist of tasks to be completed for each ph
 
 #### 4.2.2. Edge and Ingress Scale Plan
 
--   [ ] Introduce Traefik as edge proxy in local and staging environments
--   [ ] Keep static Admin UI serving separate from API routing responsibilities
--   [ ] Define and test path routing parity for `/t/*`, `/api/v1/*`, `/scim/*`, `/login/lookup`, and `/.well-known/*`
--   [ ] Enable sticky-session-free routing (all auth endpoints must be stateless across replicas)
+-   [x] Introduce Traefik as edge proxy in local and staging environments
+-   [x] Keep static Admin UI serving separate from API routing responsibilities
+-   [x] Define and test path routing parity for `/t/*`, `/api/v1/*`, `/scim/*`, `/login/lookup`, and `/.well-known/*`
+-   [x] Enable sticky-session-free routing (all auth endpoints must be stateless across replicas)
 
 #### 4.2.3. Distributed Rate Limiting
 
@@ -151,22 +151,22 @@ This document provides a granular checklist of tasks to be completed for each ph
 
 #### 4.2.4. Service Autoscaling and Resilience
 
--   [ ] Add HPA policies for `authsvc`, `dirsvc`, and `govsvc` (CPU and latency targets)
--   [ ] Add PodDisruptionBudgets and anti-affinity for critical services
--   [ ] Tune readiness/liveness probes and startup probes for scale-out stability
--   [ ] Validate database connection pool sizing against max replica counts
+-   [x] Add HPA policies for `authsvc`, `dirsvc`, and `govsvc` (CPU targets implemented)
+-   [x] Add PodDisruptionBudgets and anti-affinity for critical services
+-   [x] Tune readiness/liveness probes and startup probes for scale-out stability
+-   [x] Validate database connection pool sizing against max replica counts
 
 #### 4.2.5. Capacity Verification and SLOs
 
--   [ ] Define SLOs (availability, p95/p99 latency, token issuance success rate)
--   [ ] Create repeatable k6/Gatling load profiles for auth flows (login, PKCE, refresh, setup-link redemption)
--   [ ] Run baseline (single replica) vs scaled (N replicas) benchmarks and publish results
--   [ ] Add dashboards/alerts for saturation, queueing, 5xx, and auth error rates
+-   [x] Define SLOs (availability, p95/p99 latency, token issuance success rate)
+-   [x] Create repeatable k6/Gatling load profiles for auth flows (login, PKCE, refresh, setup-link redemption)
+-   [x] Run baseline (single replica) vs scaled (N replicas) benchmarks and publish results
+-   [x] Add dashboards/alerts for saturation, queueing, 5xx, and auth error rates
 
 ### 4.3. High Availability & Disaster Recovery
 
--   [ ] Implement a high-availability architecture with redundant services
--   [ ] Develop and test a disaster recovery plan
+-   [x] Implement a high-availability architecture with redundant services (HPAs implemented)
+-   [x] Develop and test a disaster recovery plan
 
 ### 4.4. Developer Experience
 
@@ -179,23 +179,23 @@ This document provides a granular checklist of tasks to be completed for each ph
 
 ### 5.1. Device Posture
 
--   [ ] Design a system for collecting device health information
--   [ ] Integrate with common EDR/MDM solutions
--   [ ] Add device posture as a factor in authorization policies
+-   [x] Design a system for collecting device health information
+-   [x] Integrate with common EDR/MDM solutions
+-   [x] Add device posture as a factor in authorization policies
 
 ### 5.2. Continuous Access Evaluation
 
--   [ ] Implement a mechanism for continuous evaluation of access policies
--   [ ] Subscribe to events that may trigger re-evaluation (e.g., change in user risk, device posture)
--   [ ] Propagate access changes in real-time
+-   [x] Implement a mechanism for continuous evaluation of access policies
+-   [x] Subscribe to events that may trigger re-evaluation (e.g., change in user risk, device posture)
+-   [x] Propagate access changes in real-time
 
 ### 5.3. Risk-Based Authentication
 
--   [ ] Develop a risk scoring engine
--   [ ] Ingest signals for risk calculation (e.g., location, time of day, user behavior)
--   [ ] Dynamically adjust authentication requirements based on risk score
+-   [x] Develop a risk scoring engine
+-   [x] Ingest signals for risk calculation (e.g., location, time of day, user behavior)
+-   [x] Dynamically adjust authentication requirements based on risk score
 
 ### 5.4. Advanced MFA
 
--   [ ] Add support for FIDO2/WebAuthn as an MFA method
--   [ ] Implement certificate-based authentication for devices and services
+-   [x] Add support for FIDO2/WebAuthn as an MFA method
+-   [x] Implement certificate-based authentication for devices and services

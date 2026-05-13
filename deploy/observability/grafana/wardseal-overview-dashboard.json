@@ -60,6 +60,33 @@
       "targets": [{"expr": "sum(increase(auth_token_revocations_total[1h]))", "refId": "A"}],
       "title": "Token Revocations (Last 1h)",
       "type": "stat"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+      "fieldConfig": {"defaults": {"unit": "reqps"}, "overrides": []},
+      "gridPos": {"h": 8, "w": 8, "x": 0, "y": 22},
+      "id": 7,
+      "targets": [{"expr": "sum(rate(http_requests_total{code=~\"5..\"}[5m]))", "refId": "A"}],
+      "title": "5xx Errors / sec",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+      "fieldConfig": {"defaults": {"unit": "percent"}, "overrides": []},
+      "gridPos": {"h": 8, "w": 8, "x": 8, "y": 22},
+      "id": 8,
+      "targets": [{"expr": "sum(rate(container_cpu_usage_seconds_total{container=~\"authsvc|dirsvc|govsvc\"}[5m])) by (container)", "legendFormat": "{{container}}", "refId": "A"}],
+      "title": "CPU Usage by Service",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+      "fieldConfig": {"defaults": {"unit": "bytes"}, "overrides": []},
+      "gridPos": {"h": 8, "w": 8, "x": 16, "y": 22},
+      "id": 9,
+      "targets": [{"expr": "sum(container_memory_working_set_bytes{container=~\"authsvc|dirsvc|govsvc\"}) by (container)", "legendFormat": "{{container}}", "refId": "A"}],
+      "title": "Memory Usage by Service",
+      "type": "timeseries"
     }
   ],
   "refresh": "30s",

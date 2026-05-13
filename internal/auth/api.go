@@ -28,24 +28,34 @@ const (
 )
 
 // setAuthCookies sets httpOnly secure cookies for authentication tokens
-func setAuthCookies(c *gin.Context, accessToken, refreshToken string) {
+func (h *HTTPHandler) setAuthCookies(c *gin.Context, accessToken, refreshToken string) {
 	secure := os.Getenv("ENVIRONMENT") == "production"
 	sameSite := http.SameSiteLaxMode
 
+	// Use CookieDomain from config if set, otherwise empty string means host only
+	domain := ""
+	if h.svc != nil {
+		domain = h.svc.CookieDomain()
+	}
+
 	// Access token cookie (1 hour)
 	c.SetSameSite(sameSite)
-	c.SetCookie(AccessTokenCookie, accessToken, CookieMaxAge, "/", "", secure, true)
+	c.SetCookie(AccessTokenCookie, accessToken, CookieMaxAge, "/", domain, secure, true)
 
 	// Refresh token cookie (7 days) - if provided
 	if refreshToken != "" {
-		c.SetCookie(RefreshTokenCookie, refreshToken, RefreshCookieMaxAge, "/oauth2/token", "", secure, true)
+		c.SetCookie(RefreshTokenCookie, refreshToken, RefreshCookieMaxAge, "/oauth2/token", domain, secure, true)
 	}
 }
 
 // clearAuthCookies removes authentication cookies
-func clearAuthCookies(c *gin.Context) {
-	c.SetCookie(AccessTokenCookie, "", -1, "/", "", false, true)
-	c.SetCookie(RefreshTokenCookie, "", -1, "/oauth2/token", "", false, true)
+func (h *HTTPHandler) clearAuthCookies(c *gin.Context) {
+	domain := ""
+	if h.svc != nil {
+		domain = h.svc.CookieDomain()
+	}
+	c.SetCookie(AccessTokenCookie, "", -1, "/", domain, false, true)
+	c.SetCookie(RefreshTokenCookie, "", -1, "/oauth2/token", domain, false, true)
 }
 
 // getTokenFromCookieOrHeader tries to get token from cookie first, then header
@@ -108,6 +118,10 @@ func (h *HTTPHandler) RegisterRoutes(router *gin.Engine) {
 	router.POST("/api/v1/setup", h.performSetup)
 	router.POST("/api/v1/setup/password", h.completePasswordSetup)
 	router.POST("/login/lookup", h.lookupUser) // Public lookup for tenant discovery
+	router.GET("/logout", h.logout)
+	router.POST("/logout", h.logout)
+	router.GET("/api/v1/logout", h.logout)
+	router.POST("/api/v1/logout", h.logout)
 
 	// Path-based multi-tenancy group
 	tenantGroup := router.Group("/t/:tenant")
@@ -128,6 +142,8 @@ func (h *HTTPHandler) RegisterRoutes(router *gin.Engine) {
 	tenantGroup.POST("/auth/mfa/step-up", h.completeMFALogin)  // Alias for step-up
 	tenantGroup.GET("/logout", h.logout)
 	tenantGroup.POST("/logout", h.logout) // Also allow POST for logout
+	tenantGroup.POST("/social/login", h.socialLogin)
+	tenantGroup.GET("/sso/login/:provider", h.getSSOAuthorizeURL)
 
 	// OAuth2/OIDC endpoints
 	tenantGroup.GET("/.well-known/openid-configuration", h.oidcConfig)
@@ -175,6 +191,30 @@ func (h *HTTPHandler) RegisterRoutes(router *gin.Engine) {
 		oauthGroup.POST("/revoke", h.revoke)
 	}
 	router.GET("/.well-known/jwks.json", h.jwks)
+
+	// Session-protected group (User Portal, Profile, Apps)
+	// These rely on the wardseal_access_token cookie/Authorization header
+	// and extract the tenant context from the JWT itself.
+	sessionProtected := router.Group("/")
+	sessionProtected.Use(middleware.RequireUserAuth(h.svc.ValidateToken))
+	{
+		// User Portal API
+		userAPI := sessionProtected.Group("/api/v1/user")
+		userAPI.GET("/apps", middleware.RequireScope("openid"), h.getUserApps)
+		userAPI.GET("/profile", middleware.RequireScope("profile"), h.getUserProfile)
+		userAPI.POST("/profile", middleware.RequireScope("profile"), h.updateUserProfile)
+		userAPI.POST("/export", middleware.RequireScope("profile"), h.exportUserData)
+		userAPI.DELETE("/account", middleware.RequireScope("profile"), h.deleteUserAccount)
+
+		setupAPI := sessionProtected.Group("/api/v1/setup")
+		setupAPI.POST("/password-link", h.createPasswordSetupLink)
+
+		// MFA management often happens within a session
+		mfaGroup := sessionProtected.Group("/api/v1/mfa")
+		h.RegisterWebAuthnRoutes(mfaGroup)
+		h.RegisterTOTPRoutes(mfaGroup)
+	}
+
 	tenantProtected := router.Group("/")
 	tenantProtected.Use(middleware.TenantExtractor(middleware.TenantConfig{
 		HeaderName:    "X-Tenant-ID",
@@ -187,7 +227,8 @@ func (h *HTTPHandler) RegisterRoutes(router *gin.Engine) {
 	// Device routes
 	deviceGroup := tenantProtected.Group("/api/v1/devices")
 	{
-		deviceGroup.POST("/register", h.registerDevice)
+		deviceGroup.POST("/register", mTLSAuthMiddleware(), h.registerDevice)
+		deviceGroup.POST("/webhooks/:provider", h.handleWebhook)
 		deviceGroup.POST("/:id/posture", h.updatePosture)
 		deviceGroup.GET("", h.listDevices)
 		deviceGroup.DELETE("/:id", h.deleteDevice)
@@ -199,17 +240,14 @@ func (h *HTTPHandler) RegisterRoutes(router *gin.Engine) {
 		signalGroup.POST("/ingest", h.ingestSignal)
 	}
 
-	// Social Login
+	// Social & SSO Login
 	tenantProtected.POST("/social/login", h.socialLogin)
+	tenantProtected.GET("/sso/login/:provider", h.getSSOAuthorizeURL)
 
 	// API v1 group
 	apiV1 := tenantProtected.Group("/api/v1")
 
-	// MFA WebAuthn
-	h.RegisterWebAuthnRoutes(apiV1)
-	h.RegisterTOTPRoutes(apiV1)
-
-	// MFA Completion Aliases for apiV1
+	// MFA Completion Aliases for apiV1 (still in tenant group for login flow)
 	apiV1.POST("/auth/mfa/complete", h.completeMFALogin)
 	apiV1.POST("/auth/mfa/step-up", h.completeMFALogin)
 
@@ -220,18 +258,9 @@ func (h *HTTPHandler) RegisterRoutes(router *gin.Engine) {
 		router.GET("/saml/idp-init", samlHandler) // IdP Initiated endpoint
 	}
 
-	// User Portal API (Protected)
-	userAPI := tenantProtected.Group("/api/v1/user")
-	// Use the same signing secret as the service (signer)
-	// Use the service's ValidateToken method
-	userAPI.Use(middleware.RequireUserAuth(h.svc.ValidateToken))
-	userAPI.GET("/apps", middleware.RequireScope("openid"), h.getUserApps)
-	userAPI.GET("/profile", middleware.RequireScope("profile"), h.getUserProfile)
-	userAPI.POST("/profile", middleware.RequireScope("profile"), h.updateUserProfile)
-
-	setupAPI := tenantProtected.Group("/api/v1/setup")
-	setupAPI.Use(middleware.RequireUserAuth(h.svc.ValidateToken))
-	setupAPI.POST("/password-link", h.createPasswordSetupLink)
+	// Register Branding and Federation routes
+	h.RegisterBrandingRoutes(tenantProtected)
+	h.RegisterFederationRoutes(tenantProtected)
 }
 
 func (h *HTTPHandler) getSetupStatus(c *gin.Context) {
@@ -270,6 +299,7 @@ type PasswordSetupLinkRequest struct {
 	UserID       string `json:"user_id" binding:"required"`
 	Mode         string `json:"mode" binding:"required,oneof=invite reset"`
 	ExpiresHours int    `json:"expires_hours"`
+	SendEmail    bool   `json:"send_email"`
 }
 
 type CompletePasswordSetupRequest struct {
@@ -296,7 +326,7 @@ func (h *HTTPHandler) performSetup(c *gin.Context) {
 	}
 
 	// Set auth cookies for immediate login
-	setAuthCookies(c, token, "")
+	h.setAuthCookies(c, token, "")
 
 	c.JSON(http.StatusOK, gin.H{
 		"token":       token,
@@ -341,6 +371,15 @@ func (h *HTTPHandler) createPasswordSetupLink(c *gin.Context) {
 		"url":        setupURL,
 		"expires_at": expiresAt.Format(time.RFC3339),
 	})
+
+	if req.SendEmail {
+		go func() {
+			err := h.svc.SendPasswordSetupEmail(context.Background(), tenantID, req.UserID, req.Mode, req.ExpiresHours)
+			if err != nil {
+				h.logger.Error("Failed to send password setup email", zap.Error(err))
+			}
+		}()
+	}
 }
 
 func (h *HTTPHandler) completePasswordSetup(c *gin.Context) {
@@ -468,7 +507,7 @@ func (h *HTTPHandler) login(c *gin.Context) {
 
 
 	// Set httpOnly cookies for session security
-	setAuthCookies(c, token, "")
+	h.setAuthCookies(c, token, "")
 
 	// Extract roles for the response
 	claims, _ := h.svc.ValidateToken(token)
@@ -631,7 +670,7 @@ func (h *HTTPHandler) completeMFALogin(c *gin.Context) {
 	}
 
 	// Set httpOnly cookies for session security
-	setAuthCookies(c, finalToken, "")
+	h.setAuthCookies(c, finalToken, "")
 
 	// Extract roles for the response
 	claims, _ := h.svc.ValidateToken(finalToken)
@@ -650,7 +689,7 @@ func (h *HTTPHandler) completeMFALogin(c *gin.Context) {
 
 func (h *HTTPHandler) logout(c *gin.Context) {
 	// Clear httpOnly cookies
-	clearAuthCookies(c)
+	h.clearAuthCookies(c)
 	c.JSON(http.StatusOK, gin.H{"message": "logged out successfully"})
 }
 
@@ -939,7 +978,7 @@ func (h *HTTPHandler) signup(c *gin.Context) {
 	}
 
 	// Set cookies for session
-	setAuthCookies(c, token, "")
+	h.setAuthCookies(c, token, "")
 
 	c.JSON(http.StatusCreated, gin.H{
 		"token":       token,

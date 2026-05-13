@@ -25,27 +25,37 @@ import (
 
 	func loadPublicKey(log *zap.Logger) {
 		jwtPublicKeyOnce.Do(func() {
-			cfgFile := os.Getenv("APP_CONFIG")
-			if cfgFile == "" {
-				cfgFile = os.Getenv("CONFIG_FILE")
+			// Try to get public key path from env first
+			keyPath := os.Getenv("APP_AUTH_JWT_PUBLIC_KEY_PATH")
+			if keyPath == "" {
+				// Fallback to config file if path is not directly provided
+				cfgFile := os.Getenv("APP_CONFIG")
+				if cfgFile == "" {
+					cfgFile = os.Getenv("CONFIG_FILE")
+				}
+				cfg, err := config.Load(cfgFile)
+				if err == nil {
+					keyPath = cfg.Auth.JWTPublicKeyPath
+				}
 			}
-			cfg, err := config.Load(cfgFile)
+
+			if keyPath == "" {
+				// Final fallback for development
+				keyPath = "/etc/wardseal/keys/jwt.pub"
+				if _, err := os.Stat(keyPath); err != nil {
+					keyPath = "deploy/dev-keys/jwt.pub"
+				}
+			}
+
+			log.Info("SCIM loading JWT public key", zap.String("path", keyPath))
+			keyBytes, err := os.ReadFile(keyPath)
 			if err != nil {
-				log.Warn("Failed to load config for JWT verification", zap.Error(err))
-				return
-			}
-			if cfg.Auth.JWTPublicKeyPath == "" {
-				log.Warn("JWT public key path not set, unverified JWT authentication disabled")
-				return
-			}
-			keyBytes, err := os.ReadFile(cfg.Auth.JWTPublicKeyPath)
-			if err != nil {
-				log.Error("Failed to read JWT public key file", zap.Error(err))
+				log.Warn("Failed to read JWT public key file for SCIM auth", zap.String("path", keyPath), zap.Error(err))
 				return
 			}
 			pubKey, err := jwtlib.ParseRSAPublicKeyFromPEM(keyBytes)
 			if err != nil {
-				log.Error("Failed to parse JWT public key", zap.Error(err))
+				log.Error("Failed to parse JWT public key for SCIM auth", zap.Error(err))
 				return
 			}
 			jwtPublicKey = pubKey
@@ -53,10 +63,22 @@ import (
 	}
 
 // RequireSCIMBearerToken authenticates requests using the Authorization: Bearer header.
-// It verifies the token against the api_keys table or an internal service whitelist.
+// Fallback: if no Authorization header is present, reads the wardseal_access_token
+// httpOnly session cookie and validates it as a JWT bearer token. This allows
+// first-party admin UI requests to call SCIM endpoints via shared session cookies
+// without requiring an explicit API key in the browser.
 func RequireSCIMBearerToken(repo Repository, log *zap.Logger, internalServiceToken string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
+
+		// Fallback: promote session cookie to a synthetic Bearer token so that
+		// first-party MFE portals (admin, app) can call SCIM endpoints.
+		if authHeader == "" {
+			if cookieToken, err := c.Cookie("wardseal_access_token"); err == nil && cookieToken != "" {
+				authHeader = "Bearer " + cookieToken
+			}
+		}
+
 		if authHeader == "" {
 			c.JSON(http.StatusUnauthorized, gin.H{
 				"schemas": []string{"urn:ietf:params:scim:api:messages:2.0:Error"},
@@ -112,23 +134,32 @@ func RequireSCIMBearerToken(repo Repository, log *zap.Logger, internalServiceTok
 
 				if err == nil && parsedToken.Valid {
 					var jwtTenantID string
+					// Check common claim names for tenant ID
 					if tid, ok := claims["tenant_id"].(string); ok && tid != "" {
 						jwtTenantID = tid
 					} else if tid, ok := claims["tenant"].(string); ok && tid != "" {
 						jwtTenantID = tid
+					} else if tid, ok := claims["tid"].(string); ok && tid != "" {
+						jwtTenantID = tid
 					}
+
+					// Fallback to header if claim is missing but token is valid (e.g. platform admin)
 					if jwtTenantID == "" {
 						jwtTenantID = c.GetHeader("X-Tenant-ID")
 					}
+
 					if jwtTenantID != "" {
 						ctx := middleware.InjectTenantID(c.Request.Context(), jwtTenantID)
 						c.Request = c.Request.WithContext(ctx)
 						c.Next()
 						return
 					}
-				} else {
+					log.Warn("SCIM JWT valid but no tenant ID found in claims or headers")
+				} else if err != nil {
 					log.Warn("SCIM JWT verification failed", zap.Error(err))
 				}
+			} else {
+				log.Warn("SCIM JWT verification skipped: public key not loaded")
 			}
 		}
 

@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/go-redis/redis/v8"
+	"github.com/redis/go-redis/v9"
 )
 
 // JobStatus represents the current state of a discovery scan.
@@ -39,13 +39,13 @@ type JobStore interface {
 }
 
 type redisJobStore struct {
-	client    *redis.Client
+	client    redis.UniversalClient
 	ttl       time.Duration
 	keyPrefix string
 }
 
 // NewRedisJobStore creates a new Redis-backed job store.
-func NewRedisJobStore(client *redis.Client) JobStore {
+func NewRedisJobStore(client redis.UniversalClient) JobStore {
 	if client == nil {
 		return NewNoOpJobStore()
 	}

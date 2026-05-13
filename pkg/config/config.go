@@ -66,6 +66,7 @@ type AuthConfig struct {
 	RedisAddr           string           `mapstructure:"redis_addr"`
 	RedisPassword       types.Secret     `mapstructure:"redis_password"`
 	RedisDB             int              `mapstructure:"redis_db"`
+	CookieDomain        string           `mapstructure:"cookie_domain"`
 	WebAuthnSessionTTL  time.Duration    `mapstructure:"webauthn_session_ttl"`
 	RateLimitUseTenant  bool             `mapstructure:"rate_limit_use_tenant"`
 	RateLimitKeyPrefix  string           `mapstructure:"rate_limit_key_prefix"`
@@ -170,6 +171,7 @@ func Load(cfgFile string) (*Config, error) {
 	_ = v.BindEnv("auth.jwt_private_key_path")
 	_ = v.BindEnv("auth.jwt_public_key_path")
 	_ = v.BindEnv("auth.redis_addr")
+	_ = v.BindEnv("auth.cookie_domain")
 	_ = v.BindEnv("directory.service_auth_token")
 	_ = v.BindEnv("governance.directory_service_url")
 	_ = v.BindEnv("governance.webhook_secret")

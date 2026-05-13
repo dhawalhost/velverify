@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -16,7 +17,7 @@ import (
 	"github.com/dhawalhost/gokit/observability"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
-	"github.com/go-redis/redis/v8"
+	"github.com/redis/go-redis/v9"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 	"go.uber.org/zap"
 
@@ -60,8 +61,18 @@ func main() {
 
 	var bus eventbus.EventBus
 	if cfg.Auth.RedisAddr != "" {
-		redisClient := redis.NewClient(&redis.Options{
-			Addr:     cfg.Auth.RedisAddr,
+		importStrings := func(s string) []string {
+			var res []string
+			for _, part := range strings.Split(s, ",") {
+				if trimmed := strings.TrimSpace(part); trimmed != "" {
+					res = append(res, trimmed)
+				}
+			}
+			return res
+		}
+
+		redisClient := redis.NewUniversalClient(&redis.UniversalOptions{
+			Addrs:    importStrings(cfg.Auth.RedisAddr),
 			Password: cfg.Auth.RedisPassword.Raw(),
 			DB:       cfg.Auth.RedisDB,
 		})
@@ -125,10 +136,20 @@ func main() {
 	// Security Middleware
 	router.Use(middleware.Wrap(gokitmiddleware.SecureHeaders()))
 
-	var rateLimitRedisClient *redis.Client
+	var rateLimitRedisClient redis.UniversalClient
 	if cfg.Auth.RedisAddr != "" {
-		rateLimitRedisClient = redis.NewClient(&redis.Options{
-			Addr:     cfg.Auth.RedisAddr,
+		importStrings := func(s string) []string {
+			var res []string
+			for _, part := range strings.Split(s, ",") {
+				if trimmed := strings.TrimSpace(part); trimmed != "" {
+					res = append(res, trimmed)
+				}
+			}
+			return res
+		}
+
+		rateLimitRedisClient = redis.NewUniversalClient(&redis.UniversalOptions{
+			Addrs:    importStrings(cfg.Auth.RedisAddr),
 			Password: cfg.Auth.RedisPassword.Raw(),
 			DB:       cfg.Auth.RedisDB,
 		})
@@ -181,6 +202,7 @@ func main() {
 	// Register standardized health checks
 	healthHandler := health.NewHandler()
 	router.GET("/healthz", gin.WrapF(healthHandler.LiveHandler()))
+	router.GET("/scim/healthz", gin.WrapF(healthHandler.LiveHandler()))
 	router.GET("/readyz", gin.WrapF(healthHandler.ReadyHandler()))
 
 	// Register service routes
@@ -204,6 +226,12 @@ func main() {
 		IdleTimeout:  120 * time.Second,
 	}
 
+	// Start DPDP Account Erasure Background Worker
+	workerCtx, workerCancel := context.WithCancel(context.Background())
+	defer workerCancel()
+	// Run checks daily, purging accounts that have been soft-deleted for 30 days
+	directory.StartAccountErasureWorker(workerCtx, svc, log, 24*time.Hour, 30*24*time.Hour)
+
 	go func() {
 		log.Info("Directory service starting", zap.String("addr", ":8081"))
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
@@ -216,6 +244,7 @@ func main() {
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 	log.Info("Shutting down directory service...")
+	workerCancel() // Cancel background jobs
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()

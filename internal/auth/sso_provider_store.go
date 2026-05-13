@@ -28,6 +28,7 @@ type SSOProvider struct {
 // SSOProviderRepository handles database operations for SSO providers.
 type SSOProviderRepository interface {
 	GetByName(ctx context.Context, tenantID, name string) (*SSOProvider, error)
+	ListEnabledProviders(ctx context.Context, tenantID string) ([]SSOProvider, error)
 }
 
 type sqlSSOProviderRepository struct {
@@ -56,4 +57,19 @@ func (s *sqlSSOProviderRepository) GetByName(ctx context.Context, tenantID, name
 		return nil, err
 	}
 	return &p, nil
+}
+
+func (s *sqlSSOProviderRepository) ListEnabledProviders(ctx context.Context, tenantID string) ([]SSOProvider, error) {
+	var providers []SSOProvider
+	query := `
+		SELECT id, tenant_id, name, type, enabled, 
+		       oidc_issuer_url, oidc_client_id, oidc_client_secret, oidc_scopes
+		FROM sso_providers 
+		WHERE tenant_id = $1 AND enabled = true
+	`
+	err := s.db.SelectContext(ctx, &providers, query, tenantID)
+	if err != nil {
+		return nil, err
+	}
+	return providers, nil
 }

@@ -123,5 +123,9 @@ func (h *HTTPHandler) finishWebAuthnLogin(c *gin.Context) {
 	}
 
 	h.webAuthnSessions.Delete(c.Request.Context(), userID)
+	
+	// Set httpOnly cookies for session security
+	h.setAuthCookies(c, token, "")
+
 	c.JSON(http.StatusOK, gin.H{"access_token": token, "token_type": "Bearer"})
 }

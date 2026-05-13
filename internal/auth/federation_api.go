@@ -4,9 +4,79 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/dhawalhost/wardseal/pkg/middleware"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 )
+
+func (h *HTTPHandler) RegisterFederationRoutes(router *gin.RouterGroup) {
+	// Public endpoint to fetch enabled SSO providers for a tenant
+	router.GET("/sso/public/:tenant", h.getPublicSSOProviders)
+}
+
+func (h *HTTPHandler) getPublicSSOProviders(c *gin.Context) {
+	tenantID, _ := middleware.TenantIDFromGinContext(c)
+	if tenantID == "" {
+		tenantID = c.Param("tenant")
+	}
+
+	if tenantID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "tenant identifier required"})
+		return
+	}
+
+	// Resolve slug to ID if needed
+	resolvedID, err := h.svc.ResolveTenantSlug(c.Request.Context(), tenantID)
+	if err == nil && resolvedID != "" {
+		tenantID = resolvedID
+	}
+
+	providers, err := h.svc.ListSSOProviders(c.Request.Context(), tenantID)
+	if err != nil {
+		h.logger.Error("Failed to fetch SSO providers", zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch SSO providers"})
+		return
+	}
+
+	c.JSON(http.StatusOK, providers)
+}
+
+func (h *HTTPHandler) getSSOAuthorizeURL(c *gin.Context) {
+	provider := c.Param("provider")
+	tenantID, _ := middleware.TenantIDFromGinContext(c)
+	if tenantID == "" {
+		tenantID = c.Query("tenant_id")
+	}
+
+	if tenantID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "tenant_id required"})
+		return
+	}
+
+	// Resolve slug to ID if needed
+	resolvedID, err := h.svc.ResolveTenantSlug(c.Request.Context(), tenantID)
+	if err == nil && resolvedID != "" {
+		tenantID = resolvedID
+	}
+
+	// We expect the frontend to handle the callback at /social/callback
+	// We need to know the origin to construct the full redirect URI
+	// For simplicity, we assume the same origin as the request
+	origin := c.Request.Header.Get("Origin")
+	if origin == "" {
+		origin = "http://" + c.Request.Host // fallback
+	}
+	redirectURI := origin + "/social/callback"
+
+	url, err := h.svc.GetSSOAuthorizeURL(c.Request.Context(), tenantID, provider, redirectURI)
+	if err != nil {
+		h.logger.Error("Failed to generate SSO authorize URL", zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.Redirect(http.StatusTemporaryRedirect, url)
+}
 
 func (h *HTTPHandler) socialLogin(c *gin.Context) {
 	var req SocialLoginRequest

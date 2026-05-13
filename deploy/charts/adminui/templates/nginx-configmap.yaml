@@ -12,26 +12,33 @@ data:
         root /usr/share/nginx/html;
         index index.html;
 
+        # SPA routing
         location / {
             try_files $uri $uri/ /index.html;
         }
 
-        location /login/lookup { proxy_pass http://{{ .Values.nginx.authServiceHost }}:{{ .Values.nginx.authServicePort }}; }
-        location /t/ { proxy_pass http://{{ .Values.nginx.authServiceHost }}:{{ .Values.nginx.authServicePort }}; }
-        location /oauth2 { proxy_pass http://{{ .Values.nginx.authServiceHost }}:{{ .Values.nginx.authServicePort }}; }
-        location /.well-known { proxy_pass http://{{ .Values.nginx.authServiceHost }}:{{ .Values.nginx.authServicePort }}; }
-        location /social/login { proxy_pass http://{{ .Values.nginx.authServiceHost }}:{{ .Values.nginx.authServicePort }}; }
+        # Auth Service — auth flows proxied to authsvc
+        location /t/ { proxy_pass http://wardseal-authsvc:8080; }
+        location /oauth2/ { proxy_pass http://wardseal-authsvc:8080; }
+        location /.well-known/ { proxy_pass http://wardseal-authsvc:8080; }
+        location /social/login { proxy_pass http://wardseal-authsvc:8080; }
+        location /login/lookup { proxy_pass http://wardseal-authsvc:8080; }
+        location /saml/ { proxy_pass http://wardseal-authsvc:8080; }
 
-        location ~ ^/api/v1/(apps|api-keys|mfa|user|devices|branding|signup|setup|developer) {
-            proxy_pass http://{{ .Values.nginx.authServiceHost }}:{{ .Values.nginx.authServicePort }};
+        location ~ ^/api/v1/(apps|api-keys|mfa|user|devices|branding|setup|developer|webauthn|signals) {
+            proxy_pass http://wardseal-authsvc:8080;
         }
 
-        location /scim { proxy_pass http://{{ .Values.nginx.directoryServiceHost }}:{{ .Values.nginx.directoryServicePort }}; }
-        location /api/v1/tenants { proxy_pass http://{{ .Values.nginx.directoryServiceHost }}:{{ .Values.nginx.directoryServicePort }}; }
-        location /internal/discover { proxy_pass http://{{ .Values.nginx.directoryServiceHost }}:{{ .Values.nginx.directoryServicePort }}; }
+        # Directory Service
+        location /scim/ { proxy_pass http://wardseal-dirsvc:8081; }
+        location /api/v1/tenants { proxy_pass http://wardseal-dirsvc:8081; }
+        location /internal/discover { proxy_pass http://wardseal-dirsvc:8081; }
+        location /api/v1/users { proxy_pass http://wardseal-dirsvc:8081; }
+        location /api/v1/groups { proxy_pass http://wardseal-dirsvc:8081; }
 
-        location /api/v1 { proxy_pass http://{{ .Values.nginx.governanceServiceHost }}:{{ .Values.nginx.governanceServicePort }}; }
-        location /webhooks { proxy_pass http://{{ .Values.nginx.governanceServiceHost }}:{{ .Values.nginx.governanceServicePort }}; }
+        # Governance Service (catch-all for remaining /api/v1)
+        location /api/v1/ { proxy_pass http://wardseal-govsvc:8082; }
+        location /webhooks/ { proxy_pass http://wardseal-govsvc:8082; }
 
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;

@@ -36,9 +36,9 @@ export default function SiteHeader() {
 
         <div className="header-actions">
           {localStorage.getItem('token') ? (
-            <Link className="btn btn-primary btn-sm" to={`${consoleBaseUrl}/portal`}>
+            <a className="btn btn-primary btn-sm" href={`${consoleBaseUrl}/portal`}>
               Go to Portal
-            </Link>
+            </a>
           ) : (
             <>
               <a className="btn-text" href={`${consoleBaseUrl}/login`}>Sign in</a>

@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strings"
@@ -43,6 +44,16 @@ func RequireUserAuth(validator TokenValidator) gin.HandlerFunc {
 		c.Set("roles", claims.Roles)
 		c.Set("claims", claims)
 
+		// Also populate tenant ID from claims if not already present (session-based multi-tenancy)
+		if claims.Tenant != "" {
+			if _, exists := c.Get("wardseal.tenantID"); !exists {
+				c.Set("wardseal.tenantID", claims.Tenant)
+				// Also update request context for compatibility with TenantIDFromContext
+				ctx := context.WithValue(c.Request.Context(), tenantIDContextKey, claims.Tenant)
+				c.Request = c.Request.WithContext(ctx)
+			}
+		}
+
 		// Enforce tenant isolation
 		tenantID, _ := TenantIDFromGinContext(c)
 		if tenantID == "" {
@@ -63,7 +74,7 @@ func RequireUserAuth(validator TokenValidator) gin.HandlerFunc {
 			if pathTenant == "" {
 				pathTenant = c.GetHeader("Tenant-ID")
 			}
-			
+
 			if pathTenant != "" {
 				c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "tenant context unverified"})
 				return
@@ -88,7 +99,6 @@ type Claims struct {
 	Scope  string                 `json:"scope,omitempty"`
 	CNF    map[string]interface{} `json:"cnf,omitempty"`
 }
-
 
 // ValidateToken parses and validates a JWT token string.
 func ValidateToken(tokenString, secret string) (*Claims, error) {

@@ -10,6 +10,7 @@ import (
 	"go.uber.org/zap"
 	"time"
 
+	"github.com/dhawalhost/gokit/health"
 	"github.com/dhawalhost/wardseal/internal/policy"
 	"github.com/dhawalhost/wardseal/pkg/config"
 	"github.com/dhawalhost/wardseal/pkg/database"
@@ -68,6 +69,11 @@ func main() {
 
 	policyHandlers := policy.NewHTTPHandler(svc, log)
 	policyHandlers.RegisterRoutes(router)
+
+	// Health check
+	healthHandler := health.NewHandler()
+	router.GET("/healthz", gin.WrapF(healthHandler.LiveHandler()))
+	router.GET("/policy/healthz", gin.WrapF(healthHandler.LiveHandler()))
 
 	log.Info("Policy service starting", zap.String("addr", ":8083"))
 	if err := router.Run(":8083"); err != nil {

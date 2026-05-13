@@ -43,9 +43,12 @@ Thumbs.db
 # pem keys
 deploy/dev-keys
 
+web/app/node_modules
 web/admin/node_modules
 web/admin/dist
 web/landing/node_modules
 web/landing/dist
 web/help/node_modules
 web/help/dist
+tests/e2e/node_modules
+graphify-out

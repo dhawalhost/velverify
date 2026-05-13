@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"time"
 
+	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
 )
 
@@ -15,45 +17,84 @@ const (
 
 // Engine performs recursive relationship checks with granular caching.
 type Engine struct {
-	repo  Repository
-	log   *zap.Logger
-	cache sync.Map // Key: tenantID:subID:subType:rel:ns:objID -> Value: bool
+	repo        Repository
+	log         *zap.Logger
+	redisClient redis.UniversalClient
+	localCache  sync.Map // Fallback when Redis is unavailable
 }
 
-func NewEngine(repo Repository, log *zap.Logger) *Engine {
+func NewEngine(repo Repository, log *zap.Logger, rc redis.UniversalClient) *Engine {
 	return &Engine{
-		repo: repo,
-		log:  log,
+		repo:        repo,
+		log:         log,
+		redisClient: rc,
 	}
 }
 
 // Check determines if a subject has a specific relation to an object.
 func (e *Engine) Check(ctx context.Context, tenantID, subID, subType, rel, ns, objID string) (bool, error) {
 	// 1. Check cache first
-	cacheKey := fmt.Sprintf("%s:%s:%s:%s:%s:%s", tenantID, subID, subType, rel, ns, objID)
-	if val, ok := e.cache.Load(cacheKey); ok {
-		return val.(bool), nil
+	cacheKey := fmt.Sprintf("authz:cache:%s:%s:%s:%s:%s:%s", tenantID, subID, subType, rel, ns, objID)
+
+	if e.redisClient != nil {
+		val, err := e.redisClient.Get(ctx, cacheKey).Result()
+		if err == nil {
+			return val == "true", nil
+		}
+	} else {
+		if val, ok := e.localCache.Load(cacheKey); ok {
+			return val.(bool), nil
+		}
 	}
 
 	// 2. Perform recursive check
 	allowed, err := e.checkRecursive(ctx, tenantID, subID, subType, rel, ns, objID, 0)
 	if err == nil {
-		e.cache.Store(cacheKey, allowed)
+		if e.redisClient != nil {
+			e.redisClient.Set(ctx, cacheKey, allowed, 5*time.Minute)
+		} else {
+			e.localCache.Store(cacheKey, allowed)
+		}
 	}
 	return allowed, err
 }
 
 // InvalidateByTuple clears cache entries affected by a specific tuple change.
-func (e *Engine) InvalidateByTuple(tenantID string, tuple RelationTuple) {
-	// For granular invalidation, we clear entries where either the object or subject matches.
-	// This ensures that any path through these nodes is re-evaluated.
-	e.cache.Range(func(key, value interface{}) bool {
+func (e *Engine) InvalidateByTuple(ctx context.Context, tenantID string, tuple RelationTuple) {
+	if e.redisClient != nil {
+		// Use SCAN to find keys involving this tenant and either the object or subject
+		// Note: SCAN is preferred over KEYS for performance in production.
+		matchPrefix := fmt.Sprintf("authz:cache:%s:*", tenantID)
+		var cursor uint64
+		for {
+			var keys []string
+			var err error
+			keys, cursor, err = e.redisClient.Scan(ctx, cursor, matchPrefix, 100).Result()
+			if err != nil {
+				e.log.Warn("Failed to scan redis for cache invalidation", zap.Error(err))
+				break
+			}
+			var keysToDelete []string
+			for _, k := range keys {
+				if strings.Contains(k, tuple.ObjectID) || strings.Contains(k, tuple.SubjectID) {
+					keysToDelete = append(keysToDelete, k)
+				}
+			}
+			if len(keysToDelete) > 0 {
+				e.redisClient.Del(ctx, keysToDelete...)
+			}
+			if cursor == 0 {
+				break
+			}
+		}
+	}
+
+	// Also clear local fallback cache
+	e.localCache.Range(func(key, value interface{}) bool {
 		k := key.(string)
-		// Format: tenantID:subID:subType:rel:ns:objID
-		if fmt.Sprintf("%s:", tenantID) == k[:len(tenantID)+1] {
-			// If key involves the modified object or subject, invalidate it
+		if strings.HasPrefix(k, fmt.Sprintf("authz:cache:%s:", tenantID)) {
 			if strings.Contains(k, tuple.ObjectID) || strings.Contains(k, tuple.SubjectID) {
-				e.cache.Delete(key)
+				e.localCache.Delete(key)
 			}
 		}
 		return true

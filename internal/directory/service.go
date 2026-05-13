@@ -6,6 +6,7 @@ import (
 	"errors"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/dhawalhost/wardseal/pkg/eventbus"
 
@@ -22,6 +23,7 @@ type Service interface {
 	GetUserByID(ctx context.Context, tenantID, id string) (User, error)
 	GetUserByEmail(ctx context.Context, tenantID, email string) (User, error)
 	ListUsers(ctx context.Context, tenantID string, limit, offset int) ([]User, int, error)
+	ListPendingDeletions(ctx context.Context, olderThan time.Time) ([]User, error)
 	UpdateUser(ctx context.Context, tenantID, id string, user User) error
 	DeleteUser(ctx context.Context, tenantID, id string) error
 
@@ -148,7 +150,7 @@ func (s *directoryService) CreateUser(ctx context.Context, tenantID string, user
 	var userID string
 	err = s.repo.WithTransaction(ctx, func(tx *sqlx.Tx) error {
 		var err error
-		userID, err = s.repo.CreateIdentity(ctx, tx, tenantID)
+		userID, err = s.repo.CreateIdentity(ctx, tx, tenantID, user.DisplayName, user.ExternalID, user.PhoneNumbers, user.Department, user.Title, user.Timezone)
 		if err != nil {
 			return err
 		}
@@ -190,6 +192,10 @@ func (s *directoryService) ListUsers(ctx context.Context, tenantID string, limit
 	return s.repo.ListUsers(ctx, tenantID, limit, offset)
 }
 
+func (s *directoryService) ListPendingDeletions(ctx context.Context, olderThan time.Time) ([]User, error) {
+	return s.repo.ListPendingDeletions(ctx, olderThan)
+}
+
 func (s *directoryService) UpdateUser(ctx context.Context, tenantID, id string, user User) error {
 	if user.Password != "" {
 		if err := validatePasswordPolicy(user.Password); err != nil {
@@ -217,7 +223,7 @@ func (s *directoryService) UpdateUser(ctx context.Context, tenantID, id string, 
 			passwordHash = string(hp)
 		}
 
-		if err := s.repo.UpdateIdentity(ctx, tx, tenantID, id, user.Status, user.MFAEnforced); err != nil {
+		if err := s.repo.UpdateIdentity(ctx, tx, tenantID, id, user.Status, user.DisplayName, user.ExternalID, user.PhoneNumbers, user.Department, user.Title, user.Timezone, user.MFAEnforced); err != nil {
 			return err
 		}
 

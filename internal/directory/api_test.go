@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
@@ -181,6 +182,11 @@ type mockDirectoryService struct {
 	verifyReturnUser        User
 	verifyTenantID          string
 	verifyCredentialsCalled bool
+}
+
+// ListPendingDeletions implements [Service].
+func (m *mockDirectoryService) ListPendingDeletions(ctx context.Context, olderThan time.Time) ([]User, error) {
+	panic("unimplemented")
 }
 
 func (m *mockDirectoryService) HealthCheck(context.Context) (bool, error) {

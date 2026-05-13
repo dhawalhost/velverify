@@ -19,6 +19,9 @@ services:
     environment:
       - APP_DATABASE_HOST=postgres
       - APP_AUTH_DIRECTORY_SERVICE_URL=http://dirsvc:8081
+      - APP_AUTH_UI_URL=http://id.wardseal.local
+      - APP_AUTH_COOKIE_DOMAIN=${APP_AUTH_COOKIE_DOMAIN:-wardseal.local}
+      - APP_AUTH_CORS_ALLOWED_ORIGINS=http://id.wardseal.local,http://admin.wardseal.local,http://app.wardseal.local,http://developer.wardseal.local,http://status.wardseal.local,http://wardseal.local,http://id.wardseal.com,http://admin.wardseal.com,http://app.wardseal.com,http://developer.wardseal.com,http://status.wardseal.com,http://wardseal.com,http://auth.wardseal.local,http://auth.wardseal.com
     volumes:
       - ./deploy/dev-keys:/etc/wardseal/keys:ro
     healthcheck:
@@ -26,9 +29,26 @@ services:
       interval: 10s
     labels:
       - traefik.enable=true
+      # auth.wardseal.local — raw IdP API (SAML, M2M, OIDC well-known)
       - traefik.http.routers.authsvc.rule=Host(`auth.wardseal.local`)
       - traefik.http.routers.authsvc.entrypoints=web
       - traefik.http.services.authsvc.loadbalancer.server.port=8080
+      # id.wardseal.local — auth API paths proxied through idui nginx (SPA catch-all handled by idui)
+      - traefik.http.routers.authsvc-id.rule=Host(`id.wardseal.local`) && (PathPrefix(`/t/`) || PathPrefix(`/oauth2`) || PathPrefix(`/.well-known`) || PathPrefix(`/social/login`) || PathPrefix(`/login/lookup`) || PathPrefix(`/saml`) || PathPrefix(`/api/v1/mfa`) || PathPrefix(`/api/v1/user`) || PathPrefix(`/api/v1/users`) || PathPrefix(`/api/v1/roles`) || PathPrefix(`/api/v1/permissions`) || PathPrefix(`/api/v1/devices`) || PathPrefix(`/api/v1/branding`) || PathPrefix(`/api/v1/signup`) || PathPrefix(`/api/v1/setup`) || PathPrefix(`/api/v1/webauthn`))
+      - traefik.http.routers.authsvc-id.entrypoints=web
+      - traefik.http.routers.authsvc-id.service=authsvc
+      # admin.wardseal.local — auth API paths
+      - traefik.http.routers.authsvc-admin.rule=Host(`admin.wardseal.local`) && (PathPrefix(`/t/`) || PathPrefix(`/oauth2`) || PathPrefix(`/.well-known`) || PathPrefix(`/api/v1/apps`) || PathPrefix(`/api/v1/api-keys`) || PathPrefix(`/api/v1/mfa`) || PathPrefix(`/api/v1/user`) || PathPrefix(`/api/v1/users`) || PathPrefix(`/api/v1/roles`) || PathPrefix(`/api/v1/permissions`) || PathPrefix(`/api/v1/devices`) || PathPrefix(`/api/v1/branding`) || PathPrefix(`/api/v1/setup`) || PathPrefix(`/api/v1/developer`) || PathPrefix(`/api/v1/webauthn`))
+      - traefik.http.routers.authsvc-admin.entrypoints=web
+      - traefik.http.routers.authsvc-admin.service=authsvc
+      # app.wardseal.local — user self-service auth API
+      - traefik.http.routers.authsvc-app.rule=Host(`app.wardseal.local`) && (PathPrefix(`/api/v1/user`) || PathPrefix(`/api/v1/users`) || PathPrefix(`/api/v1/roles`) || PathPrefix(`/api/v1/permissions`) || PathPrefix(`/api/v1/devices`) || PathPrefix(`/api/v1/mfa`) || PathPrefix(`/api/v1/webauthn`) || PathPrefix(`/api/v1/apps`))
+      - traefik.http.routers.authsvc-app.entrypoints=web
+      - traefik.http.routers.authsvc-app.service=authsvc
+      # developer.wardseal.local — developer API keys and apps
+      - traefik.http.routers.authsvc-dev.rule=Host(`developer.wardseal.local`) && (PathPrefix(`/api/v1/apps`) || PathPrefix(`/api/v1/api-keys`) || PathPrefix(`/api/v1/developer`) || PathPrefix(`/api/v1/users`) || PathPrefix(`/api/v1/roles`))
+      - traefik.http.routers.authsvc-dev.entrypoints=web
+      - traefik.http.routers.authsvc-dev.service=authsvc
     networks:
       - wardseal-net
 
@@ -45,13 +65,15 @@ services:
     env_file: .env
     environment:
       - APP_DATABASE_HOST=postgres
+      - APP_AUTH_COOKIE_DOMAIN=${APP_AUTH_COOKIE_DOMAIN:-wardseal.local}
+      - APP_AUTH_JWT_PUBLIC_KEY_PATH=/etc/wardseal/keys/public_key.pem
     volumes:
       - ./deploy/dev-keys:/etc/wardseal/keys:ro
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8081/healthz"]
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.dirsvc.rule=Host(`api.wardseal.local`) && (PathPrefix(`/scim`) || PathPrefix(`/groups`))"
+      - "traefik.http.routers.dirsvc.rule=Host(`api.wardseal.local`) && (PathPrefix(`/scim`) || PathPrefix(`/groups`) || PathPrefix(`/scim/healthz`))"
       - "traefik.http.routers.dirsvc.entrypoints=web"
       - "traefik.http.services.dirsvc.loadbalancer.server.port=8081"
     networks:
@@ -73,12 +95,16 @@ services:
     environment:
       - APP_DATABASE_HOST=postgres
       - APP_GOVERNANCE_DIRECTORY_SERVICE_URL=http://dirsvc:8081
+      - APP_AUTH_COOKIE_DOMAIN=${APP_AUTH_COOKIE_DOMAIN:-wardseal.local}
+      - APP_AUTH_JWT_PUBLIC_KEY_PATH=/etc/wardseal/keys/public_key.pem
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8082/healthz"]
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.govsvc.rule=Host(`api.wardseal.local`) && (PathPrefix(`/api/v1/oauth`) || PathPrefix(`/api/v1/governance`) || PathPrefix(`/api/v1/roles`) || PathPrefix(`/api/v1/permissions`) || PathPrefix(`/api/v1/users`) || PathPrefix(`/api/v1/sso`) || PathPrefix(`/api/v1/connectors`) || PathPrefix(`/api/v1/campaigns`) || PathPrefix(`/api/v1/organizations`) || PathPrefix(`/api/v1/safety`) || PathPrefix(`/api/v1/discovery`) || PathPrefix(`/api/v1/integrations`) || PathPrefix(`/api/v1/audit`) || PathPrefix(`/integrations/slack`))"
+      - "traefik.http.routers.govsvc.rule=Host(`api.wardseal.local`) && (PathPrefix(`/api/v1/oauth`) || PathPrefix(`/api/v1/governance`) || PathPrefix(`/api/v1/roles`) || PathPrefix(`/api/v1/permissions`) || PathPrefix(`/api/v1/users`) || PathPrefix(`/api/v1/sso`) || PathPrefix(`/api/v1/saml`) || PathPrefix(`/api/v1/connectors`) || PathPrefix(`/api/v1/campaigns`) || PathPrefix(`/api/v1/organizations`) || PathPrefix(`/api/v1/safety`) || PathPrefix(`/api/v1/discovery`) || PathPrefix(`/api/v1/integrations`) || PathPrefix(`/api/v1/audit`) || PathPrefix(`/integrations/slack`) || PathPrefix(`/gov/healthz`))"
       - "traefik.http.routers.govsvc.entrypoints=web"
+      - "traefik.http.routers.hooks.rule=Host(`hooks.wardseal.local`)"
+      - "traefik.http.routers.hooks.entrypoints=web"
       - "traefik.http.services.govsvc.loadbalancer.server.port=8082"
     networks:
       - wardseal-net
@@ -94,11 +120,12 @@ services:
     env_file: .env
     environment:
       - APP_DATABASE_HOST=postgres
+      - APP_AUTH_COOKIE_DOMAIN=${APP_AUTH_COOKIE_DOMAIN:-wardseal.local}
     volumes:
       - ./deploy/dev-keys:/etc/wardseal/keys:ro
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.policysvc.rule=Host(`api.wardseal.local`) && (PathPrefix(`/api/v1/policy`) || PathPrefix(`/api/v1/policies`))"
+      - "traefik.http.routers.policysvc.rule=Host(`api.wardseal.local`) && (PathPrefix(`/api/v1/policy`) || PathPrefix(`/api/v1/policies`) || PathPrefix(`/policy/healthz`))"
       - "traefik.http.routers.policysvc.entrypoints=web"
       - "traefik.http.services.policysvc.loadbalancer.server.port=8083"
     networks:
@@ -115,11 +142,12 @@ services:
     env_file: .env
     environment:
       - APP_DATABASE_HOST=postgres
+      - APP_AUTH_COOKIE_DOMAIN=${APP_AUTH_COOKIE_DOMAIN:-wardseal.local}
     volumes:
       - ./deploy/dev-keys:/etc/wardseal/keys:ro
     labels:
       - traefik.enable=true
-      - traefik.http.routers.provsvc.rule=Host(`api.wardseal.local`) && PathPrefix(`/api/v1/provisioning`)
+      - traefik.http.routers.provsvc.rule=Host(`api.wardseal.local`) && (PathPrefix(`/api/v1/provisioning`) || PathPrefix(`/provisioning/healthz`))
       - traefik.http.routers.provsvc.entrypoints=web
       - traefik.http.services.provsvc.loadbalancer.server.port=8084
     networks:

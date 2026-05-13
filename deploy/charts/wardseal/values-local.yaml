@@ -50,12 +50,13 @@ authsvc:
     JWT_PRIVATE_KEY_PATH: /etc/wardseal/keys/private_key.pem
     JWT_PUBLIC_KEY_PATH: /etc/wardseal/keys/public_key.pem
     DEPLOYMENT_MODE: saas
-    UI_URL: http://manage.wardseal.local
+    UI_URL: http://id.wardseal.local
     REDIS_ADDR: redis.wardseal-local.svc.cluster.local:6379
     REDIS_DB: "0"
     REDIS_ENABLED: "true"
+    AUTH_COOKIE_DOMAIN: "wardseal.local"
     WEBAUTHN_SESSION_TTL_SECONDS: "600"
-    CORS_ALLOWED_ORIGINS: "http://auth.wardseal.local,http://manage.wardseal.local,http://wardseal.local"
+    CORS_ALLOWED_ORIGINS: "http://id.wardseal.local,http://admin.wardseal.local,http://app.wardseal.local,http://developer.wardseal.local,http://status.wardseal.local,http://wardseal.local,http://auth.wardseal.local"
     RATE_LIMIT_USE_TENANT: "true"
     RATE_LIMIT_KEY_PREFIX: "wardseal:ratelimit"
 
@@ -105,7 +106,7 @@ dirsvc:
     LOG_LEVEL: debug
     REDIS_ADDR: redis.wardseal-local.svc.cluster.local:6379
     REDIS_ENABLED: "true"
-    CORS_ALLOWED_ORIGINS: "http://auth.wardseal.local,http://manage.wardseal.local,http://wardseal.local"
+    CORS_ALLOWED_ORIGINS: "http://id.wardseal.local,http://admin.wardseal.local,http://app.wardseal.local,http://developer.wardseal.local,http://status.wardseal.local,http://wardseal.local,http://auth.wardseal.local"
 
   database:
     existingSecret: wardseal-db-credentials
@@ -140,7 +141,7 @@ govsvc:
     DIRECTORY_SERVICE_URL: http://wardseal-dirsvc.wardseal-local.svc.cluster.local:8081
     REDIS_ADDR: redis.wardseal-local.svc.cluster.local:6379
     REDIS_ENABLED: "true"
-    CORS_ALLOWED_ORIGINS: "http://auth.wardseal.local,http://manage.wardseal.local,http://wardseal.local"
+    CORS_ALLOWED_ORIGINS: "http://id.wardseal.local,http://admin.wardseal.local,http://app.wardseal.local,http://developer.wardseal.local,http://status.wardseal.local,http://wardseal.local,http://auth.wardseal.local"
 
   database:
     existingSecret: wardseal-db-credentials
@@ -202,7 +203,7 @@ provsvc:
   env:
     ENVIRONMENT: local
     LOG_LEVEL: debug
-    CORS_ALLOWED_ORIGINS: "http://auth.wardseal.local,http://manage.wardseal.local,http://wardseal.local"
+    CORS_ALLOWED_ORIGINS: "http://id.wardseal.local,http://admin.wardseal.local,http://app.wardseal.local,http://developer.wardseal.local,http://status.wardseal.local,http://wardseal.local,http://auth.wardseal.local"
 
   database:
     existingSecret: wardseal-db-credentials
@@ -351,8 +352,136 @@ ingress:
           pathType: Prefix
           service: govsvc
           port: 8082
-    - host: manage.wardseal.local
+    - host: admin.wardseal.local
       paths:
+        - path: /login/lookup
+          pathType: Prefix
+          service: authsvc
+          port: 8080
+        - path: /t/
+          pathType: Prefix
+          service: authsvc
+          port: 8080
+        - path: /oauth2
+          pathType: Prefix
+          service: authsvc
+          port: 8080
+        - path: /.well-known
+          pathType: Prefix
+          service: authsvc
+          port: 8080
+        - path: /social/login
+          pathType: Prefix
+          service: authsvc
+          port: 8080
+        - path: /api/v1/apps
+          pathType: Prefix
+          service: authsvc
+          port: 8080
+        - path: /api/v1/api-keys
+          pathType: Prefix
+          service: authsvc
+          port: 8080
+        - path: /api/v1/mfa
+          pathType: Prefix
+          service: authsvc
+          port: 8080
+        - path: /api/v1/user
+          pathType: Prefix
+          service: authsvc
+          port: 8080
+        - path: /api/v1/devices
+          pathType: Prefix
+          service: authsvc
+          port: 8080
+        - path: /api/v1/branding
+          pathType: Prefix
+          service: authsvc
+          port: 8080
+        - path: /api/v1/signup
+          pathType: Prefix
+          service: authsvc
+          port: 8080
+        - path: /api/v1/setup
+          pathType: Prefix
+          service: authsvc
+          port: 8080
+        - path: /api/v1/developer
+          pathType: Prefix
+          service: authsvc
+          port: 8080
+        - path: /scim
+          pathType: Prefix
+          service: dirsvc
+          port: 8081
+        - path: /api/v1/tenants
+          pathType: Prefix
+          service: dirsvc
+          port: 8081
+        - path: /internal/discover
+          pathType: Prefix
+          service: dirsvc
+          port: 8081
+        - path: /api/v1/users
+          pathType: Prefix
+          service: dirsvc
+          port: 8081
+        - path: /api/v1/groups
+          pathType: Prefix
+          service: dirsvc
+          port: 8081
+        - path: /api/v1/organizations
+          pathType: Prefix
+          service: govsvc
+          port: 8082
+        - path: /api/v1/campaigns
+          pathType: Prefix
+          service: govsvc
+          port: 8082
+        - path: /api/v1/roles
+          pathType: Prefix
+          service: govsvc
+          port: 8082
+        - path: /api/v1/permissions
+          pathType: Prefix
+          service: govsvc
+          port: 8082
+        - path: /api/v1/audit
+          pathType: Prefix
+          service: govsvc
+          port: 8082
+        - path: /api/v1/sso
+          pathType: Prefix
+          service: govsvc
+          port: 8082
+        - path: /api/v1/connectors
+          pathType: Prefix
+          service: govsvc
+          port: 8082
+        - path: /api/v1/oauth
+          pathType: Prefix
+          service: govsvc
+          port: 8082
+        - path: /api/v1/governance
+          pathType: Prefix
+          service: govsvc
+          port: 8082
+        - path: /api/v1/policy
+          pathType: Prefix
+          service: policysvc
+          port: 8083
+        - path: /api/v1/provisioning
+          pathType: Prefix
+          service: provsvc
+          port: 8084
+        - path: /api/v1/webhooks
+          pathType: Prefix
+          service: govsvc
+          port: 8082
+        - path: /webhooks
+          pathType: Prefix
+          service: govsvc
+          port: 8082
         - path: /
           pathType: Prefix
           service: adminui

@@ -17,6 +17,51 @@ import (
 )
 
 // SocialLogin handles the login/registration via an external provider.
+func (s *authService) GetSSOAuthorizeURL(ctx context.Context, tenantID, providerName, redirectURI string) (string, error) {
+	ssoProvider, err := s.ssoProviderStore.GetByName(ctx, tenantID, providerName)
+	if err != nil {
+		return "", err
+	}
+	if ssoProvider == nil || !ssoProvider.Enabled {
+		return "", &Error{"invalid_request", fmt.Sprintf("provider '%s' not configured or disabled", providerName)}
+	}
+
+	if ssoProvider.OIDCIssuerURL == nil || *ssoProvider.OIDCIssuerURL == "" {
+		return "", &Error{"invalid_configuration", "sso provider issuer url missing"}
+	}
+
+	issuer := strings.TrimRight(*ssoProvider.OIDCIssuerURL, "/")
+	authURL := issuer + "/authorize"
+	// Google fallback
+	if providerName == "google" {
+		authURL = "https://accounts.google.com/o/oauth2/v2/auth"
+	}
+
+	clientID := ""
+	if ssoProvider.OIDCClientID != nil {
+		clientID = strings.TrimSpace(*ssoProvider.OIDCClientID)
+	}
+
+	conf := &oauth2.Config{
+		ClientID:     clientID,
+		RedirectURL:  redirectURI,
+		Scopes:       []string{"openid", "profile", "email"},
+		Endpoint: oauth2.Endpoint{
+			AuthURL: authURL,
+		},
+	}
+
+	if ssoProvider.OIDCScopes != nil && *ssoProvider.OIDCScopes != "" {
+		conf.Scopes = strings.Split(*ssoProvider.OIDCScopes, " ")
+	}
+
+	// For now, we use a simple state. In production, this should be a cryptographically secure random string
+	// and verified during callback.
+	state := fmt.Sprintf("tenant:%s:provider:%s", tenantID, providerName)
+	return conf.AuthCodeURL(state), nil
+}
+
+// SocialLogin handles the login/registration via an external provider.
 func (s *authService) SocialLogin(ctx context.Context, req SocialLoginRequest) (TokenResponse, error) {
 	tenantID, err := middleware.TenantIDFromContext(ctx)
 	if err != nil {
@@ -61,8 +106,8 @@ func (s *authService) SocialLogin(ctx context.Context, req SocialLoginRequest) (
 	conf := &oauth2.Config{
 		ClientID:     clientID,
 		ClientSecret: string(ssoProvider.OIDCClientSecret),
-		// RedirectURL:  req.RedirectURI, // Need to verify if request has it
-		Scopes: []string{"openid", "profile", "email"},
+		RedirectURL:  req.RedirectURI,
+		Scopes:       []string{"openid", "profile", "email"},
 		Endpoint: oauth2.Endpoint{
 			AuthURL:  authURL,
 			TokenURL: tokenURL,

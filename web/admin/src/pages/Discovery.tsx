@@ -126,14 +126,14 @@ const Discovery: React.FC = () => {
     return (
         <div className="space-y-12 animate-in fade-in duration-700">
             <PageHeader
-                icon={<Search className="w-10 h-10 text-primary" />}
+                icon={<Search className="w-8 h-8 text-primary" />}
                 title="Discovery"
                 description="Scan your network for users, groups, and applications to bring them under WardSeal protection."
                 actions={
                     <Button 
                         onClick={handleRunScan} 
                         disabled={isScanning}
-                        className="h-11 rounded-xl bg-primary text-primary-foreground font-bold tracking-tight text-[11px] px-8 shadow-xl shadow-primary/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                        className="h-9 rounded-lg bg-primary text-primary-foreground font-bold tracking-tight text-[11px] px-6 shadow-xl shadow-primary/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
                     >
                         {isScanning ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <RefreshCcw className="w-4 h-4 mr-2" />}
                         {isScanning ? 'Scanning...' : 'Start Scan'}
@@ -142,19 +142,19 @@ const Discovery: React.FC = () => {
             />
 
             {currentJob && isScanning && (
-                <GlassCard className="border-none shadow-2xl shadow-primary/10 bg-card overflow-hidden rounded-[32px] relative">
+                <GlassCard className="border-none shadow-2xl shadow-primary/10 bg-card overflow-hidden rounded-xl relative">
                     <div 
                         className="absolute top-0 left-0 h-1.5 bg-primary transition-all duration-1000 shadow-[0_0_12px_rgba(var(--primary),0.4)]" 
                         style={{ width: `${currentJob.progress}%` }}
                     />
-                    <GlassCardContent className="p-10 flex flex-col md:flex-row items-center justify-between gap-10">
-                        <div className="flex items-center gap-6">
-                            <div className="w-16 h-16 bg-primary/5 rounded-2xl flex items-center justify-center">
-                                <Activity className="w-8 h-8 animate-pulse text-primary" />
+                    <GlassCardContent className="p-6 flex flex-col md:flex-row items-center justify-between gap-6">
+                        <div className="flex items-center gap-4">
+                            <div className="w-12 h-12 bg-primary/5 rounded-xl flex items-center justify-center">
+                                <Activity className="w-6 h-6 animate-pulse text-primary" />
                             </div>
-                            <div className="space-y-1.5">
-                                <span className="text-[11px] font-bold tracking-tight text-primary animate-pulse">Scan in Progress</span>
-                                <h3 className="text-2xl font-bold tracking-tight text-on-surface">{currentJob.message || 'Scanning network...'}</h3>
+                            <div className="space-y-1">
+                                <span className="text-[10px] font-bold tracking-tight text-primary animate-pulse">Scan in Progress</span>
+                                <h3 className="text-xl font-bold tracking-tight text-on-surface">{currentJob.message || 'Scanning network...'}</h3>
                                 <div className="flex items-center gap-3 text-on-surface-variant/40">
                                     <Binary className="w-3.5 h-3.5" />
                                     <span className="text-[11px] font-bold tracking-tight italic">Job ID: {currentJob.id?.substring(0, 8).toLowerCase()}</span>
@@ -162,56 +162,56 @@ const Discovery: React.FC = () => {
                             </div>
                         </div>
                         <div className="text-right">
-                            <span className="text-6xl font-bold tracking-tighter tabular-nums text-on-surface">{currentJob.progress}<span className="text-2xl ml-1 opacity-20">%</span></span>
+                            <span className="text-4xl font-bold tracking-tighter tabular-nums text-on-surface">{currentJob.progress}<span className="text-xl ml-1 opacity-20">%</span></span>
                         </div>
                     </GlassCardContent>
                 </GlassCard>
             )}
 
             {message && (
-                <Alert variant={message.type === 'error' ? 'destructive' : 'default'} className={`border-none rounded-2xl p-6 flex items-center gap-6 animate-in slide-in-from-top-4 duration-500 ${message.type === 'error' ? 'bg-destructive/10 text-destructive' : 'bg-success-subtle text-success'}`}>
-                    <div className={`p-2.5 rounded-xl ${message.type === 'error' ? 'bg-red-100' : 'bg-emerald-100'}`}>
-                        {message.type === 'error' ? <AlertCircle className="h-5 w-5" /> : <ShieldPlus className="h-5 w-5" />}
+                <Alert variant={message.type === 'error' ? 'destructive' : 'default'} className={`border-none rounded-xl p-4 flex items-center gap-4 animate-in slide-in-from-top-4 duration-500 ${message.type === 'error' ? 'bg-destructive/10 text-destructive' : 'bg-success-subtle text-success'}`}>
+                    <div className={`p-2 rounded-lg ${message.type === 'error' ? 'bg-red-100' : 'bg-emerald-100'}`}>
+                        {message.type === 'error' ? <AlertCircle className="h-4 w-4" /> : <ShieldPlus className="h-4 w-4" />}
                     </div>
-                    <AlertDescription className="font-bold text-[12px] tracking-tight">{message.text}</AlertDescription>
+                    <AlertDescription className="font-bold text-[11px] tracking-tight">{message.text}</AlertDescription>
                 </Alert>
             )}
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <GlassCard className="border-none shadow-xl shadow-on-surface/5 bg-card overflow-hidden rounded-[32px]">
-                    <GlassCardContent className="p-10 relative group">
+                <GlassCard className="border-none shadow-xl shadow-on-surface/5 bg-card overflow-hidden rounded-xl">
+                    <GlassCardContent className="p-6 relative group">
                         <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none group-hover:scale-110 transition-transform">
-                            <Server className="w-20 h-20 -mr-4 -mt-4 text-on-surface" />
+                            <Server className="w-12 h-12 -mr-2 -mt-2 text-on-surface" />
                         </div>
-                        <div className="flex flex-col gap-2">
-                            <span className="text-[12px] font-bold tracking-tight text-on-surface-variant/40">Total Found</span>
-                            <span className="text-6xl font-bold tracking-tighter tabular-nums transition-colors group-hover:text-primary">{resources.length}</span>
+                        <div className="flex flex-col gap-1">
+                            <span className="text-[11px] font-bold tracking-tight text-on-surface-variant/40 uppercase">Total Found</span>
+                            <span className="text-4xl font-bold tracking-tighter tabular-nums transition-colors group-hover:text-primary">{resources.length}</span>
                         </div>
                     </GlassCardContent>
                 </GlassCard>
                 
-                <GlassCard className="border-none shadow-xl shadow-on-surface/5 bg-card overflow-hidden rounded-[32px]">
-                    <GlassCardContent className="p-10 relative group">
+                <GlassCard className="border-none shadow-xl shadow-on-surface/5 bg-card overflow-hidden rounded-xl">
+                    <GlassCardContent className="p-6 relative group">
                         <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none group-hover:scale-110 transition-transform">
-                            <Activity className="w-20 h-20 -mr-4 -mt-4 text-on-surface" />
+                            <Activity className="w-12 h-12 -mr-2 -mt-2 text-on-surface" />
                         </div>
-                        <div className="flex flex-col gap-2">
-                            <span className="text-[12px] font-bold tracking-tight text-on-surface-variant/40">Unmanaged Assets</span>
-                            <span className="text-6xl font-bold tracking-tighter tabular-nums transition-colors group-hover:text-destructive">
-                                {Math.round((resources.filter(r => r.status === 'discovered').length / (resources.length || 1)) * 100)}<span className="text-2xl opacity-20 ml-1">%</span>
+                        <div className="flex flex-col gap-1">
+                            <span className="text-[11px] font-bold tracking-tight text-on-surface-variant/40 uppercase">Unmanaged</span>
+                            <span className="text-4xl font-bold tracking-tighter tabular-nums transition-colors group-hover:text-destructive">
+                                {Math.round((resources.filter(r => r.status === 'discovered').length / (resources.length || 1)) * 100)}<span className="text-xl opacity-20 ml-1">%</span>
                             </span>
                         </div>
                     </GlassCardContent>
                 </GlassCard>
 
-                <GlassCard className="border-none shadow-xl shadow-on-surface/5 bg-card overflow-hidden rounded-[32px]">
-                    <GlassCardContent className="p-10 relative group">
+                <GlassCard className="border-none shadow-xl shadow-on-surface/5 bg-card overflow-hidden rounded-xl">
+                    <GlassCardContent className="p-6 relative group">
                         <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none group-hover:scale-110 transition-transform">
-                            <ShieldPlus className="w-20 h-20 -mr-4 -mt-4 text-success" />
+                            <ShieldPlus className="w-12 h-12 -mr-2 -mt-2 text-success" />
                         </div>
-                        <div className="flex flex-col gap-2">
-                            <span className="text-[12px] font-bold tracking-tight text-on-surface-variant/40">Managed Assets</span>
-                            <span className="text-6xl font-bold tracking-tighter tabular-nums text-success">
+                        <div className="flex flex-col gap-1">
+                            <span className="text-[11px] font-bold tracking-tight text-on-surface-variant/40 uppercase">Managed</span>
+                            <span className="text-4xl font-bold tracking-tighter tabular-nums text-success">
                                 {resources.filter(r => r.status === 'promoted').length}
                             </span>
                         </div>
@@ -220,20 +220,20 @@ const Discovery: React.FC = () => {
             </div>
 
             <div className="space-y-8">
-                <div className="flex items-center gap-6">
-                    <h2 className="text-[12px] font-bold tracking-tight text-on-surface-variant/40 italic flex-shrink-0 opacity-60">Asset List</h2>
+                <div className="flex items-center gap-4">
+                    <h2 className="text-[10px] font-bold tracking-tight text-on-surface-variant/40 uppercase italic flex-shrink-0 opacity-60">Asset List</h2>
                     <div className="h-px flex-1 bg-on-surface/5" />
                 </div>
 
-                <GlassCard className="border-none shadow-2xl shadow-on-surface/5 bg-card overflow-hidden rounded-[32px]">
-                    <GlassCardHeader className="py-8 px-10 border-b border-on-surface/5">
-                        <div className="flex items-center gap-5">
-                            <div className="p-3.5 bg-primary/5 rounded-2xl">
-                                <Search className="w-7 h-7 text-primary" />
+                <GlassCard className="border-none shadow-2xl shadow-on-surface/5 bg-card overflow-hidden rounded-xl">
+                    <GlassCardHeader className="py-4 px-6 border-b border-on-surface/5">
+                        <div className="flex items-center gap-4">
+                            <div className="p-2.5 bg-primary/5 rounded-xl">
+                                <Search className="w-5 h-5 text-primary" />
                             </div>
                             <div>
-                                <GlassCardTitle className="text-2xl font-bold tracking-tight text-on-surface">Discovered Assets</GlassCardTitle>
-                                <p className="text-on-surface-variant/40 font-semibold text-[12px] mt-1 tracking-tight">List of users and resources found on your network.</p>
+                                <GlassCardTitle className="text-xl font-bold tracking-tight text-on-surface">Discovered Assets</GlassCardTitle>
+                                <p className="text-on-surface-variant/40 font-semibold text-[10px] mt-0.5 tracking-tight">List of users and resources found on your network.</p>
                             </div>
                         </div>
                     </GlassCardHeader>
@@ -250,66 +250,66 @@ const Discovery: React.FC = () => {
                                 <GlassTable>
                                     <GlassTableHeader>
                                         <GlassTableRow className="hover:bg-transparent border-b border-on-surface/5">
-                                            <GlassTableHead className="py-6 pl-10">Name</GlassTableHead>
-                                            <GlassTableHead>Source</GlassTableHead>
-                                            <GlassTableHead>Type</GlassTableHead>
-                                            <GlassTableHead>Status</GlassTableHead>
-                                            <GlassTableHead className="text-right pr-10">Actions</GlassTableHead>
+                                            <GlassTableHead className="py-3 pl-6">Name</GlassTableHead>
+                                            <GlassTableHead className="py-3">Source</GlassTableHead>
+                                            <GlassTableHead className="py-3">Type</GlassTableHead>
+                                            <GlassTableHead className="py-3">Status</GlassTableHead>
+                                            <GlassTableHead className="py-3 text-right pr-6">Actions</GlassTableHead>
                                         </GlassTableRow>
                                     </GlassTableHeader>
                                     <TableBody>
                                         {resources.map(resource => (
                                             <GlassTableRow key={resource.id} className="hover:bg-surface-container/10 transition-all border-b border-on-surface/5 last:border-0 group">
-                                                <TableCell className="py-8 pl-10">
-                                                    <div className="flex items-center gap-6">
-                                                        <div className="w-12 h-12 rounded-xl bg-surface-container/50 text-on-surface-variant/40 flex items-center justify-center transition-all group-hover:bg-primary group-hover:text-primary-foreground">
-                                                            <Fingerprint className="w-6 h-6" />
+                                                <TableCell className="py-3 pl-6">
+                                                    <div className="flex items-center gap-4">
+                                                        <div className="w-8 h-8 rounded-lg bg-surface-container/50 text-on-surface-variant/40 flex items-center justify-center transition-all group-hover:bg-primary group-hover:text-primary-foreground">
+                                                            <Fingerprint className="w-4 h-4" />
                                                         </div>
-                                                        <div className="flex flex-col gap-1">
-                                                            <span className="text-lg font-bold tracking-tight text-on-surface group-hover:text-primary transition-colors">{resource.name}</span>
-                                                            <span className="text-[11px] font-bold font-mono tracking-tight opacity-20 italic truncate max-w-[200px]">{resource.external_id}</span>
+                                                        <div className="flex flex-col gap-0.5">
+                                                            <span className="text-[13px] font-bold tracking-tight text-on-surface group-hover:text-primary transition-colors">{resource.name}</span>
+                                                            <span className="text-[9px] font-bold font-mono tracking-tight opacity-20 italic truncate max-w-[150px]">{resource.external_id}</span>
                                                         </div>
                                                     </div>
                                                 </TableCell>
-                                                <TableCell className="py-8">
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="p-2 rounded-lg bg-surface-container/50 text-on-surface-variant/60 group-hover:bg-primary/5 group-hover:text-primary transition-colors">
+                                                <TableCell className="py-3">
+                                                    <div className="flex items-center gap-2.5">
+                                                        <div className="p-1.5 rounded-md bg-surface-container/50 text-on-surface-variant/60 group-hover:bg-primary/5 group-hover:text-primary transition-colors">
                                                             {getSourceIcon(resource.source)}
                                                         </div>
-                                                        <span className="text-[12px] font-bold tracking-tight text-on-surface">{resource.source}</span>
+                                                        <span className="text-[11px] font-bold tracking-tight text-on-surface">{resource.source}</span>
                                                     </div>
                                                 </TableCell>
-                                                <TableCell className="py-8">
-                                                    <Badge className="bg-surface-container/50 text-on-surface-variant/60 border-none rounded-lg font-bold text-[10px] tracking-tight px-3 py-1 group-hover:bg-surface-container transition-all">
+                                                <TableCell className="py-3">
+                                                    <Badge className="bg-surface-container/50 text-on-surface-variant/60 border-none rounded-md font-bold text-[9px] tracking-tight px-2 py-0.5 group-hover:bg-surface-container transition-all">
                                                         {resource.resource_type}
                                                     </Badge>
                                                 </TableCell>
-                                                <TableCell className="py-8">
+                                                <TableCell className="py-3">
                                                     {resource.status === 'promoted' ? (
-                                                        <Badge className="bg-success/10 text-success border-none rounded-lg font-bold text-[10px] tracking-tight px-3 py-1 flex items-center gap-2 w-fit">
-                                                            <CheckCircle2 className="w-3 h-3" /> Managed
+                                                        <Badge className="bg-success/10 text-success border-none rounded-md font-bold text-[9px] tracking-tight px-2 py-0.5 flex items-center gap-1.5 w-fit">
+                                                            <CheckCircle2 className="w-2.5 h-2.5" /> Managed
                                                         </Badge>
                                                     ) : (
-                                                        <Badge className="bg-surface-container/50 text-on-surface-variant/60 border-none rounded-lg font-bold text-[10px] tracking-tight px-3 py-1 flex items-center gap-2 w-fit">
-                                                            <Clock className="w-3 h-3" /> Discovered
+                                                        <Badge className="bg-surface-container/50 text-on-surface-variant/60 border-none rounded-md font-bold text-[9px] tracking-tight px-2 py-0.5 flex items-center gap-1.5 w-fit">
+                                                            <Clock className="w-2.5 h-2.5" /> Discovered
                                                         </Badge>
                                                     )}
                                                 </TableCell>
-                                                <TableCell className="py-8 text-right pr-10">
+                                                <TableCell className="py-3 text-right pr-6">
                                                     <Button 
                                                         size="sm" 
                                                         variant={resource.status === 'promoted' ? "ghost" : "outline"} 
                                                         disabled={resource.status === 'promoted'}
-                                                        className={`h-10 rounded-xl font-bold text-[11px] tracking-tight px-6 transition-all ${resource.status === 'promoted' ? 'text-success/40' : 'bg-card ring-1 ring-on-surface/5 hover:bg-surface-container'}`}
+                                                        className={`h-8 rounded-lg font-bold text-[10px] tracking-tight px-4 transition-all ${resource.status === 'promoted' ? 'text-success/40' : 'bg-card ring-1 ring-on-surface/5 hover:bg-surface-container'}`}
                                                     >
                                                         {resource.status === 'promoted' ? (
-                                                            <div className="flex items-center gap-2">
-                                                                <CheckCircle2 className="w-4 h-4" />
+                                                            <div className="flex items-center gap-1.5">
+                                                                <CheckCircle2 className="w-3.5 h-3.5" />
                                                                 Secured
                                                             </div>
                                                         ) : (
-                                                            <div className="flex items-center gap-2">
-                                                                <ShieldPlus className="w-4 h-4" /> 
+                                                            <div className="flex items-center gap-1.5">
+                                                                <ShieldPlus className="w-3.5 h-3.5" /> 
                                                                 Protect
                                                             </div>
                                                         )}

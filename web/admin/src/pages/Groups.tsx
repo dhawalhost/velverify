@@ -7,9 +7,16 @@ import {
     addUserToGroup,
     removeUserFromGroup,
     getSCIMUsers,
-    Group,
-    User
+    Group
 } from '../api';
+
+interface User {
+    id: string;
+    userName?: string;
+    email?: string;
+    emails?: { value: string }[];
+    status?: string;
+}
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -174,59 +181,59 @@ const Groups: React.FC = () => {
     if (loading && groups.length === 0) return <div className="h-[400px] flex items-center justify-center"><Loader2 className="h-10 w-10 animate-spin text-primary opacity-20" /></div>;
 
     return (
-        <div className="space-y-10 animate-in fade-in duration-700">
+        <div className="space-y-4 animate-in fade-in duration-700">
             <PageHeader
-                icon={<Users className="w-10 h-10 text-primary" />}
+                icon={<Users className="w-8 h-8 text-primary" />}
                 title="Groups"
                 description="Manage how users access resources by grouping them together. Create groups to apply security rules to many users at once."
                 actions={
                     <Dialog open={showCreate} onOpenChange={setShowCreate}>
                         <DialogTrigger asChild>
-                            <Button className="h-11 rounded-xl bg-primary text-primary-foreground font-bold tracking-tight text-[11px] px-8 shadow-xl shadow-primary/20 transition-all hover:scale-[1.02] active:scale-[0.98]">
-                                <Plus className="w-4 h-4 mr-3" /> Add New Group
+                            <Button className="h-9 rounded-lg bg-primary text-primary-foreground font-bold tracking-tight text-[10px] px-6 shadow-lg shadow-primary/20 transition-all hover:scale-[1.02] active:scale-[0.98]">
+                                <Plus className="w-3.5 h-3.5 mr-2" /> Add New Group
                             </Button>
                         </DialogTrigger>
                         <DialogContent className="sm:max-w-[480px] p-0 border-none rounded-[32px] shadow-2xl shadow-on-surface/10 bg-card overflow-hidden">
-                            <div className="bg-primary p-12 text-white">
+                            <div className="bg-primary p-8 text-white">
                                 <DialogHeader>
-                                    <DialogTitle className="text-3xl font-bold tracking-tight flex items-center gap-4">
-                                        <div className="w-12 h-12 bg-card/20 rounded-2xl flex items-center justify-center backdrop-blur-md">
-                                            <Plus className="w-6 h-6 text-white" />
+                                    <DialogTitle className="text-xl font-bold tracking-tight flex items-center gap-3">
+                                        <div className="w-10 h-10 bg-card/20 rounded-xl flex items-center justify-center backdrop-blur-md">
+                                            <Plus className="w-5 h-5 text-white" />
                                         </div>
                                         Create Group
                                     </DialogTitle>
-                                    <DialogDescription className="text-on-inverse/70 font-medium text-sm mt-3 tracking-tight">
+                                    <DialogDescription className="text-on-inverse/70 font-medium text-xs mt-2 tracking-tight">
                                         Create a new group to manage user access.
                                     </DialogDescription>
                                 </DialogHeader>
                             </div>
-                            <form onSubmit={handleCreateGroup} className="p-10 space-y-8 bg-card">
-                                <div className="space-y-6">
-                                    <div className="space-y-2.5">
-                                        <Label htmlFor="name" className="text-[12px] font-bold tracking-tight text-on-surface-variant/40 ml-1">Group Name</Label>
+                            <form onSubmit={handleCreateGroup} className="p-8 space-y-6 bg-card">
+                                <div className="space-y-4">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="name" className="text-[10px] font-bold tracking-tight text-on-surface-variant/40 ml-1 uppercase">Group Name</Label>
                                         <Input
                                             id="name"
                                             value={newGroupName}
                                             onChange={(e) => setNewGroupName(e.target.value)}
-                                            className="h-12 rounded-xl bg-surface-container/30 border-none ring-1 ring-on-surface/5 focus-visible:ring-2 focus-visible:ring-primary/20 font-medium transition-all"
+                                            className="h-10 rounded-lg bg-surface-container/30 border-none ring-1 ring-on-surface/5 focus-visible:ring-2 focus-visible:ring-primary/20 font-medium transition-all text-xs"
                                             placeholder="e.g. INFRA_CORE"
                                             required
                                         />
                                     </div>
-                                    <div className="space-y-2.5">
-                                        <Label htmlFor="desc" className="text-[12px] font-bold tracking-tight text-on-surface-variant/40 ml-1">Description</Label>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="desc" className="text-[10px] font-bold tracking-tight text-on-surface-variant/40 ml-1 uppercase">Description</Label>
                                         <Input
                                             id="desc"
                                             value={newGroupDesc}
                                             onChange={(e) => setNewGroupDesc(e.target.value)}
-                                            className="h-12 rounded-xl bg-surface-container/30 border-none ring-1 ring-on-surface/5 focus-visible:ring-2 focus-visible:ring-primary/20 font-medium transition-all"
+                                            className="h-10 rounded-lg bg-surface-container/30 border-none ring-1 ring-on-surface/5 focus-visible:ring-2 focus-visible:ring-primary/20 font-medium transition-all text-xs"
                                             placeholder="Purpose of this group..."
                                         />
                                     </div>
                                 </div>
-                                <DialogFooter className="pt-4">
-                                    <Button type="submit" disabled={creating} className="w-full h-12 rounded-xl font-bold text-sm shadow-md shadow-primary/10">
-                                        {creating ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Create Group'}
+                                <DialogFooter className="pt-2">
+                                    <Button type="submit" disabled={creating} className="w-full h-10 rounded-lg font-bold text-xs shadow-md shadow-primary/10">
+                                        {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Create Group'}
                                     </Button>
                                 </DialogFooter>
                             </form>
@@ -236,14 +243,14 @@ const Groups: React.FC = () => {
             />
 
             <GlassCard className="overflow-hidden border-none shadow-xl shadow-on-surface/5 bg-card">
-                <GlassCardHeader className="py-8 px-10">
-                    <div className="flex items-center gap-5">
-                        <div className="p-3.5 bg-primary/5 rounded-2xl">
-                            <UsersIcon className="w-6 h-6 text-primary" />
+                <GlassCardHeader className="py-2 px-4">
+                    <div className="flex items-center gap-4">
+                        <div className="p-2 bg-primary/5 rounded-lg">
+                            <UsersIcon className="w-4 h-4 text-primary" />
                         </div>
                         <div>
-                            <GlassCardTitle className="text-2xl font-bold tracking-tight text-on-surface">All Groups</GlassCardTitle>
-                            <p className="text-on-surface-variant/40 font-bold text-[12px] mt-1 tracking-tight">
+                            <GlassCardTitle className="text-base font-bold tracking-tight text-on-surface">All Groups</GlassCardTitle>
+                            <p className="text-on-surface-variant/40 font-bold text-[9px] mt-0.5 tracking-tight uppercase">
                                 {total} Total Groups
                             </p>
                         </div>
@@ -254,10 +261,10 @@ const Groups: React.FC = () => {
                         <GlassTable>
                             <GlassTableHeader>
                                 <GlassTableRow className="hover:bg-transparent border-b border-on-surface/5">
-                                    <GlassTableHead className="py-6 pl-10 font-bold text-[12px] tracking-tight text-on-surface-variant/40">Group Name</GlassTableHead>
-                                    <GlassTableHead className="font-bold text-[12px] tracking-tight text-on-surface-variant/40">Group ID</GlassTableHead>
-                                    <GlassTableHead className="font-bold text-[12px] tracking-tight text-on-surface-variant/40">Created On</GlassTableHead>
-                                    <GlassTableHead className="text-right font-bold text-[12px] tracking-tight text-on-surface-variant/40 pr-10">Actions</GlassTableHead>
+                                    <GlassTableHead className="py-2 pl-4 font-bold text-[8px] tracking-widest text-on-surface-variant/40 uppercase">Group Name</GlassTableHead>
+                                    <GlassTableHead className="py-2 font-bold text-[8px] tracking-widest text-on-surface-variant/40 uppercase">Group ID</GlassTableHead>
+                                    <GlassTableHead className="py-2 font-bold text-[8px] tracking-widest text-on-surface-variant/40 uppercase">Created On</GlassTableHead>
+                                    <GlassTableHead className="py-2 text-right font-bold text-[8px] tracking-widest text-on-surface-variant/40 pr-4 uppercase">Actions</GlassTableHead>
                                 </GlassTableRow>
                             </GlassTableHeader>
                             <TableBody>
@@ -270,90 +277,89 @@ const Groups: React.FC = () => {
                                 ) : (
                                     groups.map((group) => (
                                         <GlassTableRow key={group.id} className="hover:bg-surface-container/20 transition-all border-b border-on-surface/5 last:border-0 group">
-                                            <TableCell className="py-6 pl-10">
-                                                <div className="flex items-center gap-4">
-                                                    <span className="font-bold text-base tracking-tight text-on-surface group-hover:text-primary transition-colors">
+                                            <TableCell className="py-1.5 pl-4">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="font-bold text-xs tracking-tight text-on-surface group-hover:text-primary transition-colors">
                                                         {group.name}
                                                     </span>
                                                 </div>
                                             </TableCell>
-                                            <TableCell className="py-6">
-                                                <code className="bg-surface-container px-3 py-1.5 rounded-lg text-primary font-mono text-[10px] tracking-tight">
+                                            <TableCell className="py-1.5">
+                                                <code className="bg-surface-container px-2 py-0.5 rounded text-primary font-mono text-[9px] tracking-tight">
                                                     {group.id}
                                                 </code>
                                             </TableCell>
-                                            <TableCell className="py-6">
-                                                <span className="text-sm font-medium text-on-surface-variant/60 flex items-center gap-2">
+                                            <TableCell className="py-1.5">
+                                                <span className="text-[10px] font-medium text-on-surface-variant/60 flex items-center gap-2">
                                                     {group.created_at ? new Date(group.created_at).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : 'Verified'}
                                                 </span>
                                             </TableCell>
-                                            <TableCell className="py-6 text-right pr-10 space-x-2">
+                                            <TableCell className="py-1.5 text-right pr-4 space-x-1">
                                                 <Sheet onOpenChange={() => handleManageMembers(group)}>
                                                     <SheetTrigger asChild>
-                                                        <Button variant="ghost" className="h-10 rounded-xl px-5 font-bold text-[11px] tracking-tight text-primary hover:bg-primary/5 transition-all">
-                                                            <Users className="w-4 h-4 mr-2.5 opacity-60" /> Manage Members
+                                                        <Button variant="ghost" className="h-7 rounded-md px-2.5 font-bold text-[10px] tracking-tight text-primary hover:bg-primary/5 transition-all">
+                                                            <Users className="w-3.5 h-3.5 mr-1.5 opacity-60" /> Manage Members
                                                         </Button>
                                                     </SheetTrigger>
-                                                    <SheetContent className="sm:max-w-2xl p-0 border-none rounded-l-[40px] shadow-2xl shadow-on-surface/20 bg-card overflow-hidden">
-                                                        <div className="bg-primary p-12 text-white">
+                                                    <SheetContent className="sm:max-w-xl p-0 border-none rounded-l-[24px] shadow-2xl shadow-on-surface/20 bg-card overflow-hidden">
+                                                        <div className="bg-primary p-8 text-white">
                                                             <SheetHeader>
-                                                                <div className="flex items-center gap-8">
-                                                                    <div className="w-20 h-20 bg-card/20 rounded-3xl flex items-center justify-center backdrop-blur-md">
-                                                                        <Users className="w-9 h-9 text-white" />
+                                                                <div className="flex items-center gap-6">
+                                                                    <div className="w-14 h-14 bg-card/20 rounded-2xl flex items-center justify-center backdrop-blur-md">
+                                                                        <Users className="w-7 h-7 text-white" />
                                                                     </div>
                                                                     <div>
-                                                                        <SheetTitle className="text-4xl font-bold tracking-tight text-white">
+                                                                        <SheetTitle className="text-2xl font-bold tracking-tight text-white">
                                                                             {group.name}
                                                                         </SheetTitle>
-                                                                        <SheetDescription className="text-on-inverse/50 font-bold text-[12px] mt-4 tracking-tight">
+                                                                        <SheetDescription className="text-on-inverse/50 font-bold text-[10px] mt-2 tracking-tight uppercase">
                                                                             Manage the members of this group.
                                                                         </SheetDescription>
                                                                     </div>
                                                                 </div>
                                                             </SheetHeader>
                                                         </div>
-
-                                                        <ScrollArea className="h-[calc(100vh-180px)]">
-                                                            <div className="p-12 space-y-16">
+                                                        <ScrollArea className="h-[calc(100vh-140px)]">
+                                                            <div className="p-8 space-y-10">
                                                                 {/* Current Members Section */}
                                                                 <section>
-                                                                    <div className="flex items-center justify-between mb-8">
-                                                                        <h3 className="text-[12px] font-bold tracking-tight text-on-surface-variant/40 flex items-center gap-3">
-                                                                            <ShieldCheck className="w-4.5 h-4.5 text-success" />
+                                                                    <div className="flex items-center justify-between mb-4">
+                                                                        <h3 className="text-[10px] font-bold tracking-tight text-on-surface-variant/40 flex items-center gap-2 uppercase">
+                                                                            <ShieldCheck className="w-3.5 h-3.5 text-success" />
                                                                             Current Members
                                                                         </h3>
-                                                                        <Badge className="bg-primary/5 text-primary border-none rounded-xl h-8 px-4 text-xs font-bold shadow-none">
+                                                                        <Badge className="bg-primary/5 text-primary border-none rounded-lg h-6 px-3 text-[10px] font-bold shadow-none">
                                                                             {members.length} Members
                                                                         </Badge>
                                                                     </div>
 
-                                                                    <div className="space-y-4">
+                                                                    <div className="space-y-2">
                                                                         {loadingMembers ? (
-                                                                            <div className="py-20 flex items-center justify-center">
-                                                                                <Loader2 className="w-10 h-10 animate-spin text-primary/30" />
+                                                                            <div className="py-12 flex items-center justify-center">
+                                                                                <Loader2 className="w-8 h-8 animate-spin text-primary/30" />
                                                                             </div>
                                                                         ) : members.length === 0 ? (
-                                                                            <div className="py-20 text-center border-2 border-dashed rounded-[32px] bg-surface-container/10">
-                                                                                <ShieldAlert className="w-10 h-10 mx-auto text-on-surface-variant/10 mb-4" />
-                                                                                <p className="text-sm font-medium text-on-surface-variant/40">No users are in this group.</p>
+                                                                            <div className="py-12 text-center border-2 border-dashed rounded-2xl bg-surface-container/10">
+                                                                                <ShieldAlert className="w-8 h-8 mx-auto text-on-surface-variant/10 mb-2" />
+                                                                                <p className="text-xs font-medium text-on-surface-variant/40">No users are in this group.</p>
                                                                             </div>
                                                                         ) : (
-                                                                            <div className="grid gap-3">
+                                                                            <div className="grid gap-2">
                                                                                 {members.map(member => (
-                                                                                    <div key={member.id} className="flex items-center justify-between p-5 bg-card border border-on-surface/5 rounded-2xl hover:border-primary/20 hover:shadow-lg hover:shadow-primary/5 transition-all group/member">
-                                                                                        <div className="flex items-center gap-5">
+                                                                                    <div key={member.id} className="flex items-center justify-between p-3 bg-card border border-on-surface/5 rounded-xl hover:border-primary/20 hover:shadow-lg hover:shadow-primary/5 transition-all group/member">
+                                                                                        <div className="flex items-center gap-3">
                                                                                             {(() => {
                                                                                                 const email = member.email || (member.emails && member.emails.length > 0 ? member.emails[0].value : '');
                                                                                                 return (
                                                                                                     <>
-                                                                                                        <Avatar className="h-11 w-11 rounded-2xl ring-1 ring-on-surface/5 overflow-hidden">
+                                                                                                        <Avatar className="h-8 w-8 rounded-lg ring-1 ring-on-surface/5 overflow-hidden">
                                                                                                             <AvatarImage src={`https://avatar.vercel.sh/${email}`} className="contrast-[1.1]" />
-                                                                                                            <AvatarFallback className="text-[11px] font-bold uppercase bg-primary/5 text-primary">{email ? email.substring(0, 2) : '??'}</AvatarFallback>
+                                                                                                            <AvatarFallback className="text-[9px] font-bold uppercase bg-primary/5 text-primary">{email ? email.substring(0, 2) : '??'}</AvatarFallback>
                                                                                                         </Avatar>
                                                                                                         <div>
-                                                                                                            <p className="text-sm font-bold text-on-surface">{email || 'Unknown User'}</p>
-                                                                                                            <p className="text-[10px] font-bold text-on-surface-variant/20 mt-1 flex items-center gap-1.5 tracking-tight">
-                                                                                                                <div className={`h-1.5 w-1.5 rounded-full ${member.status === 'active' ? 'bg-success' : 'bg-destructive/100'}`} />
+                                                                                                            <p className="text-xs font-bold text-on-surface">{email || 'Unknown User'}</p>
+                                                                                                            <p className="text-[9px] font-bold text-on-surface-variant/20 mt-0.5 flex items-center gap-1 tracking-tight">
+                                                                                                                <div className={`h-1 w-1 rounded-full ${member.status === 'active' ? 'bg-success' : 'bg-destructive/100'}`} />
                                                                                                                 {member.status === 'active' ? 'Active' : 'Offline'}
                                                                                                             </p>
                                                                                                         </div>
@@ -364,10 +370,10 @@ const Groups: React.FC = () => {
                                                                                         <Button
                                                                                             variant="ghost"
                                                                                             size="icon"
-                                                                                            className="h-10 w-10 rounded-xl hover:bg-destructive/10 hover:text-destructive transition-all opacity-0 group-hover/member:opacity-100"
+                                                                                            className="h-8 w-8 rounded-lg hover:bg-destructive/10 hover:text-destructive transition-all opacity-0 group-hover/member:opacity-100"
                                                                                             onClick={() => handleRemoveUser(member.id)}
                                                                                         >
-                                                                                            <Trash2 className="w-4.5 h-4.5" />
+                                                                                            <Trash2 className="w-4 h-4" />
                                                                                         </Button>
                                                                                     </div>
                                                                                 ))}
@@ -377,41 +383,41 @@ const Groups: React.FC = () => {
                                                                 </section>
 
                                                                 {/* Assign New Members Section */}
-                                                                <section className="space-y-8">
-                                                                    <div className="flex flex-col gap-6">
-                                                                        <h3 className="text-[12px] font-bold tracking-tight text-on-surface-variant/40 flex items-center gap-3">
-                                                                            <UserPlus className="w-4.5 h-4.5 text-primary" />
+                                                                <section className="space-y-6">
+                                                                    <div className="flex flex-col gap-4">
+                                                                        <h3 className="text-[10px] font-bold tracking-tight text-on-surface-variant/40 flex items-center gap-2 uppercase">
+                                                                            <UserPlus className="w-3.5 h-3.5 text-primary" />
                                                                             Add More Members
                                                                         </h3>
                                                                         <div className="relative group">
-                                                                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-on-surface-variant/40 group-focus-within:text-primary transition-colors" />
+                                                                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-on-surface-variant/40 group-focus-within:text-primary transition-colors" />
                                                                             <Input
                                                                                 placeholder="Search for users to add..."
-                                                                                className="h-12 border-none rounded-2xl font-medium text-sm pl-11 bg-surface-container/30 ring-1 ring-on-surface/5 focus-visible:ring-2 focus-visible:ring-primary/20 transition-all"
+                                                                                className="h-10 border-none rounded-xl font-medium text-xs pl-10 bg-surface-container/30 ring-1 ring-on-surface/5 focus-visible:ring-2 focus-visible:ring-primary/20 transition-all"
                                                                                 value={searchUser}
                                                                                 onChange={(e) => setSearchUser(e.target.value)}
                                                                             />
                                                                         </div>
                                                                     </div>
 
-                                                                    <div className="grid gap-3 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+                                                                    <div className="grid gap-2 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
                                                                         {filteredAvailableUsers.length === 0 ? (
-                                                                            <div className="py-12 text-center bg-surface-container/10 rounded-[32px] border-2 border-dashed">
-                                                                                <p className="text-[11px] font-bold text-on-surface-variant/20 tracking-tight">No users found matching your search.</p>
+                                                                            <div className="py-8 text-center bg-surface-container/10 rounded-2xl border-2 border-dashed">
+                                                                                <p className="text-[10px] font-bold text-on-surface-variant/20 tracking-tight uppercase">No users found.</p>
                                                                             </div>
                                                                         ) : (
                                                                             filteredAvailableUsers.map(user => (
-                                                                                <div key={user.id} className="flex items-center justify-between p-4 bg-card border border-on-surface/5 rounded-2xl hover:border-primary/20 hover:shadow-lg hover:shadow-primary/5 transition-all group/add">
-                                                                                    <div className="flex items-center gap-4">
+                                                                                <div key={user.id} className="flex items-center justify-between p-2.5 bg-card border border-on-surface/5 rounded-xl hover:border-primary/20 hover:shadow-lg hover:shadow-primary/5 transition-all group/add">
+                                                                                    <div className="flex items-center gap-3">
                                                                                         {(() => {
                                                                                             const email = user.email || (user.emails && user.emails.length > 0 ? user.emails[0].value : '');
                                                                                             return (
                                                                                                 <>
-                                                                                                    <Avatar className="h-9 w-9 rounded-xl ring-1 ring-on-surface/5 overflow-hidden">
+                                                                                                    <Avatar className="h-7 w-7 rounded-lg ring-1 ring-on-surface/5 overflow-hidden">
                                                                                                         <AvatarImage src={`https://avatar.vercel.sh/${email}`} className="contrast-[1.1]" />
-                                                                                                        <AvatarFallback className="text-[10px] font-bold uppercase bg-primary/5 text-primary">{email ? email.substring(0, 2) : '??'}</AvatarFallback>
+                                                                                                        <AvatarFallback className="text-[9px] font-bold uppercase bg-primary/5 text-primary">{email ? email.substring(0, 2) : '??'}</AvatarFallback>
                                                                                                     </Avatar>
-                                                                                                    <p className="text-xs font-bold text-on-surface">{email || 'Anonymous'}</p>
+                                                                                                    <p className="text-[11px] font-bold text-on-surface">{email || 'Anonymous'}</p>
                                                                                                 </>
                                                                                             );
                                                                                         })()}
@@ -419,10 +425,10 @@ const Groups: React.FC = () => {
                                                                                     <Button
                                                                                         size="icon"
                                                                                         variant="ghost"
-                                                                                        className="h-9 w-9 rounded-xl text-primary hover:bg-primary hover:text-primary-foreground transition-all"
+                                                                                        className="h-7 w-7 rounded-lg text-primary hover:bg-primary hover:text-primary-foreground transition-all"
                                                                                         onClick={() => handleAddUser(user)}
                                                                                     >
-                                                                                        <ArrowRight className="w-4 h-4" />
+                                                                                        <ArrowRight className="w-3.5 h-3.5" />
                                                                                     </Button>
                                                                                 </div>
                                                                             ))
@@ -436,10 +442,10 @@ const Groups: React.FC = () => {
                                                 <Button
                                                     variant="ghost"
                                                     size="icon"
-                                                    className="h-9 w-9 rounded-xl hover:bg-destructive/10 hover:text-destructive transition-all opacity-40 hover:opacity-100"
+                                                    className="h-7 w-7 rounded-md hover:bg-destructive/10 hover:text-destructive transition-all opacity-40 hover:opacity-100"
                                                     onClick={() => handleDeleteGroup(group.id)}
                                                 >
-                                                    <Trash2 className="w-4.5 h-4.5" />
+                                                    <Trash2 className="w-3.5 h-3.5" />
                                                 </Button>
                                             </TableCell>
                                         </GlassTableRow>

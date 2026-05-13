@@ -3,6 +3,7 @@ package auth
 import (
 	"encoding/json"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
@@ -139,4 +140,73 @@ func (h *HTTPHandler) updateUserProfile(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "profile updated successfully"})
+}
+
+// exportUserData generates a data archive for the user to comply with DPDP data portability rights.
+func (h *HTTPHandler) exportUserData(c *gin.Context) {
+	tenantID, err := middleware.TenantIDFromContext(c.Request.Context())
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "tenant context required"})
+		return
+	}
+	userID := c.GetString("user_id")
+	if userID == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "user context required"})
+		return
+	}
+
+	// Fetch user profile
+	profile, err := h.svc.GetUserByID(c.Request.Context(), tenantID, userID)
+	if err != nil {
+		h.logger.Error("Failed to fetch user profile for export", zap.String("user_id", userID), zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate export"})
+		return
+	}
+
+	// Fetch assigned apps
+	apps, err := h.appStore.ListAssignedApps(c.Request.Context(), tenantID, userID)
+	if err != nil {
+		h.logger.Warn("Failed to fetch assigned apps for export", zap.String("user_id", userID), zap.Error(err))
+		apps = nil
+	}
+
+	exportData := gin.H{
+		"profile":    profile,
+		"apps":       apps,
+		"exported_at": time.Now().Format(time.RFC3339),
+	}
+
+	c.Header("Content-Disposition", "attachment; filename=\"wardseal_privacy_export.json\"")
+	c.Header("Content-Type", "application/json")
+	c.JSON(http.StatusOK, exportData)
+}
+
+// deleteUserAccount initiates a soft deletion of the user account for DPDP account erasure compliance.
+func (h *HTTPHandler) deleteUserAccount(c *gin.Context) {
+	tenantID, err := middleware.TenantIDFromContext(c.Request.Context())
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "tenant context required"})
+		return
+	}
+	userID := c.GetString("user_id")
+	if userID == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "user context required"})
+		return
+	}
+
+	// Soft delete: mark status as 'pending_deletion'
+	updates := map[string]interface{}{
+		"status": "pending_deletion",
+	}
+
+	if err := h.svc.UpdateUserSelf(c.Request.Context(), tenantID, userID, updates); err != nil {
+		h.logger.Error("Failed to initiate account erasure", zap.String("user_id", userID), zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to initiate account erasure"})
+		return
+	}
+
+	// Clear session
+	h.clearAuthCookies(c)
+
+	c.JSON(http.StatusOK, gin.H{"message": "account erasure initiated successfully"})
 }

@@ -6,7 +6,7 @@ WORKDIR /app
 # Build arguments for VITE environment variables
 ARG VITE_ENVIRONMENT=production
 ARG VITE_SITE_BASE_URL=https://wardseal.com
-ARG VITE_CONSOLE_BASE_URL=https://manage.wardseal.com
+ARG VITE_CONSOLE_BASE_URL=https://app.wardseal.com
 ARG VITE_SUPPORT_EMAIL=support@wardseal.com
 
 # Set environment variables for the build process

@@ -5,13 +5,17 @@ Handle deployment, infra, CI/CD.
 
 ## Responsibilities
 - Dockerization
-- Kubernetes / simple deploy
+- Kubernetes / cloud provider deployments (AWS, GCP, Azure)
 - CI/CD pipelines
 - Observability (logs, metrics)
 
 ## Rules
 - Keep infra minimal unless scaling needed
 - Prefer managed services
+- **SECURITY FIRST**: When deploying secrets, use Vault or equivalent. Do NOT use environment variables for long-lived secrets.
+- **ORGANIZATIONAL ISOLATION**: For multi-tenant setups, ensure tenant data is isolated in the database (e.g., tenant_id column) and not mixed.
+- **BACKUP & RECOVERY**: Plan for daily database backups and have a rollback procedure.
+
 
 ## Output Format
 ```json

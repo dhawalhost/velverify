@@ -109,18 +109,18 @@ const Roles: React.FC = () => {
     if (loading) return <div className="h-[400px] flex items-center justify-center"><Loader2 className="h-10 w-10 animate-spin text-primary opacity-20" /></div>;
 
     return (
-        <div className="space-y-10 animate-in fade-in duration-700">
+        <div className="space-y-4 animate-in fade-in duration-700">
             <PageHeader
-                icon={<Shield className="w-8 h-8 text-primary" />}
+                icon={<Shield className="w-7 h-7 text-primary" />}
                 title="Roles & Permissions"
                 description="Manage system roles and the permissions assigned to them. Control who can access specific resources."
                 actions={
-                    <div className="flex bg-surface-container/50 p-1 rounded-2xl ring-1 ring-on-surface/5">
+                    <div className="flex bg-surface-container/50 p-0.5 rounded-xl ring-1 ring-on-surface/5">
                         <Button
                             variant="ghost"
                             size="sm"
                             onClick={() => setActiveTab('roles')}
-                            className={`rounded-xl font-bold tracking-tight text-[11px] h-10 px-6 transition-all ${activeTab === 'roles' ? 'bg-card text-primary shadow-sm' : 'text-on-surface-variant/40 hover:text-on-surface'}`}
+                            className={`rounded-lg font-bold tracking-tight text-[10px] h-8 px-4 transition-all ${activeTab === 'roles' ? 'bg-card text-primary shadow-sm' : 'text-on-surface-variant/40 hover:text-on-surface'}`}
                         >
                             Roles List
                         </Button>
@@ -128,7 +128,7 @@ const Roles: React.FC = () => {
                             variant="ghost"
                             size="sm"
                             onClick={() => setActiveTab('permissions')}
-                            className={`rounded-xl font-bold tracking-tight text-[11px] h-10 px-6 transition-all ${activeTab === 'permissions' ? 'bg-card text-primary shadow-sm' : 'text-on-surface-variant/40 hover:text-on-surface'}`}
+                            className={`rounded-lg font-bold tracking-tight text-[10px] h-8 px-4 transition-all ${activeTab === 'permissions' ? 'bg-card text-primary shadow-sm' : 'text-on-surface-variant/40 hover:text-on-surface'}`}
                         >
                             System Permissions
                         </Button>
@@ -137,81 +137,81 @@ const Roles: React.FC = () => {
             />
 
             {activeTab === 'roles' ? (
-                <div className="grid grid-cols-1 md:grid-cols-12 gap-10 items-start">
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
                     {/* LEFT: ROLES MANAGEMENT */}
-                    <div className="md:col-span-4 space-y-10">
-                        <GlassCard className="border-none shadow-xl shadow-on-surface/5 bg-card overflow-hidden rounded-[24px]">
-                            <GlassCardHeader className="bg-primary p-8 text-white">
-                                <div className="flex items-center gap-4">
-                                    <div className="p-2.5 bg-card/20 rounded-xl backdrop-blur-md">
-                                        <Plus className="w-5 h-5 text-white" />
+                    <div className="md:col-span-4 space-y-4">
+                        <GlassCard className="border-none shadow-lg shadow-on-surface/5 bg-card overflow-hidden rounded-xl">
+                            <GlassCardHeader className="bg-primary p-3 text-white">
+                                <div className="flex items-center gap-2">
+                                    <div className="p-1.5 bg-card/20 rounded-md backdrop-blur-md">
+                                        <Plus className="w-3.5 h-3.5 text-white" />
                                     </div>
-                                    <GlassCardTitle className="text-xl font-bold tracking-tight">Create New Role</GlassCardTitle>
+                                    <GlassCardTitle className="text-base font-bold tracking-tight">Create New Role</GlassCardTitle>
                                 </div>
                             </GlassCardHeader>
-                            <GlassCardContent className="p-8">
-                                <form onSubmit={handleCreateRole} className="space-y-8">
-                                    <div className="space-y-2.5">
-                                        <Label className="text-[12px] font-bold tracking-tight text-on-surface-variant/40 ml-1">Role Name</Label>
+                            <GlassCardContent className="p-4">
+                                <form onSubmit={handleCreateRole} className="space-y-4">
+                                    <div className="space-y-2">
+                                        <Label className="text-[10px] font-bold tracking-tight text-on-surface-variant/40 ml-1 uppercase">Role Name</Label>
                                         <Input
                                             placeholder="e.g. CORE_OPERATOR"
                                             value={newRole.name}
                                             onChange={(e) => setNewRole({ ...newRole, name: e.target.value })}
-                                            className="h-12 border-none rounded-xl bg-surface-container/30 ring-1 ring-on-surface/5 focus-visible:ring-2 focus-visible:ring-primary/20 font-medium transition-all"
+                                            className="h-10 border-none rounded-lg bg-surface-container/30 ring-1 ring-on-surface/5 focus-visible:ring-2 focus-visible:ring-primary/20 font-medium transition-all text-xs"
                                             required
                                         />
                                     </div>
-                                     <div className="space-y-2.5">
-                                         <Label className="text-[12px] font-bold tracking-tight text-on-surface-variant/40 ml-1">Description</Label>
+                                     <div className="space-y-2">
+                                         <Label className="text-[10px] font-bold tracking-tight text-on-surface-variant/40 ml-1 uppercase">Description</Label>
                                         <Input
                                             placeholder="What this role allows..."
                                             value={newRole.description}
                                             onChange={(e) => setNewRole({ ...newRole, description: e.target.value })}
-                                            className="h-12 border-none rounded-xl bg-surface-container/30 ring-1 ring-on-surface/5 focus-visible:ring-2 focus-visible:ring-primary/20 font-medium transition-all"
+                                            className="h-10 border-none rounded-lg bg-surface-container/30 ring-1 ring-on-surface/5 focus-visible:ring-2 focus-visible:ring-primary/20 font-medium transition-all text-xs"
                                         />
                                     </div>
-                                     <Button type="submit" className="w-full h-12 rounded-xl font-bold text-sm shadow-md shadow-primary/10">
+                                     <Button type="submit" className="w-full h-10 rounded-lg font-bold text-xs shadow-md shadow-primary/10">
                                          Create Role
                                      </Button>
                                 </form>
                             </GlassCardContent>
                         </GlassCard>
 
-                        <GlassCard className="border-none shadow-xl shadow-on-surface/5 bg-card overflow-hidden flex flex-col h-[600px] rounded-[24px]">
-                            <GlassCardHeader className="py-8 px-8 border-b border-on-surface/5">
-                                 <GlassCardTitle className="text-lg font-bold tracking-tight text-on-surface">Active Roles</GlassCardTitle>
-                                 <p className="text-[12px] font-bold text-on-surface-variant/40 mt-1 tracking-tight">{roles.length} Roles Found</p>
+                        <GlassCard className="border-none shadow-lg shadow-on-surface/5 bg-card overflow-hidden flex flex-col h-[400px] rounded-xl">
+                            <GlassCardHeader className="py-2 px-4 border-b border-on-surface/5">
+                                 <GlassCardTitle className="text-base font-bold tracking-tight text-on-surface">Active Roles</GlassCardTitle>
+                                 <p className="text-[10px] font-bold text-on-surface-variant/40 mt-0.5 tracking-tight uppercase">{roles.length} Roles Found</p>
                             </GlassCardHeader>
-                            <div className="flex-1 overflow-y-auto p-4 space-y-2 custom-scrollbar">
+                            <div className="flex-1 overflow-y-auto p-2 space-y-1.5 custom-scrollbar">
                                 {roles.map(role => (
                                     <div
                                         key={role.id}
                                         onClick={() => setSelectedRole(role)}
                                         className={`
-                                            group flex items-center justify-between p-5 cursor-pointer transition-all rounded-2xl
+                                            group flex items-center justify-between p-2 cursor-pointer transition-all rounded-lg
                                             ${selectedRole?.id === role.id
                                                 ? 'bg-primary/5 ring-1 ring-primary/20'
                                                 : 'bg-card hover:bg-surface-container/30 ring-1 ring-on-surface/5 hover:ring-on-surface/10'}
                                         `}
                                     >
                                         <div className="min-w-0 pr-4">
-                                            <div className={`font-bold text-sm tracking-tight truncate flex items-center gap-3 transition-colors ${selectedRole?.id === role.id ? 'text-primary' : 'text-on-surface'}`}>
-                                                <Fingerprint className={`h-4 w-4 opacity-40 ${selectedRole?.id === role.id ? 'text-primary' : ''}`} />
+                                            <div className={`font-bold text-[11px] tracking-tight truncate flex items-center gap-2 transition-colors ${selectedRole?.id === role.id ? 'text-primary' : 'text-on-surface'}`}>
+                                                <Fingerprint className={`h-3 w-3 opacity-40 ${selectedRole?.id === role.id ? 'text-primary' : ''}`} />
                                                 {role.name}
                                             </div>
-                                            <div className="text-[10px] font-medium text-on-surface-variant/40 truncate mt-1.5 tracking-tight">
+                                            <div className="text-[9px] font-medium text-on-surface-variant/40 truncate mt-1 tracking-tight">
                                                 {role.description || 'No description provided'}
                                             </div>
                                         </div>
                                         <div className="flex items-center gap-2">
-                                            {selectedRole?.id === role.id && <ChevronRight className="h-5 w-5 text-primary/40 animate-in fade-in slide-in-from-left-2" />}
+                                            {selectedRole?.id === role.id && <ChevronRight className="h-4 w-4 text-primary/40 animate-in fade-in slide-in-from-left-2" />}
                                             <Button
                                                 size="icon"
                                                 variant="ghost"
-                                                className={`h-9 w-9 rounded-xl hover:bg-destructive/10 hover:text-destructive transition-all ${selectedRole?.id === role.id ? 'opacity-20' : 'opacity-0 group-hover:opacity-40'}`}
+                                                className={`h-7 w-7 rounded-md hover:bg-destructive/10 hover:text-destructive transition-all ${selectedRole?.id === role.id ? 'opacity-20' : 'opacity-0 group-hover:opacity-40'}`}
                                                 onClick={(e) => handleDeleteRole(role.id, e)}
                                             >
-                                                <Trash2 className="h-4 w-4" />
+                                                <Trash2 className="h-3 w-3" />
                                             </Button>
                                         </div>
                                     </div>
@@ -223,51 +223,51 @@ const Roles: React.FC = () => {
                     {/* RIGHT: BINDING CONTROLS */}
                     <div className="md:col-span-8">
                         {selectedRole ? (
-                            <GlassCard className="border-none shadow-2xl shadow-on-surface/5 bg-card overflow-hidden min-h-[850px] flex flex-col rounded-[32px]">
-                                <GlassCardHeader className="bg-surface-container p-12 ">
+                            <GlassCard className="border-none shadow-2xl shadow-on-surface/5 bg-card overflow-hidden min-h-[600px] flex flex-col rounded-xl">
+                                <GlassCardHeader className="bg-surface-container p-4 ">
                                     <div className="flex items-center justify-between">
-                                        <div className="space-y-5">
-                                            <div className="flex items-center gap-5">
-                                                <div className="p-3.5 bg-primary/10 rounded-2xl">
-                                                    <Shield className="w-8 h-8 text-primary" />
+                                        <div className="space-y-3">
+                                            <div className="flex items-center gap-3">
+                                                <div className="p-2 bg-primary/10 rounded-lg">
+                                                    <Shield className="w-5 h-5 text-primary" />
                                                 </div>
-                                                <h2 className="text-4xl font-bold tracking-tight text-on-surface">{selectedRole.name}</h2>
+                                                <h2 className="text-xl font-bold tracking-tight text-on-surface">{selectedRole.name}</h2>
                                             </div>
-                                            <p className="font-medium text-sm text-on-surface-variant/60 max-w-xl">{selectedRole.description || 'Details for this role.'}</p>
+                                            <p className="font-medium text-xs text-on-surface-variant/60 max-w-xl">{selectedRole.description || 'Details for this role.'}</p>
                                         </div>
                                     </div>
                                 </GlassCardHeader>
-                                <GlassCardContent className="p-12 space-y-16 flex-1 overflow-y-auto bg-card">
+                                <GlassCardContent className="p-4 space-y-6 flex-1 overflow-y-auto bg-card">
                                     {/* BOUND POLICIES */}
-                                    <div className="space-y-10">
-                                        <div className="flex items-center justify-between border-b border-on-surface/5 pb-6">
-                                             <h3 className="text-[12px] font-bold tracking-tight text-on-surface-variant/40 flex items-center gap-3">
-                                                 <ShieldCheck className="w-4.5 h-4.5 text-success" />
+                                    <div className="space-y-4">
+                                        <div className="flex items-center justify-between border-b border-on-surface/5 pb-3">
+                                             <h3 className="text-[10px] font-bold tracking-tight text-on-surface-variant/40 flex items-center gap-2 uppercase">
+                                                 <ShieldCheck className="w-3.5 h-3.5 text-success" />
                                                  Assigned Permissions
                                              </h3>
-                                             <Badge className="bg-success-subtle text-success border-none rounded-xl h-8 px-4 text-xs font-bold tracking-tight">
+                                             <Badge className="bg-success-subtle text-success border-none rounded-lg h-5 px-2.5 text-[9px] font-bold tracking-tight uppercase">
                                                  {rolePermissions.length} Permissions
                                              </Badge>
                                         </div>
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                             {rolePermissions.length === 0 ? (
-                                                <div className="col-span-full py-20 border-2 border-dashed rounded-[32px] bg-surface-container/10 flex flex-col items-center justify-center">
-                                                    <Lock className="w-10 h-10 mb-4 text-on-surface-variant/10" />
-                                                    <span className="text-sm font-medium text-on-surface-variant/40">No permissions assigned to this role.</span>
+                                                <div className="col-span-full py-12 border-2 border-dashed rounded-2xl bg-surface-container/10 flex flex-col items-center justify-center">
+                                                    <Lock className="w-8 h-8 mb-2 text-on-surface-variant/10" />
+                                                    <span className="text-xs font-medium text-on-surface-variant/40">No permissions assigned to this role.</span>
                                                 </div>
                                             ) : (
                                                 rolePermissions.map(p => (
-                                                    <div key={p.id} className="p-6 bg-card ring-1 ring-on-surface/5 rounded-2xl flex items-center justify-between group hover:ring-emerald-500/20 hover:bg-success-subtle/10 transition-all shadow-sm hover:shadow-lg hover:shadow-emerald-500/5">
+                                                    <div key={p.id} className="p-2.5 bg-card ring-1 ring-on-surface/5 rounded-lg flex items-center justify-between group hover:ring-emerald-500/20 hover:bg-success-subtle/10 transition-all shadow-sm">
                                                          <div className="flex flex-col">
-                                                             <span className="text-[10px] font-bold tracking-tight text-on-surface-variant/40 mb-2 italic">Resource</span>
-                                                            <div className="flex items-center gap-3">
-                                                                <span className="font-mono text-xs font-bold text-on-surface">{p.resource}</span>
+                                                             <span className="text-[9px] font-bold tracking-tight text-on-surface-variant/40 mb-1 italic uppercase">Resource</span>
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="font-mono text-[10px] font-bold text-on-surface">{p.resource}</span>
                                                                 <span className="text-on-surface-variant/10">/</span>
-                                                                <Badge className="bg-primary/5 text-primary border-none rounded-lg font-bold text-[10px] tracking-tight px-2.5 py-1">{p.action}</Badge>
+                                                                <Badge className="bg-primary/5 text-primary border-none rounded-md font-bold text-[9px] tracking-tight px-2 py-0.5 uppercase">{p.action}</Badge>
                                                             </div>
                                                         </div>
-                                                        <div className="w-10 h-10 bg-success-subtle rounded-xl flex items-center justify-center">
-                                                            <ShieldCheck className="w-4.5 h-4.5 text-success" />
+                                                        <div className="w-7 h-7 bg-success-subtle rounded-md flex items-center justify-center">
+                                                            <ShieldCheck className="w-3.5 h-3.5 text-success" />
                                                         </div>
                                                     </div>
                                                 ))
@@ -276,29 +276,29 @@ const Roles: React.FC = () => {
                                     </div>
 
                                     {/* AVAILABLE POLICIES */}
-                                    <div className="space-y-10">
-                                        <div className="flex items-center justify-between border-b border-on-surface/5 pb-6">
-                                             <h3 className="text-[12px] font-bold tracking-tight text-on-surface-variant/40 flex items-center gap-3">
-                                                 <Command className="w-4.5 h-4.5 text-primary/40" />
+                                    <div className="space-y-4">
+                                        <div className="flex items-center justify-between border-b border-on-surface/5 pb-3">
+                                             <h3 className="text-[10px] font-bold tracking-tight text-on-surface-variant/40 flex items-center gap-2 uppercase">
+                                                 <Command className="w-3.5 h-3.5 text-primary/40" />
                                                  Available Permissions
                                              </h3>
                                         </div>
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[500px] overflow-y-auto pr-4 custom-scrollbar">
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-[400px] overflow-y-auto pr-3 custom-scrollbar">
                                             {permissions
                                                 .filter(p => !rolePermissions.find(rp => rp.id === p.id))
                                                 .map(p => (
-                                                    <div key={p.id} className="p-6 bg-card ring-1 ring-on-surface/5 rounded-2xl group hover:ring-primary/20 hover:bg-primary/5 transition-all cursor-pointer shadow-sm hover:shadow-lg hover:shadow-primary/5" onClick={() => handleAssignPermission(p.id)}>
+                                                    <div key={p.id} className="p-4 bg-card ring-1 ring-on-surface/5 rounded-xl group hover:ring-primary/20 hover:bg-primary/5 transition-all cursor-pointer shadow-sm" onClick={() => handleAssignPermission(p.id)}>
                                                         <div className="flex items-center justify-between">
-                                                            <div className="flex flex-col min-w-0 pr-4">
-                                                                <div className="flex items-center gap-3 mb-2">
-                                                                    <span className="font-mono text-[11px] font-bold text-on-surface">{p.resource}</span>
+                                                            <div className="flex flex-col min-w-0 pr-3">
+                                                                <div className="flex items-center gap-2 mb-1.5">
+                                                                    <span className="font-mono text-[10px] font-bold text-on-surface">{p.resource}</span>
                                                                     <span className="text-on-surface-variant/10">:</span>
-                                                                    <span className="font-bold text-[11px] text-primary">{p.action}</span>
+                                                                    <span className="font-bold text-[10px] text-primary">{p.action}</span>
                                                                 </div>
-                                                                <span className="text-[10px] font-medium text-on-surface-variant/40 tracking-tight truncate">{p.description || 'No verifiable description provided'}</span>
+                                                                <span className="text-[9px] font-medium text-on-surface-variant/40 tracking-tight truncate">{p.description || 'No verifiable description provided'}</span>
                                                             </div>
-                                                            <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-surface-container/50 group-hover:bg-primary group-hover:text-primary-foreground flex items-center justify-center transition-all">
-                                                                <Plus className="h-4.5 w-4.5" />
+                                                            <div className="flex-shrink-0 w-7 h-7 rounded-md bg-surface-container/50 group-hover:bg-primary group-hover:text-primary-foreground flex items-center justify-center transition-all">
+                                                                <Plus className="h-3 w-3" />
                                                             </div>
                                                         </div>
                                                     </div>
@@ -310,13 +310,13 @@ const Roles: React.FC = () => {
                                 </GlassCardContent>
                             </GlassCard>
                         ) : (
-                            <div className="h-full flex flex-col items-center justify-center border-2 border-dashed rounded-[40px] border-on-surface/5 bg-surface-container/10 min-h-[850px] animate-in fade-in duration-1000">
-                                <div className="p-16 bg-card rounded-[32px] shadow-2xl shadow-on-surface/5 flex flex-col items-center text-center max-w-lg mx-auto">
-                                    <div className="w-24 h-24 bg-primary/5 rounded-[32px] flex items-center justify-center mb-10">
-                                        <Shield className="h-12 w-12 text-primary/20 animate-pulse" />
+                            <div className="h-full flex flex-col items-center justify-center border-2 border-dashed rounded-[24px] border-on-surface/5 bg-surface-container/10 min-h-[700px] animate-in fade-in duration-1000">
+                                <div className="p-10 bg-card rounded-2xl shadow-xl shadow-on-surface/5 flex flex-col items-center text-center max-w-sm mx-auto">
+                                    <div className="w-16 h-16 bg-primary/5 rounded-2xl flex items-center justify-center mb-6">
+                                        <Shield className="h-8 w-8 text-primary/20 animate-pulse" />
                                     </div>
-                                    <h3 className="text-2xl font-bold tracking-tight text-on-surface mb-4">No Role Selected</h3>
-                                    <p className="text-sm font-medium text-on-surface-variant/40 leading-relaxed max-w-xs">Choose a role from the list on the left to view and manage its permissions.</p>
+                                    <h3 className="text-xl font-bold tracking-tight text-on-surface mb-2">No Role Selected</h3>
+                                    <p className="text-xs font-medium text-on-surface-variant/40 leading-relaxed max-w-xs">Choose a role from the list on the left to view and manage its permissions.</p>
                                 </div>
                             </div>
                         )}
@@ -324,49 +324,49 @@ const Roles: React.FC = () => {
                 </div>
             ) : (
                 /* PERMISSIONS REGISTRY */
-                <div className="grid grid-cols-1 md:grid-cols-12 gap-10 items-start">
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
                     <div className="md:col-span-4">
-                        <GlassCard className="border-none shadow-xl shadow-on-surface/5 bg-card overflow-hidden rounded-[24px]">
-                            <GlassCardHeader className="bg-primary p-12 text-white">
-                                <div className="flex items-center gap-5">
-                                    <div className="p-3 bg-card/20 rounded-2xl backdrop-blur-md">
-                                        <Plus className="w-6 h-6 text-white" />
+                        <GlassCard className="border-none shadow-lg shadow-on-surface/5 bg-card overflow-hidden rounded-xl">
+                            <GlassCardHeader className="bg-primary p-4 text-white">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 bg-card/20 rounded-lg backdrop-blur-md">
+                                        <Plus className="w-4 h-4 text-white" />
                                     </div>
-                                     <GlassCardTitle className="text-2xl font-bold tracking-tight">Add Permission</GlassCardTitle>
+                                     <GlassCardTitle className="text-lg font-bold tracking-tight">Add Permission</GlassCardTitle>
                                 </div>
                             </GlassCardHeader>
-                            <GlassCardContent className="p-10">
-                                <form onSubmit={handleCreatePermission} className="space-y-8">
-                                     <div className="space-y-2.5">
-                                         <Label className="text-[12px] font-bold tracking-tight text-on-surface-variant/40 ml-1">Resource Name</Label>
+                            <GlassCardContent className="p-4">
+                                <form onSubmit={handleCreatePermission} className="space-y-5">
+                                     <div className="space-y-2">
+                                         <Label className="text-[10px] font-bold tracking-tight text-on-surface-variant/40 ml-1 uppercase">Resource Name</Label>
                                         <Input
                                             placeholder="e.g. applications"
                                             value={newPermission.resource}
                                             onChange={(e) => setNewPermission({ ...newPermission, resource: e.target.value })}
-                                            className="h-12 border-none rounded-xl bg-surface-container/30 ring-1 ring-on-surface/5 focus-visible:ring-2 focus-visible:ring-primary/20 font-medium transition-all"
+                                            className="h-10 border-none rounded-lg bg-surface-container/30 ring-1 ring-on-surface/5 focus-visible:ring-2 focus-visible:ring-primary/20 font-medium transition-all text-xs"
                                             required
                                         />
                                     </div>
-                                     <div className="space-y-2.5">
-                                         <Label className="text-[12px] font-bold tracking-tight text-on-surface-variant/40 ml-1">Action (e.g. READ, WRITE)</Label>
+                                     <div className="space-y-2">
+                                         <Label className="text-[10px] font-bold tracking-tight text-on-surface-variant/40 ml-1 uppercase">Action (e.g. READ, WRITE)</Label>
                                         <Input
                                             placeholder="e.g. WRITE"
                                             value={newPermission.action}
                                             onChange={(e) => setNewPermission({ ...newPermission, action: e.target.value })}
-                                            className="h-12 border-none rounded-xl bg-surface-container/30 ring-1 ring-on-surface/5 focus-visible:ring-2 focus-visible:ring-primary/20 font-medium transition-all"
+                                            className="h-10 border-none rounded-lg bg-surface-container/30 ring-1 ring-on-surface/5 focus-visible:ring-2 focus-visible:ring-primary/20 font-medium transition-all text-xs"
                                             required
                                         />
                                     </div>
-                                     <div className="space-y-2.5">
-                                         <Label className="text-[12px] font-bold tracking-tight text-on-surface-variant/40 ml-1">Description</Label>
+                                     <div className="space-y-2">
+                                         <Label className="text-[10px] font-bold tracking-tight text-on-surface-variant/40 ml-1 uppercase">Description</Label>
                                         <Input
                                             placeholder="Detailed access logic description..."
                                             value={newPermission.description}
                                             onChange={(e) => setNewPermission({ ...newPermission, description: e.target.value })}
-                                            className="h-12 border-none rounded-xl bg-surface-container/30 ring-1 ring-on-surface/5 focus-visible:ring-2 focus-visible:ring-primary/20 font-medium transition-all"
+                                            className="h-10 border-none rounded-lg bg-surface-container/30 ring-1 ring-on-surface/5 focus-visible:ring-2 focus-visible:ring-primary/20 font-medium transition-all text-xs"
                                         />
                                     </div>
-                                     <Button type="submit" className="w-full h-12 rounded-xl font-bold text-sm shadow-md shadow-primary/10">
+                                     <Button type="submit" className="w-full h-10 rounded-lg font-bold text-xs shadow-md shadow-primary/10">
                                          Create Permission
                                      </Button>
                                 </form>
@@ -374,15 +374,15 @@ const Roles: React.FC = () => {
                         </GlassCard>
                     </div>
                     <div className="md:col-span-8">
-                        <GlassCard className="border-none shadow-xl shadow-on-surface/5 bg-card overflow-hidden rounded-[32px]">
-                            <GlassCardHeader className="py-10 px-10 border-b border-on-surface/5">
-                                <div className="flex items-center gap-6">
-                                    <div className="p-4 bg-primary/5 rounded-[20px]">
-                                        <Lock className="w-8 h-8 text-primary" />
+                        <GlassCard className="border-none shadow-lg shadow-on-surface/5 bg-card overflow-hidden rounded-2xl">
+                            <GlassCardHeader className="py-2 px-4 border-b border-on-surface/5">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 bg-primary/5 rounded-lg">
+                                        <Lock className="w-4 h-4 text-primary" />
                                     </div>
                                      <div>
-                                         <GlassCardTitle className="text-3xl font-bold tracking-tight text-on-surface">All Permissions</GlassCardTitle>
-                                         <p className="text-on-surface-variant/40 font-bold text-[12px] mt-1 tracking-tight">{permissions.length} Permissions Found</p>
+                                         <GlassCardTitle className="text-base font-bold tracking-tight text-on-surface">All Permissions</GlassCardTitle>
+                                         <p className="text-on-surface-variant/40 font-bold text-[9px] mt-0.5 tracking-tight uppercase">{permissions.length} Permissions Found</p>
                                      </div>
                                 </div>
                             </GlassCardHeader>
@@ -391,21 +391,21 @@ const Roles: React.FC = () => {
                                     <GlassTable>
                                         <GlassTableHeader>
                                             <GlassTableRow className="hover:bg-transparent border-b border-on-surface/5">
-                                                 <GlassTableHead className="py-6 pl-10 font-bold text-[12px] tracking-tight text-on-surface-variant/40">Resource</GlassTableHead>
-                                                 <GlassTableHead className="font-bold text-[12px] tracking-tight text-on-surface-variant/40">Action</GlassTableHead>
-                                                 <GlassTableHead className="font-bold text-[12px] tracking-tight text-on-surface-variant/40 pr-10">Description</GlassTableHead>
+                                                 <GlassTableHead className="py-2 pl-4 font-bold text-[8px] tracking-widest text-on-surface-variant/40 uppercase">Resource</GlassTableHead>
+                                                 <GlassTableHead className="py-2 font-bold text-[8px] tracking-widest text-on-surface-variant/40 uppercase">Action</GlassTableHead>
+                                                 <GlassTableHead className="py-2 font-bold text-[8px] tracking-widest text-on-surface-variant/40 pr-4 uppercase">Description</GlassTableHead>
                                             </GlassTableRow>
                                         </GlassTableHeader>
                                         <TableBody>
                                             {permissions.map(p => (
                                                 <GlassTableRow key={p.id} className="hover:bg-surface-container/20 transition-all border-b border-on-surface/5 last:border-0 group">
-                                                    <TableCell className="py-8 pl-10 font-mono text-sm font-bold text-on-surface/60">{p.resource}</TableCell>
-                                                     <TableCell className="py-8">
-                                                         <Badge className="bg-primary/5 text-primary border-none rounded-lg font-bold text-[10px] tracking-tight px-4 py-1.5 group-hover:bg-primary group-hover:text-primary-foreground transition-all shadow-none">
+                                                    <TableCell className="py-1.5 pl-4 font-mono text-[10px] font-bold text-on-surface/60">{p.resource}</TableCell>
+                                                     <TableCell className="py-1.5">
+                                                         <Badge className="bg-primary/5 text-primary border-none rounded-md font-bold text-[8px] tracking-tight px-2 py-0.5 group-hover:bg-primary group-hover:text-primary-foreground transition-all shadow-none uppercase">
                                                              {p.action}
                                                          </Badge>
                                                      </TableCell>
-                                                    <TableCell className="py-8 text-[11px] font-bold text-on-surface-variant/20 italic tracking-tight pr-10">{p.description || 'No system definition metadata'}</TableCell>
+                                                    <TableCell className="py-1.5 text-[9px] font-bold text-on-surface-variant/20 italic tracking-tight pr-4">{p.description || 'No system definition metadata'}</TableCell>
                                                 </GlassTableRow>
                                             ))}
                                         </TableBody>

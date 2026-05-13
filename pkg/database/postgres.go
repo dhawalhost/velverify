@@ -3,6 +3,8 @@ package database
 import (
 	"context"
 	"fmt"
+	"os"
+	"strconv"
 	"time"
 
 	"github.com/jmoiron/sqlx"
@@ -31,8 +33,20 @@ func NewConnection(config Config) (*sqlx.DB, error) { // Use sqlx.DB
 	}
 
 	// It's a good practice to set connection pool parameters.
-	db.SetMaxOpenConns(25)
-	db.SetMaxIdleConns(25)
+	maxOpen := 25
+	if envOpen := os.Getenv("DB_MAX_OPEN_CONNS"); envOpen != "" {
+		if val, err := strconv.Atoi(envOpen); err == nil {
+			maxOpen = val
+		}
+	}
+	maxIdle := 25
+	if envIdle := os.Getenv("DB_MAX_IDLE_CONNS"); envIdle != "" {
+		if val, err := strconv.Atoi(envIdle); err == nil {
+			maxIdle = val
+		}
+	}
+	db.SetMaxOpenConns(maxOpen)
+	db.SetMaxIdleConns(maxIdle)
 	db.SetConnMaxLifetime(5 * time.Minute)
 
 	// Ping the database to verify the connection.

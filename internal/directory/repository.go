@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"time"
 
 	"github.com/jmoiron/sqlx"
 )
@@ -16,12 +17,13 @@ type Repository interface {
 	WithTransaction(ctx context.Context, fn func(tx *sqlx.Tx) error) error
 
 	// User operations
-	CreateIdentity(ctx context.Context, tx *sqlx.Tx, tenantID string) (string, error)
+	CreateIdentity(ctx context.Context, tx *sqlx.Tx, tenantID string, displayName, externalID *string, phoneNumbers PhoneNumbers, department, title, timezone *string) (string, error)
 	CreateAccount(ctx context.Context, tx *sqlx.Tx, userID, tenantID, email, passwordHash string) error
 	GetUserByID(ctx context.Context, tenantID, id string) (User, error)
 	GetUserByEmail(ctx context.Context, tenantID, email string) (User, error)
 	ListUsers(ctx context.Context, tenantID string, limit, offset int) ([]User, int, error)
-	UpdateIdentity(ctx context.Context, tx *sqlx.Tx, tenantID, id, status string, mfaEnforced bool) error
+	ListPendingDeletions(ctx context.Context, olderThan time.Time) ([]User, error)
+	UpdateIdentity(ctx context.Context, tx *sqlx.Tx, tenantID, id, status string, displayName, externalID *string, phoneNumbers PhoneNumbers, department, title, timezone *string, mfaEnforced *bool) error
 	UpdateAccount(ctx context.Context, tx *sqlx.Tx, tenantID, id, email, passwordHash string) error
 	DeleteIdentity(ctx context.Context, tenantID, id string) error
 
@@ -83,14 +85,14 @@ func (r *sqlRepository) WithTransaction(ctx context.Context, fn func(tx *sqlx.Tx
 	return tx.Commit()
 }
 
-func (r *sqlRepository) CreateIdentity(ctx context.Context, tx *sqlx.Tx, tenantID string) (string, error) {
+func (r *sqlRepository) CreateIdentity(ctx context.Context, tx *sqlx.Tx, tenantID string, displayName, externalID *string, phoneNumbers PhoneNumbers, department, title, timezone *string) (string, error) {
 	var id string
-	query := `INSERT INTO identities (tenant_id, status) VALUES ($1, $2) RETURNING id`
+	query := `INSERT INTO identities (tenant_id, status, display_name, external_id, phone_numbers, department, title, timezone) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`
 	var err error
 	if tx != nil {
-		err = tx.QueryRowxContext(ctx, query, tenantID, "active").Scan(&id)
+		err = tx.QueryRowxContext(ctx, query, tenantID, "active", displayName, externalID, phoneNumbers, department, title, timezone).Scan(&id)
 	} else {
-		err = r.db.QueryRowxContext(ctx, query, tenantID, "active").Scan(&id)
+		err = r.db.QueryRowxContext(ctx, query, tenantID, "active", displayName, externalID, phoneNumbers, department, title, timezone).Scan(&id)
 	}
 	return id, err
 }
@@ -108,7 +110,7 @@ func (r *sqlRepository) CreateAccount(ctx context.Context, tx *sqlx.Tx, userID, 
 
 func (r *sqlRepository) GetUserByID(ctx context.Context, tenantID, id string) (User, error) {
 	var user User
-	err := r.db.GetContext(ctx, &user, `SELECT i.id, i.tenant_id, a.login AS email, i.status, i.mfa_enforced, i.created_at, i.updated_at
+	err := r.db.GetContext(ctx, &user, `SELECT i.id, i.tenant_id, a.login AS email, i.display_name, i.external_id, i.phone_numbers, i.department, i.title, i.timezone, i.status, i.mfa_enforced, i.created_at, i.updated_at
 		 FROM identities i JOIN accounts a ON i.id = a.identity_id WHERE i.id = $1 AND i.tenant_id = $2`,
 		id, tenantID)
 	return user, err
@@ -116,7 +118,7 @@ func (r *sqlRepository) GetUserByID(ctx context.Context, tenantID, id string) (U
 
 func (r *sqlRepository) GetUserByEmail(ctx context.Context, tenantID, email string) (User, error) {
 	var user User
-	err := r.db.GetContext(ctx, &user, `SELECT i.id, i.tenant_id, a.login AS email, i.status, i.mfa_enforced, i.created_at, i.updated_at
+	err := r.db.GetContext(ctx, &user, `SELECT i.id, i.tenant_id, a.login AS email, i.display_name, i.external_id, i.phone_numbers, i.department, i.title, i.timezone, i.status, i.mfa_enforced, i.created_at, i.updated_at
 		 FROM identities i JOIN accounts a ON i.id = a.identity_id WHERE a.login = $1 AND a.tenant_id = $2`,
 		email, tenantID)
 	return user, err
@@ -127,7 +129,7 @@ func (r *sqlRepository) GetPasswordHash(ctx context.Context, tenantID, email str
 		User
 		PasswordHash string `db:"password_hash"`
 	}
-	err := r.db.GetContext(ctx, &record, `SELECT i.id, i.tenant_id, a.login AS email, i.status, i.mfa_enforced, i.created_at, i.updated_at, a.password_hash
+	err := r.db.GetContext(ctx, &record, `SELECT i.id, i.tenant_id, a.login AS email, i.display_name, i.external_id, i.phone_numbers, i.department, i.title, i.timezone, i.status, i.mfa_enforced, i.created_at, i.updated_at, a.password_hash
 		FROM identities i JOIN accounts a ON i.id = a.identity_id
 		WHERE a.login = $1 AND a.tenant_id = $2`, email, tenantID)
 	if err != nil {
@@ -144,7 +146,7 @@ func (r *sqlRepository) ListUsers(ctx context.Context, tenantID string, limit, o
 	}
 
 	var users []User
-	err = r.db.SelectContext(ctx, &users, `SELECT i.id, i.tenant_id, a.login AS email, i.status, i.mfa_enforced, i.created_at, i.updated_at
+	err = r.db.SelectContext(ctx, &users, `SELECT i.id, i.tenant_id, a.login AS email, i.display_name, i.external_id, i.phone_numbers, i.department, i.title, i.timezone, i.status, i.mfa_enforced, i.created_at, i.updated_at
 		FROM identities i JOIN accounts a ON i.id = a.identity_id 
 		WHERE i.tenant_id = $1 
 		ORDER BY i.created_at DESC 
@@ -153,13 +155,22 @@ func (r *sqlRepository) ListUsers(ctx context.Context, tenantID string, limit, o
 	return users, total, err
 }
 
-func (r *sqlRepository) UpdateIdentity(ctx context.Context, tx *sqlx.Tx, tenantID, id, status string, mfaEnforced bool) error {
-	query := `UPDATE identities SET status = $1, mfa_enforced = $2, updated_at = NOW() WHERE id = $3 AND tenant_id = $4`
+func (r *sqlRepository) ListPendingDeletions(ctx context.Context, olderThan time.Time) ([]User, error) {
+	var users []User
+	err := r.db.SelectContext(ctx, &users, `SELECT i.id, i.tenant_id, a.login AS email, i.display_name, i.external_id, i.phone_numbers, i.department, i.title, i.timezone, i.status, i.mfa_enforced, i.created_at, i.updated_at
+		FROM identities i JOIN accounts a ON i.id = a.identity_id 
+		WHERE i.status = 'pending_deletion' AND i.updated_at < $1`,
+		olderThan)
+	return users, err
+}
+
+func (r *sqlRepository) UpdateIdentity(ctx context.Context, tx *sqlx.Tx, tenantID, id, status string, displayName, externalID *string, phoneNumbers PhoneNumbers, department, title, timezone *string, mfaEnforced *bool) error {
+	query := `UPDATE identities SET status = $1, display_name = $2, external_id = $3, phone_numbers = $4, department = $5, title = $6, timezone = $7, mfa_enforced = $8, updated_at = NOW() WHERE id = $9 AND tenant_id = $10`
 	var err error
 	if tx != nil {
-		_, err = tx.ExecContext(ctx, query, status, mfaEnforced, id, tenantID)
+		_, err = tx.ExecContext(ctx, query, status, displayName, externalID, phoneNumbers, department, title, timezone, mfaEnforced, id, tenantID)
 	} else {
-		_, err = r.db.ExecContext(ctx, query, status, mfaEnforced, id, tenantID)
+		_, err = r.db.ExecContext(ctx, query, status, displayName, externalID, phoneNumbers, department, title, timezone, mfaEnforced, id, tenantID)
 	}
 	return err
 }

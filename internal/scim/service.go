@@ -37,6 +37,9 @@ func (s *Service) CreateUser(ctx context.Context, tenantID string, req User) (Us
 		return User{}, errors.New("password must be at least 8 characters")
 	}
 	email := req.UserName
+	if req.PrimaryEmail != "" {
+		email = req.PrimaryEmail
+	}
 	// If emails present, use primary or first one as well? For now, assume userName is email.
 	if len(req.Emails) > 0 {
 		for _, e := range req.Emails {
@@ -53,9 +56,15 @@ func (s *Service) CreateUser(ctx context.Context, tenantID string, req User) (Us
 	}
 
 	dirUser := directory.User{
-		Email:    email,
-		Status:   "active",
-		Password: password,
+		Email:        email,
+		DisplayName:  &req.DisplayName,
+		Status:       "active",
+		Password:     password,
+		ExternalID:   &req.ExternalID,
+		PhoneNumbers: mapSCIMPhonesToDir(req.PhoneNumbers),
+		Department:   &req.Department,
+		Title:        &req.Title,
+		Timezone:     &req.Timezone,
 	}
 	if !req.Active {
 		dirUser.Status = "inactive"
@@ -126,14 +135,20 @@ func (s *Service) GetUser(ctx context.Context, tenantID, id string) (User, error
 	}
 
 	return User{
-		Schemas:  []string{UserSchema},
-		ID:       u.ID,
-		UserName: u.Email,
-		Active:   u.Status == "active",
+		Schemas:     []string{UserSchema},
+		ID:          u.ID,
+		UserName:    u.Email,
+		DisplayName: stringValue(u.DisplayName),
+		ExternalID:  stringValue(u.ExternalID),
+		Active:      u.Status == "active",
 		Emails: []Email{
 			{Value: u.Email, Type: "work", Primary: true},
 		},
-		Groups: scimGroups,
+		PhoneNumbers: mapDirPhonesToSCIM(u.PhoneNumbers),
+		Department:   stringValue(u.Department),
+		Title:        stringValue(u.Title),
+		Timezone:     stringValue(u.Timezone),
+		Groups:       scimGroups,
 		Meta: Meta{
 			ResourceType: "User",
 			Created:      u.CreatedAt.Format(time.RFC3339),
@@ -219,14 +234,20 @@ func (s *Service) mapToSCIMUser(ctx context.Context, tenantID string, u director
 	}
 
 	return User{
-		Schemas:  []string{UserSchema},
-		ID:       u.ID,
-		UserName: u.Email,
-		Active:   u.Status == "active",
+		Schemas:     []string{UserSchema},
+		ID:          u.ID,
+		UserName:    u.Email,
+		DisplayName: stringValue(u.DisplayName),
+		ExternalID:  stringValue(u.ExternalID),
+		Active:      u.Status == "active",
 		Emails: []Email{
 			{Value: u.Email, Type: "work", Primary: true},
 		},
-		Groups: scimGroups,
+		PhoneNumbers: mapDirPhonesToSCIM(u.PhoneNumbers),
+		Department:   stringValue(u.Department),
+		Title:        stringValue(u.Title),
+		Timezone:     stringValue(u.Timezone),
+		Groups:       scimGroups,
 		Meta: Meta{
 			ResourceType: "User",
 			Created:      u.CreatedAt.Format(time.RFC3339),
@@ -236,10 +257,20 @@ func (s *Service) mapToSCIMUser(ctx context.Context, tenantID string, u director
 	}
 }
 
+func stringValue(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
+}
+
 // ReplaceUser handles PUT /scim/v2/Users/{id} - full replacement.
 func (s *Service) ReplaceUser(ctx context.Context, tenantID, id string, req User) (User, error) {
 	// Map SCIM User to directory User
 	email := req.UserName
+	if req.PrimaryEmail != "" {
+		email = req.PrimaryEmail
+	}
 	if len(req.Emails) > 0 {
 		for _, e := range req.Emails {
 			if e.Primary {
@@ -255,8 +286,15 @@ func (s *Service) ReplaceUser(ctx context.Context, tenantID, id string, req User
 	}
 
 	dirUser := directory.User{
-		Email:  email,
-		Status: status,
+		Email:        email,
+		DisplayName:  &req.DisplayName,
+		Status:       status,
+		Password:     req.Password,
+		ExternalID:   &req.ExternalID,
+		PhoneNumbers: mapSCIMPhonesToDir(req.PhoneNumbers),
+		Department:   &req.Department,
+		Title:        &req.Title,
+		Timezone:     &req.Timezone,
 	}
 
 	if err := s.dirSvc.UpdateUser(ctx, tenantID, id, dirUser); err != nil {
@@ -303,6 +341,30 @@ func (s *Service) PatchUser(ctx context.Context, tenantID, id string, ops []Patc
 			case "userName":
 				if userName, ok := op.Value.(string); ok {
 					current.Email = userName
+				}
+			case "password":
+				if password, ok := op.Value.(string); ok {
+					current.Password = password
+				}
+			case "displayName":
+				if displayName, ok := op.Value.(*string); ok {
+					current.DisplayName = displayName
+				}
+			case "externalId":
+				if externalID, ok := op.Value.(*string); ok {
+					current.ExternalID = externalID
+				}
+			case "title":
+				if title, ok := op.Value.(*string); ok {
+					current.Title = title
+				}
+			case "department":
+				if department, ok := op.Value.(*string); ok {
+					current.Department = department
+				}
+			case "timezone":
+				if timezone, ok := op.Value.(*string); ok {
+					current.Timezone = timezone
 				}
 			}
 		}
@@ -568,4 +630,34 @@ func (s *Service) DeleteGroup(ctx context.Context, tenantID, id string) error {
 	}
 
 	return nil
+}
+
+func mapSCIMPhonesToDir(scimPhones []PhoneNumber) directory.PhoneNumbers {
+	if len(scimPhones) == 0 {
+		return nil
+	}
+	var dirPhones directory.PhoneNumbers
+	for _, p := range scimPhones {
+		dirPhones = append(dirPhones, directory.PhoneNumber{
+			Value:   p.Value,
+			Type:    p.Type,
+			Primary: p.Primary,
+		})
+	}
+	return dirPhones
+}
+
+func mapDirPhonesToSCIM(dirPhones directory.PhoneNumbers) []PhoneNumber {
+	if len(dirPhones) == 0 {
+		return nil
+	}
+	var scimPhones []PhoneNumber
+	for _, p := range dirPhones {
+		scimPhones = append(scimPhones, PhoneNumber{
+			Value:   p.Value,
+			Type:    p.Type,
+			Primary: p.Primary,
+		})
+	}
+	return scimPhones
 }

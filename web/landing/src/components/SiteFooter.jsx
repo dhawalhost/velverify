@@ -31,8 +31,8 @@ export default function SiteFooter() {
           <div className="footer-col">
             <h4>Company</h4>
             <ul>
-              <li><Link to="/privacy">Privacy Policy</Link></li>
-              <li><Link to="/terms">Terms of Service</Link></li>
+              <li><Link to="/privacy-policy">Privacy Policy</Link></li>
+              <li><Link to="/terms-of-service">Terms of Service</Link></li>
               <li><Link to="/cookies">Cookie Policy</Link></li>
             </ul>
           </div>

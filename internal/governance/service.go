@@ -179,8 +179,8 @@ func (s *governanceService) GetApprovedScopes(ctx context.Context, tenantID, wor
 			}
 			if err := json.Unmarshal(req.Metadata, &metadata); err == nil && len(metadata.RequestedScopes) > 0 {
 				ttl := 1 * time.Hour
-				if req.Duration != "" {
-					if d, err := time.ParseDuration(req.Duration); err == nil {
+				if *req.Duration != "" {
+					if d, err := time.ParseDuration(*req.Duration); err == nil {
 						ttl = d
 					}
 				}
@@ -309,9 +309,9 @@ func (s *governanceService) CreateAccessRequest(ctx context.Context, tenantID st
 		RequesterType: requesterType,
 		ResourceType:  input.ResourceType,
 		ResourceID:    input.ResourceID,
-		Reason:        input.Reason,
-		Duration:      input.Duration,
-		DeviceID:      input.DeviceID,
+		Reason:        &input.Reason,
+		Duration:      &input.Duration,
+		DeviceID:      &input.DeviceID,
 		Metadata:      input.Metadata,
 	}
 	id, err := s.reqStore.CreateRequest(ctx, req)
@@ -360,8 +360,8 @@ func (s *governanceService) ApproveAccessRequest(ctx context.Context, tenantID, 
 
 	// Evaluate policy with Device Posture context
 	deviceTrust := "unknown"
-	if req.DeviceID != "" {
-		device, err := s.endpointStore.GetDevice(ctx, tenantID, req.DeviceID)
+	if req.DeviceID != nil && *req.DeviceID != "" {
+		device, err := s.endpointStore.GetDevice(ctx, tenantID, *req.DeviceID)
 		if err == nil {
 			deviceTrust = device.TrustStatus
 		}
@@ -395,8 +395,8 @@ func (s *governanceService) ApproveAccessRequest(ctx context.Context, tenantID, 
 		return validationError("resource_type 'app' is not supported yet")
 	case "role":
 		// Assign role to user via RBAC service
-		if req.Duration != "" {
-			if err := s.rbacSvc.AssignRoleWithExpiration(ctx, tenantID, req.RequesterID, req.ResourceID, &approverID, req.Duration); err != nil {
+		if req.Duration != nil && *req.Duration != "" {
+			if err := s.rbacSvc.AssignRoleWithExpiration(ctx, tenantID, req.RequesterID, req.ResourceID, &approverID, *req.Duration); err != nil {
 				return fmt.Errorf("temporal role assignment failed: %w", err)
 			}
 		} else {
@@ -614,9 +614,9 @@ func (s *governanceService) CreateIPPolicy(ctx context.Context, tenantID string,
 		ID:          generateShortID(), // Using a helper or uuid
 		TenantID:    tenantID,
 		Type:        req.Type,
-		CIDR:        req.CIDR,
-		CountryCode: req.CountryCode,
-		Reason:      req.Reason,
+		CIDR:        &req.CIDR,
+		CountryCode: &req.CountryCode,
+		Reason:      &req.Reason,
 	}
 
 	id, err := s.reqStore.CreateIPPolicy(ctx, p)

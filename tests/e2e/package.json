@@ -1,0 +1,14 @@
+{
+  "name": "wardseal-e2e",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.0"
+  },
+  "dependencies": {
+    "otplib": "^13.4.0"
+  }
+}

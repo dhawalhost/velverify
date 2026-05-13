@@ -1,0 +1,29 @@
+groups:
+- name: wardseal-alerts
+  rules:
+  - alert: High5xxErrorRate
+    expr: sum(rate(http_requests_total{code=~"5.."}[5m])) > 0.05 * sum(rate(http_requests_total[5m]))
+    for: 2m
+    labels:
+      severity: critical
+    annotations:
+      summary: High 5xx error rate detected
+      description: "More than 5% of HTTP requests are failing with 5xx errors."
+
+  - alert: HighTokenErrorRate
+    expr: sum(rate(auth_token_errors_total[5m])) > 1
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: High token error rate
+      description: "Token error rate is elevated (> 1/sec)."
+
+  - alert: P95LatencyDegradation
+    expr: histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le)) > 0.5
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: High P95 latency
+      description: "P95 latency is above 500ms."

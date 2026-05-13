@@ -1,0 +1,824 @@
+openapi: 3.0.3
+info:
+  title: Identity & Governance Platform - Management API
+  version: v1
+  description: |-
+    This is the management API for the Identity & Governance Platform.
+    It is used by the admin UI and other internal services to manage
+    tenants, users, groups, and other resources.
+
+paths:
+  /users:
+    post:
+      summary: Create a new user
+      operationId: createUser
+      tags:
+        - Users
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  format: password
+      responses:
+        '201':
+          description: User created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user_id:
+                    type: string
+                    format: uuid
+        '400':
+          description: Invalid request body
+        '500':
+          description: Internal server error
+
+  /users/{email}:
+    get:
+      summary: Get a user by email
+      operationId: getUserByEmail
+      tags:
+        - Users
+      parameters:
+        - name: email
+          in: path
+          required: true
+          schema:
+            type: string
+            format: email
+      responses:
+        '200':
+          description: User found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  email:
+                    type: string
+                    format: email
+        '404':
+          description: User not found
+        '500':
+          description: Internal server error
+
+  /oauth2/authorize:
+    get:
+      summary: OAuth2 Authorization Endpoint
+      operationId: authorize
+      tags: [Authentication]
+      parameters:
+        - name: response_type
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: client_id
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: redirect_uri
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: scope
+          in: query
+          schema:
+            type: string
+        - name: state
+          in: query
+          schema:
+            type: string
+      responses:
+        '302':
+          description: Redirects to client callback
+        '400':
+          description: Invalid request
+
+  /oauth2/token:
+    post:
+      summary: OAuth2 Token Endpoint
+      operationId: token
+      tags: [Authentication]
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                grant_type:
+                  type: string
+                code:
+                  type: string
+                client_id:
+                  type: string
+                client_secret:
+                  type: string
+                redirect_uri:
+                  type: string
+                refresh_token:
+                  type: string
+      responses:
+        '200':
+          description: Token issued
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  access_token:
+                    type: string
+                  token_type:
+                    type: string
+                  expires_in:
+                    type: integer
+                  refresh_token:
+                    type: string
+                    
+  /oauth2/introspect:
+    post:
+      summary: RFC 7662 Token Introspection
+      operationId: introspect
+      tags: [Authentication]
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                token:
+                  type: string
+      responses:
+        '200':
+          description: Token metadata
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  active:
+                    type: boolean
+                  scope:
+                    type: string
+                  client_id:
+                    type: string
+                  exp:
+                    type: integer
+
+  /oauth2/revoke:
+    post:
+      summary: RFC 7009 Token Revocation
+      operationId: revoke
+      tags: [Authentication]
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                token:
+                  type: string
+      responses:
+        '200':
+          description: Token revoked successfully
+
+  /scim/v2/Users:
+    get:
+      summary: List/Query Users (SCIM)
+      operationId: scimListUsers
+      tags: [Provisioning]
+      parameters:
+        - name: filter
+          in: query
+          schema:
+             type: string
+        - name: startIndex
+          in: query
+          schema:
+            type: integer
+        - name: count
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: List of users
+          content:
+             application/scim+json:
+               schema:
+                 type: object
+    post:
+      summary: Create User (SCIM)
+      operationId: scimCreateUser
+      tags: [Provisioning]
+      requestBody:
+        content:
+          application/scim+json:
+            schema:
+              type: object
+      responses:
+        '201':
+          description: User created
+          content:
+             application/scim+json:
+               schema:
+                 type: object
+
+  /scim/v2/Users/{id}:
+    get:
+      summary: Get User (SCIM)
+      operationId: scimGetUser
+      tags: [Provisioning]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+         '200':
+            description: User resource
+         '404':
+            description: User not found
+    put:
+      summary: Replace User (SCIM)
+      operationId: scimReplaceUser
+      tags: [Provisioning]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+             type: string
+      requestBody:
+        content:
+          application/scim+json:
+            schema:
+               type: object
+      responses:
+         '200':
+             description: User updated
+    delete:
+      summary: Delete User (SCIM)
+      operationId: scimDeleteUser
+      tags: [Provisioning]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+             type: string
+      responses:
+         '204':
+             description: User deleted
+
+  /login:
+    post:
+      summary: Direct Username/Password Login (Legacy)
+      operationId: login
+      tags: [Authentication]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                username:
+                  type: string
+                  format: email
+                password:
+                  type: string
+      responses:
+        '200':
+          description: Authentication successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+        '401':
+          description: Invalid credentials
+        '500':
+          description: Internal server error
+
+  /.well-known/jwks.json:
+    get:
+      summary: Get the JSON Web Key Set (JWKS)
+      operationId: getJWKS
+      tags:
+        - Authentication
+      responses:
+        '200':
+          description: JWKS retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object # A more specific schema can be added here
+        '500':
+          description: Internal server error
+
+  /api/v1/oauth/clients:
+    get:
+      summary: List OAuth clients for a tenant
+      operationId: listOAuthClients
+      tags:
+        - Governance
+      parameters:
+        - $ref: '#/components/parameters/TenantHeader'
+      responses:
+        '200':
+          description: Clients returned successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OAuthClientListResponse'
+        '400':
+          description: Missing tenant header or invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    post:
+      summary: Register a new OAuth client
+      operationId: createOAuthClient
+      tags:
+        - Governance
+      parameters:
+        - $ref: '#/components/parameters/TenantHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOAuthClientRequest'
+      responses:
+        '201':
+          description: Client created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OAuthClient'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/oauth/clients/{clientId}:
+    parameters:
+      - $ref: '#/components/parameters/TenantHeader'
+      - name: clientId
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      summary: Fetch a specific OAuth client
+      operationId: getOAuthClient
+      tags:
+        - Governance
+      responses:
+        '200':
+          description: Client found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OAuthClient'
+        '404':
+          description: Client not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    put:
+      summary: Update an existing OAuth client
+      operationId: updateOAuthClient
+      tags:
+        - Governance
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateOAuthClientRequest'
+      responses:
+        '200':
+          description: Client updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OAuthClient'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Client not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      summary: Delete an OAuth client
+      operationId: deleteOAuthClient
+      tags:
+        - Governance
+      responses:
+        '204':
+          description: Client deleted successfully
+        '404':
+          description: Client not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /governance/requests:
+    get:
+      summary: List access requests
+      operationId: listAccessRequests
+      tags: [Governance]
+      parameters:
+        - $ref: '#/components/parameters/TenantHeader'
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, approved, rejected]
+      responses:
+        '200':
+          description: List of requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccessRequestList'
+    post:
+      summary: Submit access request
+      operationId: createAccessRequest
+      tags: [Governance]
+      parameters:
+        - $ref: '#/components/parameters/TenantHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAccessRequest'
+      responses:
+        '201':
+          description: Request created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccessRequest'
+
+  /governance/requests/{id}/approve:
+    post:
+      summary: Approve access request
+      operationId: approveAccessRequest
+      tags: [Governance]
+      parameters:
+        - $ref: '#/components/parameters/TenantHeader'
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                comment:
+                  type: string
+      responses:
+        '200':
+          description: Request approved
+
+  /governance/requests/{id}/reject:
+    post:
+      summary: Reject access request
+      operationId: rejectAccessRequest
+      tags: [Governance]
+      parameters:
+        - $ref: '#/components/parameters/TenantHeader'
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                comment:
+                  type: string
+      responses:
+        '200':
+          description: Request rejected
+
+  /webhooks:
+    get:
+      summary: List webhooks
+      operationId: listWebhooks
+      tags: [Governance]
+      parameters:
+        - $ref: '#/components/parameters/TenantHeader'
+      responses:
+        '200':
+          description: List of webhooks
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebhookList'
+    post:
+      summary: Register a webhook
+      operationId: createWebhook
+      tags: [Governance]
+      parameters:
+        - $ref: '#/components/parameters/TenantHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateWebhookRequest'
+      responses:
+        '201':
+          description: Webhook created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+  /webhooks/{id}:
+    delete:
+      summary: Delete a webhook
+      operationId: deleteWebhook
+      tags: [Governance]
+      parameters:
+        - $ref: '#/components/parameters/TenantHeader'
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Webhook deleted
+
+components:
+  parameters:
+    TenantHeader:
+      name: X-Tenant-ID
+      in: header
+      required: true
+      schema:
+        type: string
+      description: Tenant identifier used for scoping requests
+  schemas:
+    OAuthClient:
+      type: object
+      required:
+        - client_id
+        - tenant_id
+        - client_type
+        - name
+        - redirect_uris
+        - allowed_scopes
+      properties:
+        client_id:
+          type: string
+        tenant_id:
+          type: string
+        client_type:
+          type: string
+          enum: [public, confidential]
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        redirect_uris:
+          type: array
+          items:
+            type: string
+            format: uri
+        allowed_scopes:
+          type: array
+          items:
+            type: string
+    OAuthClientListResponse:
+      type: object
+      properties:
+        clients:
+          type: array
+          items:
+            $ref: '#/components/schemas/OAuthClient'
+    CreateOAuthClientRequest:
+      type: object
+      required:
+        - client_id
+        - name
+        - client_type
+        - redirect_uris
+        - allowed_scopes
+      properties:
+        client_id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        client_type:
+          type: string
+          enum: [public, confidential]
+        redirect_uris:
+          type: array
+          items:
+            type: string
+            format: uri
+        allowed_scopes:
+          type: array
+          items:
+            type: string
+        client_secret:
+          type: string
+          description: Required for confidential clients
+    UpdateOAuthClientRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        client_type:
+          type: string
+          enum: [public, confidential]
+        redirect_uris:
+          type: array
+          items:
+            type: string
+            format: uri
+        allowed_scopes:
+          type: array
+          items:
+            type: string
+        client_secret:
+          type: string
+          description: Replaces the previous secret for confidential clients
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+    AccessRequest:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        tenant_id:
+          type: string
+          format: uuid
+        requester_id:
+          type: string
+          format: uuid
+        resource_type:
+          type: string
+          enum: [group, app]
+        resource_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [pending, approved, rejected]
+        reason:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+    AccessRequestList:
+      type: object
+      properties:
+        requests:
+          type: array
+          items:
+            $ref: '#/components/schemas/AccessRequest'
+    CreateAccessRequest:
+      type: object
+      required:
+        - resource_type
+        - resource_id
+        - reason
+      properties:
+        resource_type:
+          type: string
+          enum: [group, app]
+        resource_id:
+          type: string
+          format: uuid
+        reason:
+          type: string
+    Webhook:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        tenant_id:
+          type: string
+          format: uuid
+        url:
+          type: string
+          format: uri
+        secret:
+          type: string
+        events:
+          type: array
+          items:
+            type: string
+        active:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+    CreateWebhookRequest:
+      type: object
+      required:
+        - url
+        - secret
+        - events
+      properties:
+        url:
+          type: string
+          format: uri
+        secret:
+          type: string
+        events:
+          type: array
+          items:
+            type: string
+    WebhookList:
+      type: object
+      properties:
+        webhooks:
+          type: array
+          items:
+            $ref: '#/components/schemas/Webhook'

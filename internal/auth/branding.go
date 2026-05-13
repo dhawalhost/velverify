@@ -17,6 +17,8 @@ type BrandingConfig struct {
 	BackgroundColor string    `json:"background_color" db:"background_color"`
 	CSSOverride     string    `json:"css_override" db:"css_override"`
 	Config          JSON      `json:"config" db:"config"`
+	TenantName      string    `json:"tenant_name" db:"-"`
+	TenantSlug      string    `json:"tenant_slug" db:"-"`
 	CreatedAt       time.Time `json:"created_at" db:"created_at"`
 	UpdatedAt       time.Time `json:"updated_at" db:"updated_at"`
 }

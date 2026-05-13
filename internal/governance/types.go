@@ -62,11 +62,11 @@ type AccessRequest struct {
 	ResourceType  string          `json:"resource_type"`
 	ResourceID    string          `json:"resource_id"`
 	Status        string          `json:"status"`
-	Reason        string          `json:"reason"`
-	Duration      string          `json:"duration,omitempty"` // e.g. "4h", "1d"
-	CreatedAt     string          `json:"created_at"`         // ISO8601
-	UpdatedAt     string          `json:"updated_at"`
-	DeviceID      string          `json:"device_id,omitempty"`
+	Reason        *string         `json:"reason,omitempty"`
+	Duration      *string         `json:"duration,omitempty"` // e.g. "4h", "1d"
+	CreatedAt     time.Time       `json:"created_at"`
+	UpdatedAt     time.Time       `json:"updated_at"`
+	DeviceID      *string         `json:"device_id,omitempty"`
 	Metadata      json.RawMessage `json:"metadata,omitempty"`
 }
 
@@ -92,13 +92,13 @@ type ApprovalDecision struct {
 // IP Access Policy types
 
 type IPPolicy struct {
-	ID          string `json:"id"`
-	TenantID    string `json:"tenant_id"`
-	Type        string `json:"type"` // ALLOW, BLOCK
-	CIDR        string `json:"cidr,omitempty"`
-	CountryCode string `json:"country_code,omitempty"`
-	Reason      string `json:"reason,omitempty"`
-	CreatedAt   string `json:"created_at"`
+	ID          string    `json:"id"`
+	TenantID    string    `json:"tenant_id"`
+	Type        string    `json:"type"` // ALLOW, BLOCK
+	CIDR        *string   `json:"cidr,omitempty"`
+	CountryCode *string   `json:"country_code,omitempty"`
+	Reason      *string   `json:"reason,omitempty"`
+	CreatedAt   time.Time `json:"created_at"`
 }
 
 type CreateIPPolicyRequest struct {

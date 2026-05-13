@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-export const AUTHSVC_URL = (import.meta as any).env?.VITE_AUTHSVC_URL || '';
+export const AUTHSVC_URL = (import.meta as any).env?.VITE_AUTHSVC_URL || (import.meta as any).env?.VITE_API_URL || '';
 const DIRSVC_URL = (import.meta as any).env?.VITE_DIRSVC_URL || '';
 const GOVSVC_URL = (import.meta as any).env?.VITE_GOVSVC_URL || '';
 
@@ -8,6 +8,7 @@ console.log('API Strings:', { AUTHSVC_URL, DIRSVC_URL, GOVSVC_URL });
 
 export const api = axios.create({
     baseURL: AUTHSVC_URL,
+    withCredentials: true,
     headers: {
         'Content-Type': 'application/json',
     },
@@ -16,6 +17,7 @@ export const api = axios.create({
 // Directory service API (hosts SCIM, user management)
 const dirApi = axios.create({
     baseURL: DIRSVC_URL,
+    withCredentials: true,
     headers: {
         'Content-Type': 'application/json',
     },
@@ -24,6 +26,7 @@ const dirApi = axios.create({
 // Governance service API (hosts requests, sso, audit, etc)
 const govApi = axios.create({
     baseURL: GOVSVC_URL,
+    withCredentials: true,
     headers: {
         'Content-Type': 'application/json',
     },
@@ -32,12 +35,8 @@ const govApi = axios.create({
 // Add interceptor to directory API as well
 dirApi.interceptors.request.use(
     (config) => {
-        const token = localStorage.getItem('token');
         const tenantID = localStorage.getItem('tenantID');
         const userId = localStorage.getItem('userId');
-        if (token) {
-            config.headers.Authorization = `Bearer ${token}`;
-        }
         if (tenantID) {
             config.headers['X-Tenant-ID'] = tenantID;
         }
@@ -52,12 +51,8 @@ dirApi.interceptors.request.use(
 // Add interceptor to governance API
 govApi.interceptors.request.use(
     (config) => {
-        const token = localStorage.getItem('token');
         const tenantID = localStorage.getItem('tenantID');
         const userId = localStorage.getItem('userId');
-        if (token) {
-            config.headers.Authorization = `Bearer ${token}`;
-        }
         if (tenantID) {
             config.headers['X-Tenant-ID'] = tenantID;
         }
@@ -69,15 +64,11 @@ govApi.interceptors.request.use(
     (error) => Promise.reject(error)
 );
 
-// Add a request interceptor to inject the token
+// Add a request interceptor to inject metadata
 api.interceptors.request.use(
     (config) => {
-        const token = localStorage.getItem('token');
         const tenantID = localStorage.getItem('tenantID');
         const userId = localStorage.getItem('userId');
-        if (token) {
-            config.headers.Authorization = `Bearer ${token}`;
-        }
         if (tenantID) {
             config.headers['X-Tenant-ID'] = tenantID;
         }
@@ -216,11 +207,12 @@ export const getSCIMSchemas = async () => {
     return response.data;
 };
 
-export const requestPasswordSetupLink = async (userID: string, mode: 'invite' | 'reset', expiresHours: number = 72) => {
+export const requestPasswordSetupLink = async (userID: string, mode: 'invite' | 'reset', expiresHours: number = 72, sendEmail: boolean = false) => {
     const response = await api.post('/api/v1/setup/password-link', {
         user_id: userID,
         mode,
         expires_hours: expiresHours,
+        send_email: sendEmail,
     });
     return response.data;
 };
@@ -778,6 +770,11 @@ export const getAPIKeyLogs = async (keyId: string) => {
 
 export const getUserApps = async () => {
     const response = await api.get('/api/v1/user/apps');
+    return response.data;
+};
+
+export const getUserProfile = async () => {
+    const response = await api.get('/api/v1/user/profile');
     return response.data;
 };
 

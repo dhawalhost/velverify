@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/go-redis/redis/v8"
+	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
 
 	"github.com/dhawalhost/wardseal/pkg/eventbus"
@@ -15,14 +15,14 @@ import (
 
 // redisBus implements eventbus.EventBus using Redis Pub/Sub.
 type redisBus struct {
-	client *redis.Client
+	client redis.UniversalClient
 	logger *zap.Logger
 	mu     sync.Mutex
 	subs   map[string]*redis.PubSub
 }
 
 // NewRedisEventBus creates a new EventBus backed by Redis Pub/Sub.
-func NewRedisEventBus(client *redis.Client, logger *zap.Logger) eventbus.EventBus {
+func NewRedisEventBus(client redis.UniversalClient, logger *zap.Logger) eventbus.EventBus {
 	return &redisBus{
 		client: client,
 		logger: logger,

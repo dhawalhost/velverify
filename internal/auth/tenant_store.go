@@ -12,6 +12,8 @@ import (
 type TenantRepository interface {
 	GetIDBySlug(ctx context.Context, slug string) (string, error)
 	GetSlugByID(ctx context.Context, id string) (string, error)
+	GetNameByID(ctx context.Context, id string) (string, error)
+	GetDetailsByID(ctx context.Context, id string) (string, string, error) // slug, name, error
 	IsMFAEnforcedForUserOrganizations(ctx context.Context, tenantID, userID string) (bool, error)
 }
 
@@ -49,6 +51,35 @@ func (r *sqlTenantRepository) GetSlugByID(ctx context.Context, id string) (strin
 		return "", err
 	}
 	return slug, nil
+}
+
+func (r *sqlTenantRepository) GetNameByID(ctx context.Context, id string) (string, error) {
+	var name string
+	query := `SELECT name FROM tenants WHERE id = $1`
+	err := r.db.GetContext(ctx, &name, query, id)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return "", nil
+		}
+		return "", err
+	}
+	return name, nil
+}
+
+func (r *sqlTenantRepository) GetDetailsByID(ctx context.Context, id string) (string, string, error) {
+	var dest struct {
+		Slug string `db:"slug"`
+		Name string `db:"name"`
+	}
+	query := `SELECT slug, name FROM tenants WHERE id = $1`
+	err := r.db.GetContext(ctx, &dest, query, id)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return "", "", nil
+		}
+		return "", "", err
+	}
+	return dest.Slug, dest.Name, nil
 }
 
 func (r *sqlTenantRepository) IsMFAEnforcedForUserOrganizations(ctx context.Context, tenantID, userID string) (bool, error) {

@@ -36,14 +36,16 @@ authsvc:
     LOG_LEVEL: debug
     DIRECTORY_SERVICE_URL: http://wardseal-dirsvc:8081
     AUTH_SERVICE_URL: https://auth-staging.wardseal.com
-    UI_URL: https://manage-staging.wardseal.com
+    UI_URL: https://id-staging.wardseal.com
     KMS_PROVIDER: vault
     REDIS_ENABLED: "true"
     REDIS_ADDR: redis-staging.wardseal.svc.cluster.local:6379
     WEBAUTHN_SESSION_TTL_SECONDS: "600"
     RATE_LIMIT_USE_TENANT: "true"
     RATE_LIMIT_KEY_PREFIX: wardseal:ratelimit
-    CORS_ALLOWED_ORIGINS: https://staging.wardseal.com,https://manage-staging.wardseal.com
+    CORS_ALLOWED_ORIGINS: "https://id-staging.wardseal.com,https://admin-staging.wardseal.com,https://app-staging.wardseal.com,https://developer-staging.wardseal.com,https://status-staging.wardseal.com,https://staging.wardseal.com,https://auth-staging.wardseal.com"
+    DB_MAX_OPEN_CONNS: "5"
+    DB_MAX_IDLE_CONNS: "5"
 
   envFrom:
     - secretRef:
@@ -56,6 +58,30 @@ authsvc:
     requests:
       cpu: 50m
       memory: 64Mi
+
+  autoscaling:
+    enabled: true
+    minReplicas: 1
+    maxReplicas: 2
+    targetCPUUtilizationPercentage: 80
+
+  readinessProbe:
+    initialDelaySeconds: 2
+  livenessProbe:
+    initialDelaySeconds: 5
+
+  affinity:
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            labelSelector:
+              matchExpressions:
+                - key: app.kubernetes.io/name
+                  operator: In
+                  values:
+                    - authsvc
+            topologyKey: kubernetes.io/hostname
 
 # Directory Service - Staging
 dirsvc:
@@ -77,7 +103,9 @@ dirsvc:
     REDIS_ADDR: redis-staging.wardseal.svc.cluster.local:6379
     RATE_LIMIT_USE_TENANT: "true"
     RATE_LIMIT_KEY_PREFIX: wardseal:ratelimit
-    CORS_ALLOWED_ORIGINS: https://staging.wardseal.com,https://manage-staging.wardseal.com
+    CORS_ALLOWED_ORIGINS: "https://id-staging.wardseal.com,https://admin-staging.wardseal.com,https://app-staging.wardseal.com,https://developer-staging.wardseal.com,https://status-staging.wardseal.com,https://staging.wardseal.com,https://auth-staging.wardseal.com"
+    DB_MAX_OPEN_CONNS: "5"
+    DB_MAX_IDLE_CONNS: "5"
 
   resources:
     limits:
@@ -86,6 +114,30 @@ dirsvc:
     requests:
       cpu: 50m
       memory: 64Mi
+
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 5
+    targetCPUUtilizationPercentage: 80
+
+  readinessProbe:
+    initialDelaySeconds: 2
+  livenessProbe:
+    initialDelaySeconds: 5
+
+  affinity:
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            labelSelector:
+              matchExpressions:
+                - key: app.kubernetes.io/name
+                  operator: In
+                  values:
+                    - dirsvc
+            topologyKey: kubernetes.io/hostname
 
 # Governance Service - Staging
 govsvc:
@@ -108,7 +160,9 @@ govsvc:
     REDIS_ADDR: redis-staging.wardseal.svc.cluster.local:6379
     RATE_LIMIT_USE_TENANT: "true"
     RATE_LIMIT_KEY_PREFIX: wardseal:ratelimit
-    CORS_ALLOWED_ORIGINS: https://staging.wardseal.com,https://manage-staging.wardseal.com
+    CORS_ALLOWED_ORIGINS: "https://id-staging.wardseal.com,https://admin-staging.wardseal.com,https://app-staging.wardseal.com,https://developer-staging.wardseal.com,https://status-staging.wardseal.com,https://staging.wardseal.com,https://auth-staging.wardseal.com"
+    DB_MAX_OPEN_CONNS: "5"
+    DB_MAX_IDLE_CONNS: "5"
 
   resources:
     limits:
@@ -117,6 +171,30 @@ govsvc:
     requests:
       cpu: 50m
       memory: 64Mi
+
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 5
+    targetCPUUtilizationPercentage: 80
+
+  readinessProbe:
+    initialDelaySeconds: 2
+  livenessProbe:
+    initialDelaySeconds: 5
+
+  affinity:
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            labelSelector:
+              matchExpressions:
+                - key: app.kubernetes.io/name
+                  operator: In
+                  values:
+                    - govsvc
+            topologyKey: kubernetes.io/hostname
 
 adminui:
   enabled: true
@@ -152,9 +230,10 @@ provsvc:
 # Ingress - Staging
 ingress:
   enabled: true
-  className: nginx
+  className: traefik
   annotations:
-    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.tls: "true"
   hosts:
     - host: auth-staging.wardseal.com
       paths:
@@ -188,8 +267,136 @@ ingress:
           pathType: Prefix
           service: provsvc
           port: 8084
-    - host: manage-staging.wardseal.com
+    - host: admin-staging.wardseal.com
       paths:
+        - path: /login/lookup
+          pathType: Prefix
+          service: authsvc
+          port: 8080
+        - path: /t/
+          pathType: Prefix
+          service: authsvc
+          port: 8080
+        - path: /oauth2
+          pathType: Prefix
+          service: authsvc
+          port: 8080
+        - path: /.well-known
+          pathType: Prefix
+          service: authsvc
+          port: 8080
+        - path: /social/login
+          pathType: Prefix
+          service: authsvc
+          port: 8080
+        - path: /api/v1/apps
+          pathType: Prefix
+          service: authsvc
+          port: 8080
+        - path: /api/v1/api-keys
+          pathType: Prefix
+          service: authsvc
+          port: 8080
+        - path: /api/v1/mfa
+          pathType: Prefix
+          service: authsvc
+          port: 8080
+        - path: /api/v1/user
+          pathType: Prefix
+          service: authsvc
+          port: 8080
+        - path: /api/v1/devices
+          pathType: Prefix
+          service: authsvc
+          port: 8080
+        - path: /api/v1/branding
+          pathType: Prefix
+          service: authsvc
+          port: 8080
+        - path: /api/v1/signup
+          pathType: Prefix
+          service: authsvc
+          port: 8080
+        - path: /api/v1/setup
+          pathType: Prefix
+          service: authsvc
+          port: 8080
+        - path: /api/v1/developer
+          pathType: Prefix
+          service: authsvc
+          port: 8080
+        - path: /scim
+          pathType: Prefix
+          service: dirsvc
+          port: 8081
+        - path: /api/v1/tenants
+          pathType: Prefix
+          service: dirsvc
+          port: 8081
+        - path: /internal/discover
+          pathType: Prefix
+          service: dirsvc
+          port: 8081
+        - path: /api/v1/users
+          pathType: Prefix
+          service: dirsvc
+          port: 8081
+        - path: /api/v1/groups
+          pathType: Prefix
+          service: dirsvc
+          port: 8081
+        - path: /api/v1/organizations
+          pathType: Prefix
+          service: govsvc
+          port: 8082
+        - path: /api/v1/campaigns
+          pathType: Prefix
+          service: govsvc
+          port: 8082
+        - path: /api/v1/roles
+          pathType: Prefix
+          service: govsvc
+          port: 8082
+        - path: /api/v1/permissions
+          pathType: Prefix
+          service: govsvc
+          port: 8082
+        - path: /api/v1/audit
+          pathType: Prefix
+          service: govsvc
+          port: 8082
+        - path: /api/v1/sso
+          pathType: Prefix
+          service: govsvc
+          port: 8082
+        - path: /api/v1/connectors
+          pathType: Prefix
+          service: govsvc
+          port: 8082
+        - path: /api/v1/oauth
+          pathType: Prefix
+          service: govsvc
+          port: 8082
+        - path: /api/v1/governance
+          pathType: Prefix
+          service: govsvc
+          port: 8082
+        - path: /api/v1/policy
+          pathType: Prefix
+          service: policysvc
+          port: 8083
+        - path: /api/v1/provisioning
+          pathType: Prefix
+          service: provsvc
+          port: 8084
+        - path: /api/v1/webhooks
+          pathType: Prefix
+          service: govsvc
+          port: 8082
+        - path: /webhooks
+          pathType: Prefix
+          service: govsvc
+          port: 8082
         - path: /
           pathType: Prefix
           service: adminui
@@ -205,5 +412,5 @@ ingress:
       hosts:
         - auth-staging.wardseal.com
         - api-staging.wardseal.com
-        - manage-staging.wardseal.com
+        - admin-staging.wardseal.com
         - staging.wardseal.com

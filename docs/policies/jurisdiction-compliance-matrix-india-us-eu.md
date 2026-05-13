@@ -38,11 +38,11 @@ Use this matrix to finalize policy language and operational controls for your ta
 
 ## 4) Operational controls to confirm before go-live
 
-- Rights request intake and identity verification workflow
-- Deletion workflow and backup-aging statement
-- Subprocessor list publication and update mechanism
-- Incident escalation and external notification runbook
-- Regional contract packet (ToS + DPA addendum + SLA)
+- [x] Rights request intake and identity verification workflow (See `data-rights-and-deletion-runbook.md`)
+- [x] Deletion workflow and backup-aging statement (See `data-rights-and-deletion-runbook.md`)
+- [ ] Subprocessor list publication and update mechanism
+- [ ] Incident escalation and external notification runbook
+- [ ] Regional contract packet (ToS + DPA addendum + SLA)
 
 ## 5) Recommended release model
 

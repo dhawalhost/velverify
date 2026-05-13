@@ -31,6 +31,17 @@ func (h *HTTPHandler) RegisterRoutes(rg *gin.RouterGroup) {
 		sso.DELETE("/:id", h.deleteProvider)
 		sso.POST("/:id/toggle", h.toggleProvider)
 	}
+
+	// Alias for general SSO providers
+	unified := rg.Group("/sso/providers")
+	{
+		unified.GET("", h.listProviders)
+		unified.POST("", h.createProvider)
+		unified.GET("/:id", h.getProvider)
+		unified.PUT("/:id", h.updateProvider)
+		unified.DELETE("/:id", h.deleteProvider)
+		unified.POST("/:id/toggle", h.toggleProvider)
+	}
 }
 
 func (h *HTTPHandler) tenantID(c *gin.Context) (string, bool) {

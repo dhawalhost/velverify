@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/jmoiron/sqlx"
 )
@@ -52,31 +51,18 @@ func (s *sqlRepository) CreateRequest(ctx context.Context, req AccessRequest) (s
 
 func (s *sqlRepository) GetRequest(ctx context.Context, tenantID, id string) (AccessRequest, error) {
 	var req AccessRequest
-	// Note: We scan created_at/updated_at as time.Time then format to string in Service if needed,
-	// or scan to string if Postgres driver supports it. Default scanning to struct string requires compatibility.
-	// But our struct has string for CreatedAt. Let's use a temporary struct or assume Service handles conversion.
-	// Actually for simplicity, let's change struct to use time.Time or custom scanner.
-	// But since I already defined struct with string in types.go, I will Scan into time.Time and convert.
-
-	row := s.db.QueryRowxContext(ctx, `SELECT id, tenant_id, requester_id, requester_type, resource_type, resource_id, status, reason, duration, created_at, updated_at, device_id, metadata
-		FROM access_requests WHERE id = $1 AND tenant_id = $2`, id, tenantID)
-
-	var createdAt, updatedAt time.Time
-	err := row.Scan(&req.ID, &req.TenantID, &req.RequesterID, &req.RequesterType, &req.ResourceType, &req.ResourceID, &req.Status, &req.Reason, &req.Duration, &createdAt, &updatedAt, &req.DeviceID, &req.Metadata)
+	err := s.db.GetContext(ctx, &req, `SELECT * FROM access_requests WHERE id = $1 AND tenant_id = $2`, id, tenantID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return AccessRequest{}, fmt.Errorf("request not found")
 		}
 		return AccessRequest{}, err
 	}
-	req.CreatedAt = createdAt.Format(time.RFC3339)
-	req.UpdatedAt = updatedAt.Format(time.RFC3339)
 	return req, nil
 }
 
 func (s *sqlRepository) ListRequests(ctx context.Context, tenantID, status string) ([]AccessRequest, error) {
-	query := `SELECT id, tenant_id, requester_id, requester_type, resource_type, resource_id, status, reason, duration, created_at, updated_at, device_id, metadata
-		FROM access_requests WHERE tenant_id = $1`
+	query := `SELECT * FROM access_requests WHERE tenant_id = $1`
 	args := []interface{}{tenantID}
 
 	if status != "" {
@@ -85,22 +71,10 @@ func (s *sqlRepository) ListRequests(ctx context.Context, tenantID, status strin
 	}
 	query += ` ORDER BY created_at DESC`
 
-	rows, err := s.db.QueryContext(ctx, query, args...)
+	var requests []AccessRequest
+	err := s.db.SelectContext(ctx, &requests, query, args...)
 	if err != nil {
 		return nil, err
-	}
-	defer func() { _ = rows.Close() }()
-
-	var requests []AccessRequest
-	for rows.Next() {
-		var req AccessRequest
-		var createdAt, updatedAt time.Time
-		if err := rows.Scan(&req.ID, &req.TenantID, &req.RequesterID, &req.RequesterType, &req.ResourceType, &req.ResourceID, &req.Status, &req.Reason, &req.Duration, &createdAt, &updatedAt, &req.DeviceID, &req.Metadata); err != nil {
-			return nil, err
-		}
-		req.CreatedAt = createdAt.Format(time.RFC3339)
-		req.UpdatedAt = updatedAt.Format(time.RFC3339)
-		requests = append(requests, req)
 	}
 	return requests, nil
 }

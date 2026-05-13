@@ -1,0 +1,6 @@
+ALTER TABLE identities 
+DROP COLUMN IF EXISTS external_id,
+DROP COLUMN IF EXISTS phone_numbers,
+DROP COLUMN IF EXISTS department,
+DROP COLUMN IF EXISTS title,
+DROP COLUMN IF EXISTS timezone;

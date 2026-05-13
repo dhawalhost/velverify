@@ -54,9 +54,10 @@ export default function PrivacyPolicy() {
           <li>Provide, secure, and improve WardSeal services</li>
           <li>Authenticate users and enforce access controls</li>
           <li>Detect and prevent fraud, abuse, and unauthorized access</li>
-          <li>Provide customer support</li>
+          <li>Provide customer support and AI-assisted diagnostics (via Security Copilot)</li>
           <li>Comply with legal obligations</li>
         </ul>
+        <p><strong>AI Processing Notice:</strong> We process telemetry queries through Large Language Models to surface security insights. Data transmitted for parsing excludes primary underlying credentials.</p>
 
         <h2 style={{ color: '#fff', marginTop: '32px' }}>5. Legal bases (EEA/UK)</h2>
         <p>Where GDPR or UK GDPR applies, we rely on one or more legal bases:</p>
@@ -84,13 +85,14 @@ export default function PrivacyPolicy() {
         <p>We do not sell personal data in exchange for monetary compensation.</p>
 
         <h2 style={{ color: '#fff', marginTop: '32px' }}>7. International transfers</h2>
-        <p>If data is transferred across borders, we use appropriate safeguards, such as Standard Contractual Clauses or equivalent lawful mechanisms.</p>
+        <p>If data is transferred across borders, we ensure compliance via European Commission Standard Contractual Clauses (SCCs), UK International Data Transfer Agreements, or explicit adequacy determinations.</p>
 
         <h2 style={{ color: '#fff', marginTop: '32px' }}>8. Data retention</h2>
         <p>We retain personal data for as long as needed to provide the service, meet contractual obligations, resolve disputes, and comply with law. Detailed retention periods are documented in our internal data retention policies.</p>
 
-        <h2 style={{ color: '#fff', marginTop: '32px' }}>9. Security measures</h2>
+        <h2 style={{ color: '#fff', marginTop: '32px' }}>9. Security measures and breach notifications</h2>
         <p>We use technical and organizational measures designed to protect data, including access controls, encryption in transit, tenant isolation controls, and audit logging.</p>
+        <p><strong>Breach Notification:</strong> In the event of a confirmed security incident involving Personal Data, WardSeal will notify affected administrators without undue delay and, where feasible, not later than 72 hours after discovery.</p>
 
         <h2 style={{ color: '#fff', marginTop: '32px' }}>10. Your rights</h2>
         <p>Depending on location, individuals may have rights to access personal data, correct inaccurate data, delete data, restrict or object to processing, data portability, and withdraw consent.</p>

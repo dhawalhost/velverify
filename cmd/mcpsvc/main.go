@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/dhawalhost/gokit/logger"
+	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
 	"golang.org/x/crypto/bcrypt"
 
@@ -64,9 +65,35 @@ func main() {
 		cfg.Directory.ServiceAuthToken.Raw(),
 	)
 
+	// Initialize Redis Client
+	var globalRedisClient redis.UniversalClient
+	if cfg.Auth.RedisAddr != "" {
+		importStrings := func(s string) []string {
+			var res []string
+			for _, part := range strings.Split(s, ",") {
+				if trimmed := strings.TrimSpace(part); trimmed != "" {
+					res = append(res, trimmed)
+				}
+			}
+			return res
+		}
+
+		globalRedisClient = redis.NewUniversalClient(&redis.UniversalOptions{
+			Addrs:    importStrings(cfg.Auth.RedisAddr),
+			Password: cfg.Auth.RedisPassword.Raw(),
+			DB:       cfg.Auth.RedisDB,
+		})
+		if err := globalRedisClient.Ping(context.Background()).Err(); err != nil {
+			log.Warn("Redis unavailable; caches will degrade to in-memory fallbacks",
+				zap.Error(err),
+				zap.String("redis_addr", cfg.Auth.RedisAddr))
+			globalRedisClient = nil
+		}
+	}
+
 	rbacRepo := rbac.NewRepository(db)
 	authzRepo := authz.NewRepository(db)
-	authzEngine := authz.NewEngine(authzRepo, log)
+	authzEngine := authz.NewEngine(authzRepo, log, globalRedisClient)
 	rbacSvc := rbac.NewService(rbacRepo, authzEngine)
 
 	// Initialize Governance Service

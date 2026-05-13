@@ -1,16 +1,16 @@
 package main
 
 import (
-	"crypto/rsa"
 	"context"
+	"crypto/rsa"
 	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
-	"github.com/golang-jwt/jwt/v5"
 	gokitconfig "github.com/dhawalhost/gokit/config"
 	"github.com/dhawalhost/gokit/health"
 	"github.com/dhawalhost/gokit/logger"
@@ -18,7 +18,8 @@ import (
 	"github.com/dhawalhost/gokit/observability"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
-	"github.com/go-redis/redis/v8"
+	"github.com/golang-jwt/jwt/v5"
+	"github.com/redis/go-redis/v9"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 	"go.uber.org/zap"
 
@@ -87,11 +88,21 @@ func main() {
 	// Initialize metrics
 	metrics := wardsealobs.NewMetrics()
 
-	var redisClient *redis.Client
+	var redisClient redis.UniversalClient
 	var bus eventbus.EventBus
 	if cfg.Auth.RedisAddr != "" {
-		redisClient = redis.NewClient(&redis.Options{
-			Addr:     cfg.Auth.RedisAddr,
+		importStrings := func(s string) []string {
+			var res []string
+			for _, part := range strings.Split(s, ",") {
+				if trimmed := strings.TrimSpace(part); trimmed != "" {
+					res = append(res, trimmed)
+				}
+			}
+			return res
+		}
+
+		redisClient = redis.NewUniversalClient(&redis.UniversalOptions{
+			Addrs:    importStrings(cfg.Auth.RedisAddr),
 			Password: cfg.Auth.RedisPassword.Raw(),
 			DB:       cfg.Auth.RedisDB,
 		})
@@ -105,7 +116,7 @@ func main() {
 
 	rbacRepo := rbac.NewRepository(db)
 	authzRepo := authz.NewRepository(db)
-	authzEngine := authz.NewEngine(authzRepo, log)
+	authzEngine := authz.NewEngine(authzRepo, log, redisClient)
 	rbacSvc := rbac.NewService(rbacRepo, authzEngine)
 
 	signalStore := auth.NewSignalRepository(db)
@@ -174,7 +185,7 @@ func main() {
 	// Security Middleware
 	router.Use(middleware.Wrap(gokitmiddleware.SecureHeaders()))
 
-	var rateLimitRedisClient *redis.Client
+	var rateLimitRedisClient redis.UniversalClient
 	if redisClient != nil {
 		rateLimitRedisClient = redisClient
 	}
@@ -221,6 +232,7 @@ func main() {
 	// Register standardized health checks
 	healthHandler := health.NewHandler()
 	router.GET("/healthz", gin.WrapF(healthHandler.LiveHandler()))
+	router.GET("/gov/healthz", gin.WrapF(healthHandler.LiveHandler()))
 	router.GET("/readyz", gin.WrapF(healthHandler.ReadyHandler()))
 
 	campaignRepo := governance.NewCampaignRepository(db)

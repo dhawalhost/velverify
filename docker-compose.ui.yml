@@ -1,6 +1,10 @@
 # WardSeal UI Layer
 # =================
 # Frontend applications for the WardSeal platform.
+# All VITE_* build args are baked into the static bundle at build time.
+# VITE_API_URL  — this MFE's own nginx proxy (used for API calls)
+# VITE_ID_URL   — the identity/login portal (id.wardseal.local)
+# VITE_AUTH_URL — the raw authsvc (used by idui only for login calls)
 
 services:
   adminui:
@@ -8,19 +12,89 @@ services:
       context: ./web/admin
       dockerfile: Dockerfile
       args:
+        VITE_API_URL: http://admin.wardseal.local
+        VITE_AUTHSVC_URL: http://admin.wardseal.local
         VITE_GOVSVC_URL: http://api.wardseal.local
-        VITE_AUTHSVC_URL: http://auth.wardseal.local
         VITE_DIRSVC_URL: http://api.wardseal.local
+        VITE_ID_URL: http://id.wardseal.local
+        VITE_AUTH_URL: http://auth.wardseal.local
         VITE_APP_MODE: saas
     container_name: wardseal-adminui
     depends_on:
+      authsvc:
+        condition: service_healthy
       govsvc:
         condition: service_healthy
     labels:
       - traefik.enable=true
-      - traefik.http.routers.adminui.rule=Host(`manage.wardseal.local`)
+      - traefik.http.routers.adminui.rule=Host(`admin.wardseal.local`)
       - traefik.http.routers.adminui.entrypoints=web
       - traefik.http.services.adminui.loadbalancer.server.port=80
+    networks:
+      - wardseal-net
+
+  appui:
+    build:
+      context: ./web/app
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: http://app.wardseal.local
+        VITE_AUTHSVC_URL: http://app.wardseal.local
+        VITE_GOVSVC_URL: http://api.wardseal.local
+        VITE_DIRSVC_URL: http://api.wardseal.local
+        VITE_ID_URL: http://id.wardseal.local
+        VITE_AUTH_URL: http://auth.wardseal.local
+        VITE_APP_MODE: saas
+    container_name: wardseal-appui
+    depends_on:
+      authsvc:
+        condition: service_healthy
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.appui.rule=Host(`app.wardseal.local`)
+      - traefik.http.routers.appui.entrypoints=web
+      - traefik.http.services.appui.loadbalancer.server.port=80
+    networks:
+      - wardseal-net
+
+  idui:
+    build:
+      context: ./web/id
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: http://id.wardseal.local
+        VITE_AUTH_URL: http://auth.wardseal.local
+        VITE_APP_MODE: saas
+    container_name: wardseal-idui
+    depends_on:
+      authsvc:
+        condition: service_healthy
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.idui.rule=Host(`id.wardseal.local`)
+      - traefik.http.routers.idui.entrypoints=web
+      - traefik.http.services.idui.loadbalancer.server.port=80
+    networks:
+      - wardseal-net
+
+  developerui:
+    build:
+      context: ./web/developer
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: http://developer.wardseal.local
+        VITE_ID_URL: http://id.wardseal.local
+        VITE_AUTH_URL: http://auth.wardseal.local
+        VITE_APP_MODE: saas
+    container_name: wardseal-developerui
+    depends_on:
+      authsvc:
+        condition: service_healthy
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.developerui.rule=Host(`developer.wardseal.local`)
+      - traefik.http.routers.developerui.entrypoints=web
+      - traefik.http.services.developerui.loadbalancer.server.port=80
     networks:
       - wardseal-net
 
@@ -31,7 +105,7 @@ services:
       args:
         VITE_ENVIRONMENT: local
         VITE_SITE_BASE_URL: http://wardseal.local
-        VITE_CONSOLE_BASE_URL: http://manage.wardseal.local
+        VITE_CONSOLE_BASE_URL: http://app.wardseal.local
         VITE_SUPPORT_EMAIL: support@wardseal.com
     container_name: wardseal-landingui
     labels:
@@ -39,6 +113,23 @@ services:
       - traefik.http.routers.landingui.rule=Host(`wardseal.local`)
       - traefik.http.routers.landingui.entrypoints=web
       - traefik.http.services.landingui.loadbalancer.server.port=80
+    networks:
+      - wardseal-net
+
+  statusui:
+    build:
+      context: ./web/status
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: http://status.wardseal.local
+        VITE_APP_MODE: saas
+    container_name: wardseal-statusui
+    # No service dependency — status page is public and stateless
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.statusui.rule=Host(`status.wardseal.local`)
+      - traefik.http.routers.statusui.entrypoints=web
+      - traefik.http.services.statusui.loadbalancer.server.port=80
     networks:
       - wardseal-net
 

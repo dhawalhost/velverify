@@ -21,8 +21,8 @@ export default function TermsOfService() {
           <li>Promptly notifying WardSeal of unauthorized access</li>
         </ul>
 
-        <h2 style={{ color: '#fff', marginTop: '32px' }}>4. Acceptable use</h2>
-        <p>You must comply with the <strong>Acceptable Use Policy</strong>. You may not use the service for unlawful, abusive, or harmful activities.</p>
+        <h2 style={{ color: '#fff', marginTop: '32px' }}>4. Acceptable use and export compliance</h2>
+        <p>You must comply with the <strong>Acceptable Use Policy</strong>. You may not use the service for unlawful, abusive, or harmful activities. You certify compliance with applicable export control parameters (including EAR and ITAR provisions).</p>
 
         <h2 style={{ color: '#fff', marginTop: '32px' }}>5. Customer data</h2>
         <p>As between the parties, Customer retains all rights to Customer Data. WardSeal processes Customer Data to provide the services and as described in the Privacy Policy and DPA.</p>
@@ -46,7 +46,7 @@ export default function TermsOfService() {
         <p>To the maximum extent permitted by law:</p>
         <ul>
           <li>Neither party is liable for indirect, incidental, special, consequential, or punitive damages.</li>
-          <li>Each party’s aggregate liability is limited to amounts paid or payable in the 12-month period before the event giving rise to liability.</li>
+          <li>Each party’s aggregate liability is limited to amounts paid or payable in the 12-month period before the event giving rise to liability. (Liability exceptions apply strictly for gross negligence, intentional misconduct, or severe operational data breaches).</li>
         </ul>
 
         <h2 style={{ color: '#fff', marginTop: '32px' }}>12. Indemnification</h2>

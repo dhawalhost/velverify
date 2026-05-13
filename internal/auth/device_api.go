@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"fmt"
 	"net/http"
 	"time"
 
@@ -160,4 +161,98 @@ func (h *HTTPHandler) deleteDevice(c *gin.Context) {
 	}
 
 	c.Status(http.StatusNoContent)
+}
+
+// CrowdStrikeWebhook defines the payload for CrowdStrike ZTA.
+type CrowdStrikeWebhook struct {
+	DeviceID string  `json:"device_id"`
+	ZTA      float64 `json:"zta_score"`
+}
+
+// JamfWebhook defines the payload for Jamf compliance.
+type JamfWebhook struct {
+	DeviceID         string `json:"device_id"`
+	ComplianceStatus string `json:"compliance_status"`
+}
+
+// handleWebhook handles POST /api/v1/devices/webhooks/:provider
+func (h *HTTPHandler) handleWebhook(c *gin.Context) {
+	provider := c.Param("provider")
+	tenantID, err := middleware.TenantIDFromGinContext(c)
+	if err != nil {
+		h.logger.Error("Failed to extract tenant ID", zap.Error(err))
+		c.JSON(http.StatusBadRequest, gin.H{"error": "missing tenant context"})
+		return
+	}
+
+	var isCompliant bool
+	var riskScore int
+	var deviceID string
+
+	switch provider {
+	case "crowdstrike":
+		var req CrowdStrikeWebhook
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		deviceID = req.DeviceID
+		isCompliant = req.ZTA >= 50
+		riskScore = int(100 - req.ZTA)
+
+	case "jamf":
+		var req JamfWebhook
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		deviceID = req.DeviceID
+		isCompliant = req.ComplianceStatus == "Compliant"
+		if isCompliant {
+			riskScore = 0
+		} else {
+			riskScore = 80
+		}
+
+	default:
+		c.JSON(http.StatusBadRequest, gin.H{"error": "unsupported provider"})
+		return
+	}
+
+	// Find device
+	device, err := h.svc.Device().GetByID(c.Request.Context(), deviceID)
+	if err != nil {
+		h.logger.Error("Failed to fetch device for webhook", zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to verify device"})
+		return
+	}
+	if device == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "device not found"})
+		return
+	}
+	if device.TenantID != tenantID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "device does not belong to this tenant"})
+		return
+	}
+
+	// Update Posture
+	if err := h.svc.Device().UpdatePosture(c.Request.Context(), deviceID, isCompliant, riskScore); err != nil {
+		h.logger.Error("Failed to update posture from webhook", zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update device posture"})
+		return
+	}
+
+	// Ingest Security Event if not compliant
+	if !isCompliant {
+		event := &SecurityEvent{
+			SubjectID: device.UserID,
+			TenantID:  tenantID,
+			EventType: "device-posture-violation",
+			EventTime: time.Now(),
+			Reason:    fmt.Sprintf("EDR (%s) reported non-compliance", provider),
+		}
+		_ = h.svc.Signal().Ingest(c.Request.Context(), event)
+	}
+
+	c.Status(http.StatusOK)
 }
