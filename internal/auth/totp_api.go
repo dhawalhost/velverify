@@ -69,7 +69,7 @@ func (h *HTTPHandler) RequireMFAAuth() gin.HandlerFunc {
 
 // RegisterTOTPRoutes registers TOTP-related routes.
 func (h *HTTPHandler) RegisterTOTPRoutes(rg *gin.RouterGroup) {
-	totp := rg.Group("/mfa/totp")
+	totp := rg.Group("/totp")
 	totp.Use(h.RequireMFAAuth())
 	{
 		totp.POST("/enroll", h.enrollTOTP)
@@ -224,7 +224,13 @@ func (h *HTTPHandler) getTOTPStatus(c *gin.Context) {
 		return
 	}
 
-	userID := c.GetString("user_id")
+	// Try query param first (for admin/support tools)
+	userID := c.Query("user_id")
+	if userID == "" {
+		// Fallback to session user
+		userID = c.GetString("user_id")
+	}
+
 	if userID == "" {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 		return
@@ -237,14 +243,32 @@ func (h *HTTPHandler) getTOTPStatus(c *gin.Context) {
 		return
 	}
 
-	if stored == nil {
-		c.JSON(http.StatusOK, gin.H{"enrolled": false, "verified": false})
-		return
+	status := gin.H{
+		"enrolled": false,
+		"verified": false,
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"enrolled":   true,
-		"verified":   stored.Verified,
-		"created_at": stored.CreatedAt,
-	})
+	if stored != nil {
+		status["enrolled"] = true
+		status["verified"] = stored.Verified
+		status["created_at"] = stored.CreatedAt
+	}
+
+	// Fetch Real Security Intel
+	risk, err := h.svc.Signal().GetUserRisk(c.Request.Context(), tenantID, userID)
+	if err == nil && risk != nil {
+		status["risk_score"] = risk.Score
+		status["risk_level"] = risk.Level
+	} else {
+		status["risk_score"] = 0
+		status["risk_level"] = "low"
+	}
+
+	latestLogin, err := h.svc.Signal().GetLatestSuccess(c.Request.Context(), userID)
+	if err == nil && latestLogin != nil {
+		status["last_login_at"] = latestLogin.Timestamp
+		status["last_login_ip"] = latestLogin.IPAddress
+	}
+
+	c.JSON(http.StatusOK, status)
 }

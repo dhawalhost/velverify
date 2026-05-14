@@ -43,6 +43,7 @@ const MFASetup: React.FC = () => {
     const [verifyCode, setVerifyCode] = useState('');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(true);
+    const [intel, setIntel] = useState<any>(null);
 
     const getUserId = () => {
         return localStorage.getItem('userId') || 'admin@wardseal.com';
@@ -53,6 +54,7 @@ const MFASetup: React.FC = () => {
             const response = await api.get(`/api/v1/mfa/totp/status?user_id=${encodeURIComponent(getUserId())}`);
             setEnrolled(response.data.enrolled);
             setVerified(response.data.verified);
+            setIntel(response.data);
         } catch (err) {
             console.error('Failed to fetch TOTP status', err);
         } finally {
@@ -278,9 +280,21 @@ const MFASetup: React.FC = () => {
 
                             <div className="space-y-8">
                                 {[
-                                    { label: 'Latency Threshold', value: '< 20ms', icon: <Activity className="w-4 h-4" /> },
-                                    { label: 'Seed Algorithm', value: 'SHA1_TRANSIENT', icon: <Binary className="w-4 h-4" /> },
-                                    { label: 'Cluster Mode', value: 'DETERMINISTIC', icon: <Layout className="w-4 h-4" /> },
+                                    { 
+                                        label: 'Risk Profile', 
+                                        value: intel?.risk_level ? `${intel.risk_level.toUpperCase()} (${intel.risk_score || 0})` : 'CALCULATING...', 
+                                        icon: <ShieldAlert className="w-4 h-4" /> 
+                                    },
+                                    { 
+                                        label: 'Access Signal', 
+                                        value: intel?.last_login_ip || 'PENDING_INIT', 
+                                        icon: <Activity className="w-4 h-4" /> 
+                                    },
+                                    { 
+                                        label: 'Identity Age', 
+                                        value: intel?.last_login_at ? new Date(intel.last_login_at).toLocaleDateString() : 'GENESIS', 
+                                        icon: <Binary className="w-4 h-4" /> 
+                                    },
                                 ].map((stat) => (
                                     <div key={stat.label} className="group flex items-center justify-between border-b border-on-inverse/5 pb-4 last:border-0 last:pb-0">
                                         <div className="flex items-center gap-4">

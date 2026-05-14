@@ -504,8 +504,6 @@ func (h *HTTPHandler) login(c *gin.Context) {
 		_ = h.loginAttemptStore.UnlockAccount(c.Request.Context(), tenantID, req.Username)
 	}
 
-
-
 	// Set httpOnly cookies for session security
 	h.setAuthCookies(c, token, "")
 
@@ -744,7 +742,6 @@ func (h *HTTPHandler) authorize(c *gin.Context) {
 		c.JSON(http.StatusForbidden, gin.H{"error": "tenant context mismatch"})
 		return
 	}
-
 
 	if tenantID != "" && h.appStore != nil {
 		app, err := h.appStore.GetByClientID(c.Request.Context(), req.ClientID)

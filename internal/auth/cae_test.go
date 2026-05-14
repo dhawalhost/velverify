@@ -64,6 +64,9 @@ func (m *mockSignalStore) GetLatestSuccess(ctx context.Context, subjectID string
 	return nil, nil
 }
 func (m *mockSignalStore) UpdateUserRisk(ctx context.Context, risk UserRisk) error { return nil }
+func (m *mockSignalStore) GetUserRisk(ctx context.Context, tenantID, userID string) (*UserRisk, error) {
+	return nil, nil
+}
 func (m *mockSignalStore) GetHighRiskUsers(ctx context.Context, tenantID string, threshold int) ([]UserRisk, error) {
 	return nil, nil
 }

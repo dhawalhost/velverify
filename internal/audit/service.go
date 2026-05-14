@@ -51,13 +51,14 @@ func (s *service) Log(ctx context.Context, input LogInput) error {
 	}
 
 	// Serialize details to JSON
-	var details json.RawMessage
+	var details *json.RawMessage
 	if input.Details != nil {
 		b, err := json.Marshal(input.Details)
 		if err != nil {
 			return fmt.Errorf("failed to serialize details: %w", err)
 		}
-		details = b
+		raw := json.RawMessage(b)
+		details = &raw
 	}
 
 	e := Event{

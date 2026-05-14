@@ -2,6 +2,8 @@ package auth
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"time"
 
 	"github.com/google/uuid"
@@ -37,6 +39,7 @@ type UserRisk struct {
 	Level           string    `db:"level"`
 	Factors         string    `db:"factors"` // JSONB string
 	LastEvaluatedAt time.Time `db:"last_evaluated_at"`
+	UpdatedAt       time.Time `db:"updated_at"`
 }
 
 // SignalRepository defines storage for security events and risk state.
@@ -48,6 +51,7 @@ type SignalRepository interface {
 
 	// Risk Persistence
 	UpdateUserRisk(ctx context.Context, risk UserRisk) error
+	GetUserRisk(ctx context.Context, tenantID, userID string) (*UserRisk, error)
 	GetHighRiskUsers(ctx context.Context, tenantID string, threshold int) ([]UserRisk, error)
 }
 
@@ -120,6 +124,19 @@ func (r *sqlSignalRepository) GetLatestSuccess(ctx context.Context, subjectID st
 		return nil, err
 	}
 	return &s, nil
+}
+
+func (r *sqlSignalRepository) GetUserRisk(ctx context.Context, tenantID, userID string) (*UserRisk, error) {
+	var risk UserRisk
+	query := `SELECT * FROM user_risk_levels WHERE tenant_id = $1 AND user_id = $2`
+	err := r.db.GetContext(ctx, &risk, query, tenantID, userID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &risk, nil
 }
 
 func (r *sqlSignalRepository) UpdateUserRisk(ctx context.Context, risk UserRisk) error {

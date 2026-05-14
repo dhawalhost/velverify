@@ -268,16 +268,16 @@ const IPPolicies: React.FC = () => {
                                 <GlassTable>
                                     <GlassTableHeader>
                                         <GlassTableRow className="hover:bg-transparent border-b border-on-surface/5">
-                                            <GlassTableHead className="py-6 pl-10 font-bold text-[12px] tracking-tight text-on-surface-variant/40">IP Rule</GlassTableHead>
+                                            <GlassTableHead className="py-6 pl-10 font-bold text-[12px] tracking-tight text-on-surface-variant/40">IP Rule / Location</GlassTableHead>
+                                            <GlassTableHead className="font-bold text-[12px] tracking-tight text-on-surface-variant/40">Type</GlassTableHead>
                                             <GlassTableHead className="font-bold text-[12px] tracking-tight text-on-surface-variant/40">Description</GlassTableHead>
-                                            <GlassTableHead className="text-center font-bold text-[12px] tracking-tight text-on-surface-variant/40">Status</GlassTableHead>
                                             <GlassTableHead className="text-right font-bold text-[12px] tracking-tight text-on-surface-variant/40 pr-10">Actions</GlassTableHead>
                                         </GlassTableRow>
                                     </GlassTableHeader>
                                     <TableBody>
                                         {policies.length === 0 ? (
                                             <GlassTableRow>
-                                                <TableCell colSpan={5} className="py-40 text-center">
+                                                <TableCell colSpan={4} className="py-40 text-center">
                                                     <div className="flex flex-col items-center gap-6 opacity-20">
                                                         <Activity className="h-16 w-16" />
                                                         <span className="text-[13px] font-bold tracking-tight italic">Null policy state // Open architecture</span>
@@ -288,23 +288,6 @@ const IPPolicies: React.FC = () => {
                                             policies.map((policy) => (
                                                 <GlassTableRow key={policy.id} className="hover:bg-surface-container/10 transition-all border-b border-on-surface/5 last:border-0 group">
                                                     <TableCell className="py-8 pl-10">
-                                                        <Badge className={`rounded-xl font-bold text-[10px] tracking-tight px-4 py-1.5 border-none shadow-sm transition-all ${policy.type === 'allow'
-                                                            ? 'bg-success-subtle text-success'
-                                                            : 'bg-destructive/10 text-destructive'
-                                                            }`}>
-                                                            {policy.type}
-                                                        </Badge>
-                                                    </TableCell>
-                                                    <TableCell className="py-8">
-                                                        <div className="flex items-center gap-2.5 text-[11px] font-bold tracking-tight text-on-surface-variant/40 group-hover:text-on-surface transition-colors italic">
-                                                            {policy.cidr ? (
-                                                                <><Network className="w-4 h-4 text-primary opacity-40 group-hover:opacity-100" /> Cidr range</>
-                                                            ) : (
-                                                                <><Globe className="w-4 h-4 text-primary opacity-40 group-hover:opacity-100" /> Geo iso</>
-                                                            )}
-                                                        </div>
-                                                    </TableCell>
-                                                    <TableCell className="py-8">
                                                         <div className="flex items-center gap-5">
                                                             <div className="w-11 h-11 rounded-xl bg-surface-container flex items-center justify-center group-hover:bg-primary/10 group-hover:text-primary transition-all">
                                                                 {policy.cidr ? <Terminal className="h-5 w-5 opacity-40" /> : <MapPin className="h-5 w-5 opacity-40" />}
@@ -316,18 +299,35 @@ const IPPolicies: React.FC = () => {
                                                         </div>
                                                     </TableCell>
                                                     <TableCell className="py-8">
-                                                        <span className="text-[12px] font-medium text-on-surface-variant/60 tracking-tight">
-                                                            {policy.reason || 'Null description'}
-                                                        </span>
+                                                        <Badge className={`rounded-xl font-bold text-[10px] tracking-tight px-4 py-1.5 border-none shadow-sm transition-all ${policy.type === 'allow'
+                                                            ? 'bg-success-subtle text-success'
+                                                            : 'bg-destructive/10 text-destructive'
+                                                            }`}>
+                                                            {policy.type === 'allow' ? 'Allow' : 'Block'}
+                                                        </Badge>
+                                                    </TableCell>
+                                                    <TableCell className="py-8">
+                                                        <div className="flex flex-col gap-1">
+                                                            <div className="flex items-center gap-2.5 text-[11px] font-bold tracking-tight text-on-surface-variant/40 group-hover:text-on-surface transition-colors italic">
+                                                                {policy.cidr ? (
+                                                                    <><Network className="w-4 h-4 text-primary opacity-40 group-hover:opacity-100" /> Cidr range</>
+                                                                ) : (
+                                                                    <><Globe className="w-4 h-4 text-primary opacity-40 group-hover:opacity-100" /> Geo iso</>
+                                                                )}
+                                                            </div>
+                                                            <span className="text-[12px] font-medium text-on-surface-variant/60 tracking-tight">
+                                                                {policy.reason || 'No description provided'}
+                                                            </span>
+                                                        </div>
                                                     </TableCell>
                                                     <TableCell className="py-8 text-right pr-10">
                                                         <Button
                                                             variant="ghost"
-                                                            size="icon"
-                                                            className="h-11 w-11 rounded-xl text-on-surface-variant/30 hover:text-destructive hover:bg-destructive/10 transition-all"
+                                                            size="sm"
+                                                            className="h-9 px-4 rounded-lg bg-destructive/5 text-destructive border border-destructive/10 hover:bg-destructive hover:text-white transition-all font-bold text-[10px] uppercase tracking-wider"
                                                             onClick={() => handleDeletePolicy(policy.id)}
                                                         >
-                                                            <Trash2 className="w-5 h-5" />
+                                                            <Trash2 className="w-3.5 h-3.5 mr-2" /> Revoke
                                                         </Button>
                                                     </TableCell>
                                                 </GlassTableRow>

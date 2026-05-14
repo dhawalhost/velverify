@@ -20,7 +20,7 @@ type Event struct {
 	ResourceType string          `json:"resource_type" db:"resource_type"`
 	ResourceID   *string         `json:"resource_id,omitempty" db:"resource_id"`
 	ResourceName *string         `json:"resource_name,omitempty" db:"resource_name"`
-	Details      json.RawMessage `json:"details,omitempty" db:"details"`
+	Details      *json.RawMessage `json:"details,omitempty" db:"details"`
 	IPAddress    *string         `json:"ip_address,omitempty" db:"ip_address"`
 	UserAgent    *string         `json:"user_agent,omitempty" db:"user_agent"`
 	Outcome      string          `json:"outcome" db:"outcome"` // success, failure

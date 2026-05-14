@@ -10,10 +10,10 @@ import (
 )
 
 func (h *HTTPHandler) RegisterWebAuthnRoutes(rg *gin.RouterGroup) {
-	rg.POST("/mfa/webauthn/login/begin", h.beginWebAuthnLogin)
-	rg.POST("/mfa/webauthn/login/finish", h.finishWebAuthnLogin)
+	rg.POST("/webauthn/login/begin", h.beginWebAuthnLogin)
+	rg.POST("/webauthn/login/finish", h.finishWebAuthnLogin)
 
-	protected := rg.Group("/mfa/webauthn")
+	protected := rg.Group("/webauthn")
 	protected.Use(middleware.RequireUserAuth(h.svc.ValidateToken))
 	{
 		protected.POST("/register/begin", h.beginWebAuthnRegistration)
@@ -123,7 +123,7 @@ func (h *HTTPHandler) finishWebAuthnLogin(c *gin.Context) {
 	}
 
 	h.webAuthnSessions.Delete(c.Request.Context(), userID)
-	
+
 	// Set httpOnly cookies for session security
 	h.setAuthCookies(c, token, "")
 

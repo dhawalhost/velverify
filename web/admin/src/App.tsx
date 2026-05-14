@@ -22,6 +22,8 @@ import Discovery from './pages/Discovery';
 import Policies from './pages/Policies';
 import IPPolicies from './pages/IPPolicies';
 import Groups from './pages/Groups';
+import MFASetup from './pages/MFASetup';
+import Passkeys from './pages/Passkeys';
 import SlackIntegration from './pages/SlackIntegration';
 import GraphExplorer from './pages/GraphExplorer';
 import WorkloadManagement from './pages/WorkloadManagement';
@@ -85,6 +87,8 @@ const App: React.FC = () => {
             <Route path="/branding" element={<Branding />} />
             <Route path="/webhooks" element={<Webhooks />} />
             <Route path="/devices" element={<Devices />} />
+            <Route path="/mfa" element={<MFASetup />} />
+            <Route path="/passkeys" element={<Passkeys />} />
             <Route path="/organizations" element={<Organizations />} />
             <Route path="/discovery" element={<Discovery />} />
             <Route path="/policies" element={<Policies />} />

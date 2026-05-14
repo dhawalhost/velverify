@@ -55,19 +55,19 @@ type updateOAuthClientRequest struct {
 // Access Request types
 
 type AccessRequest struct {
-	ID            string          `json:"id"`
-	TenantID      string          `json:"tenant_id"`
-	RequesterID   string          `json:"requester_id"`
-	RequesterType string          `json:"requester_type"` // user, workload
-	ResourceType  string          `json:"resource_type"`
-	ResourceID    string          `json:"resource_id"`
-	Status        string          `json:"status"`
-	Reason        *string         `json:"reason,omitempty"`
-	Duration      *string         `json:"duration,omitempty"` // e.g. "4h", "1d"
-	CreatedAt     time.Time       `json:"created_at"`
-	UpdatedAt     time.Time       `json:"updated_at"`
-	DeviceID      *string         `json:"device_id,omitempty"`
-	Metadata      json.RawMessage `json:"metadata,omitempty"`
+	ID            string          `json:"id" db:"id"`
+	TenantID      string          `json:"tenant_id" db:"tenant_id"`
+	RequesterID   string          `json:"requester_id" db:"requester_id"`
+	RequesterType string          `json:"requester_type" db:"requester_type"` // user, workload
+	ResourceType  string          `json:"resource_type" db:"resource_type"`
+	ResourceID    string          `json:"resource_id" db:"resource_id"`
+	Status        string          `json:"status" db:"status"`
+	Reason        *string         `json:"reason,omitempty" db:"reason"`
+	Duration      *string         `json:"duration,omitempty" db:"duration"` // e.g. "4h", "1d"
+	CreatedAt     time.Time       `json:"created_at" db:"created_at"`
+	UpdatedAt     time.Time       `json:"updated_at" db:"updated_at"`
+	DeviceID      *string         `json:"device_id,omitempty" db:"device_id"`
+	Metadata      json.RawMessage `json:"metadata,omitempty" db:"metadata"`
 }
 
 type CreateAccessRequest struct {
@@ -92,13 +92,13 @@ type ApprovalDecision struct {
 // IP Access Policy types
 
 type IPPolicy struct {
-	ID          string    `json:"id"`
-	TenantID    string    `json:"tenant_id"`
-	Type        string    `json:"type"` // ALLOW, BLOCK
-	CIDR        *string   `json:"cidr,omitempty"`
-	CountryCode *string   `json:"country_code,omitempty"`
-	Reason      *string   `json:"reason,omitempty"`
-	CreatedAt   time.Time `json:"created_at"`
+	ID          string    `json:"id" db:"id"`
+	TenantID    string    `json:"tenant_id" db:"tenant_id"`
+	Type        string    `json:"type" db:"type"` // ALLOW, BLOCK
+	CIDR        *string   `json:"cidr,omitempty" db:"cidr"`
+	CountryCode *string   `json:"country_code,omitempty" db:"country_code"`
+	Reason      *string   `json:"reason,omitempty" db:"reason"`
+	CreatedAt   time.Time `json:"created_at" db:"created_at"`
 }
 
 type CreateIPPolicyRequest struct {

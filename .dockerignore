@@ -1,0 +1,9 @@
+.git
+node_modules
+web/*/node_modules
+dist
+build
+.next
+.env
+*.log
+deploy/dev-keys
