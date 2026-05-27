@@ -50,7 +50,9 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { PageHeader, GlassCard, GlassCardHeader, GlassCardTitle, GlassCardContent, GlassTable, GlassTableHeader, GlassTableHead, GlassTableRow } from '@/components/layout';
+import { PageHeader, GlassCard, GlassCardHeader, GlassCardTitle, GlassCardContent, GlassTable, GlassTableHeader, GlassTableHead, GlassTableRow, PageLayout
+} from '@/components/layout';
+import { IPPolicyTableRow } from '../components/IPPolicyTableRow';
 
 const IPPolicies: React.FC = () => {
     const [policies, setPolicies] = useState<IPPolicy[]>([]);
@@ -115,6 +117,7 @@ const IPPolicies: React.FC = () => {
     if (loading && policies.length === 0) return <div className="h-[400px] flex items-center justify-center"><Loader2 className="h-10 w-10 animate-spin text-primary opacity-20" /></div>;
 
     return (
+        <PageLayout>
         <div className="space-y-12 animate-in fade-in duration-700">
             <PageHeader
                 icon={<ShieldCheck className="w-10 h-10 text-primary" />}
@@ -286,51 +289,11 @@ const IPPolicies: React.FC = () => {
                                             </GlassTableRow>
                                         ) : (
                                             policies.map((policy) => (
-                                                <GlassTableRow key={policy.id} className="hover:bg-surface-container/10 transition-all border-b border-on-surface/5 last:border-0 group">
-                                                    <TableCell className="py-8 pl-10">
-                                                        <div className="flex items-center gap-5">
-                                                            <div className="w-11 h-11 rounded-xl bg-surface-container flex items-center justify-center group-hover:bg-primary/10 group-hover:text-primary transition-all">
-                                                                {policy.cidr ? <Terminal className="h-5 w-5 opacity-40" /> : <MapPin className="h-5 w-5 opacity-40" />}
-                                                            </div>
-                                                            <div className="flex flex-col">
-                                                                <span className="text-lg font-bold tracking-tight text-on-surface group-hover:text-primary transition-colors">{policy.cidr || policy.country_code}</span>
-                                                                <span className="text-[10px] font-bold font-mono tracking-tight text-on-surface-variant/30 mt-1 italic">Id: {policy.id.substring(0, 8)}</span>
-                                                            </div>
-                                                        </div>
-                                                    </TableCell>
-                                                    <TableCell className="py-8">
-                                                        <Badge className={`rounded-xl font-bold text-[10px] tracking-tight px-4 py-1.5 border-none shadow-sm transition-all ${policy.type === 'allow'
-                                                            ? 'bg-success-subtle text-success'
-                                                            : 'bg-destructive/10 text-destructive'
-                                                            }`}>
-                                                            {policy.type === 'allow' ? 'Allow' : 'Block'}
-                                                        </Badge>
-                                                    </TableCell>
-                                                    <TableCell className="py-8">
-                                                        <div className="flex flex-col gap-1">
-                                                            <div className="flex items-center gap-2.5 text-[11px] font-bold tracking-tight text-on-surface-variant/40 group-hover:text-on-surface transition-colors italic">
-                                                                {policy.cidr ? (
-                                                                    <><Network className="w-4 h-4 text-primary opacity-40 group-hover:opacity-100" /> Cidr range</>
-                                                                ) : (
-                                                                    <><Globe className="w-4 h-4 text-primary opacity-40 group-hover:opacity-100" /> Geo iso</>
-                                                                )}
-                                                            </div>
-                                                            <span className="text-[12px] font-medium text-on-surface-variant/60 tracking-tight">
-                                                                {policy.reason || 'No description provided'}
-                                                            </span>
-                                                        </div>
-                                                    </TableCell>
-                                                    <TableCell className="py-8 text-right pr-10">
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="sm"
-                                                            className="h-9 px-4 rounded-lg bg-destructive/5 text-destructive border border-destructive/10 hover:bg-destructive hover:text-white transition-all font-bold text-[10px] uppercase tracking-wider"
-                                                            onClick={() => handleDeletePolicy(policy.id)}
-                                                        >
-                                                            <Trash2 className="w-3.5 h-3.5 mr-2" /> Revoke
-                                                        </Button>
-                                                    </TableCell>
-                                                </GlassTableRow>
+                                                <IPPolicyTableRow
+                                                    key={policy.id}
+                                                    policy={policy}
+                                                    onDelete={handleDeletePolicy}
+                                                />
                                             ))
                                         )}
                                     </TableBody>
@@ -341,6 +304,7 @@ const IPPolicies: React.FC = () => {
                 </div>
             </div>
         </div>
+        </PageLayout>
     );
 };
 

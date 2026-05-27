@@ -84,6 +84,7 @@ type Service interface {
 	PerformSystemSetup(ctx context.Context, email, password string) (string, error)
 
 	ResolveTenantSlug(ctx context.Context, slug string) (string, error)
+	GetTenantSlug(ctx context.Context, tenantID string) (string, error)
 	UIURL() string
 	ValidateToken(tokenString string) (*middleware.Claims, error)
 	ValidateStepUpToken(tokenString string) (*middleware.Claims, error)
@@ -824,6 +825,13 @@ func (s *authService) ResolveTenantSlug(ctx context.Context, slug string) (strin
 		return "", errors.New("tenant store not configured")
 	}
 	return s.tenantStore.GetIDBySlug(ctx, slug)
+}
+
+func (s *authService) GetTenantSlug(ctx context.Context, tenantID string) (string, error) {
+	if s.tenantStore == nil {
+		return "", errors.New("tenant store not configured")
+	}
+	return s.tenantStore.GetSlugByID(ctx, tenantID)
 }
 
 func (s *authService) Authorize(ctx context.Context, userID string, req AuthorizeRequest) (AuthorizeResponse, error) {

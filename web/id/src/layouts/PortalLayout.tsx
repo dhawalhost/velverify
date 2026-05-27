@@ -15,6 +15,7 @@ import api, { getUserRoles } from '../api';
 import { useAuth } from '../hooks/useAuth';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import BoringAvatar from 'boring-avatars';
 
 const ADMIN_ROLE = 'admin';
 
@@ -155,8 +156,12 @@ const PortalLayout = () => {
                                 <DropdownMenuTrigger asChild>
                                     <Button variant="ghost" className="h-10 w-10 p-0 rounded-full hover:bg-surface-container transition-all">
                                         <Avatar className="h-8 w-8">
-                                            <AvatarImage src={`https://avatar.vercel.sh/${getTokenUserID(localStorage.getItem('token'))}`} />
-                                            <AvatarFallback className="bg-primary/10 text-primary text-[10px] font-bold">US</AvatarFallback>
+                                            <BoringAvatar
+                                                size={32}
+                                                name={getTokenUserID(localStorage.getItem('token')) || 'user'}
+                                                variant="marble"
+                                                colors={["#00FF9E", "#17171C", "#8B5CF6", "#06B6D4", "#10B981"]}
+                                            />
                                         </Avatar>
                                     </Button>
                                 </DropdownMenuTrigger>

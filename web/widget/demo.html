@@ -5,8 +5,9 @@
   <title>WardSeal Login Widget Demo</title>
   <style>
     body {
-      font-family: -apple-system, sans-serif;
-      background: #f4f6f8;
+      font-family: 'Inter', -apple-system, sans-serif;
+      background: #09090b;
+      color: #fafafa;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -18,7 +19,8 @@
       margin-top: 2rem;
     }
     pre {
-      background: #eee;
+      background: #18181b;
+      color: #06ffa5;
       padding: 1rem;
       border-radius: 8px;
     }
@@ -45,8 +47,8 @@
       tenantId: '11111111-1111-1111-1111-111111111111', // Default Dev Tenant
       clientId: 'test-client',
       branding: {
-        logoUrl: 'https://via.placeholder.com/150x50?text=Your+Logo',
-        primaryColor: '#6366f1' // Indigo
+        logoUrl: '../landing/public/logo.png',
+        primaryColor: '#06ffa5' // Electric Green
       },
       onSuccess: (token) => {
         console.log('Login Success:', token);

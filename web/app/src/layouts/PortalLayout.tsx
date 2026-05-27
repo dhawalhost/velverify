@@ -15,6 +15,7 @@ import api, { getUserRoles } from '../api';
 import { useAuth } from '../hooks/useAuth';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import BoringAvatar from 'boring-avatars';
 
 const ADMIN_ROLE = 'admin';
 
@@ -55,6 +56,7 @@ const PortalLayout = () => {
     const navigate = useNavigate();
     const { logout } = useAuth();
     const [canAccessAdmin, setCanAccessAdmin] = useState(false);
+    const [imgFailed, setImgFailed] = useState(false);
     const [userName, setUserName] = useState(localStorage.getItem('userName') || "Authorized User");
     const policyBaseUrl = window.location.hostname.endsWith('.local')
         ? 'http://wardseal.local'
@@ -65,7 +67,7 @@ const PortalLayout = () => {
 
         const loadAdminAccess = async () => {
             const token = localStorage.getItem('token');
-            const userID = getTokenUserID(token);
+            const userID = localStorage.getItem('userId') || getTokenUserID(token);
             if (!userID) {
                 if (mounted) setCanAccessAdmin(false);
                 return;
@@ -156,8 +158,12 @@ const PortalLayout = () => {
                                 <DropdownMenuTrigger asChild>
                                     <Button variant="ghost" className="h-9 w-9 p-0 rounded-full hover:bg-surface-container transition-all">
                                         <Avatar className="h-7 w-7">
-                                            <AvatarImage src={`https://avatar.vercel.sh/${getTokenUserID(localStorage.getItem('token'))}`} />
-                                            <AvatarFallback className="bg-primary/10 text-primary text-[10px] font-bold">US</AvatarFallback>
+                                            <BoringAvatar
+                                                size={28}
+                                                name={localStorage.getItem('userId') || getTokenUserID(localStorage.getItem('token')) || 'user'}
+                                                variant="marble"
+                                                colors={["#00FF9E", "#17171C", "#8B5CF6", "#06B6D4", "#10B981"]}
+                                            />
                                         </Avatar>
                                     </Button>
                                 </DropdownMenuTrigger>

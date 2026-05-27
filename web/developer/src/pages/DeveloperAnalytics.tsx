@@ -4,6 +4,7 @@ import { Activity, BarChart2, Clock, Terminal, AlertCircle, RefreshCw, Loader2, 
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Button } from '@/components/ui/button';
 import { PageHeader, GlassCard, GlassCardHeader, GlassCardTitle, GlassCardContent } from '@/components/layout';
+import { DeveloperMetricCard } from '../components/DeveloperMetricCard';
 
 interface AnalyticPoint {
     date: string;
@@ -73,45 +74,44 @@ export function DeveloperAnalytics() {
 
             {/* KPI Cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <GlassCard className="border-none shadow-xl shadow-on-surface/5 bg-card rounded-xl overflow-hidden">
-                    <GlassCardContent className="p-3.5 flex flex-col gap-1">
-                        <div className="flex items-center gap-2">
-                            <div className="p-1.5 bg-primary/10 rounded-lg">
-                                <Activity className="h-3.5 w-3.5 text-primary" />
-                            </div>
-                            <span className="text-[10px] font-bold tracking-tight text-on-surface-variant/40 uppercase">Total Calls (7d)</span>
+                <DeveloperMetricCard
+                    icon={
+                        <div className="p-1.5 bg-primary/10 rounded-lg">
+                            <Activity className="h-3.5 w-3.5 text-primary" />
                         </div>
-                        <p className="text-xl font-bold tracking-tight text-on-surface tabular-nums">{loading ? '—' : totalCalls.toLocaleString()}</p>
-                    </GlassCardContent>
-                </GlassCard>
+                    }
+                    title="Total Calls (7d)"
+                    value={totalCalls.toLocaleString()}
+                    loading={loading}
+                />
 
-                <GlassCard className="border-none shadow-xl shadow-on-surface/5 bg-card rounded-xl overflow-hidden">
-                    <GlassCardContent className="p-3.5 flex flex-col gap-1">
-                        <div className="flex items-center gap-2">
-                            <div className="p-1.5 bg-primary/10 rounded-lg">
-                                <Clock className="h-3.5 w-3.5 text-primary" />
-                            </div>
-                            <span className="text-[10px] font-bold tracking-tight text-on-surface-variant/40 uppercase">Avg Latency</span>
+                <DeveloperMetricCard
+                    icon={
+                        <div className="p-1.5 bg-primary/10 rounded-lg">
+                            <Clock className="h-3.5 w-3.5 text-primary" />
                         </div>
-                        <p className="text-xl font-bold tracking-tight text-on-surface tabular-nums">
-                            {loading ? '—' : <>{avgLatency}<span className="text-sm ml-1 text-on-surface-variant/40">ms</span></>}
-                        </p>
-                    </GlassCardContent>
-                </GlassCard>
+                    }
+                    title="Avg Latency"
+                    value={
+                        <>
+                            {avgLatency}
+                            <span className="text-sm ml-1 text-on-surface-variant/40">ms</span>
+                        </>
+                    }
+                    loading={loading}
+                />
 
-                <GlassCard className="border-none shadow-xl shadow-on-surface/5 bg-card rounded-xl overflow-hidden">
-                    <GlassCardContent className="p-3.5 flex flex-col gap-1">
-                        <div className="flex items-center gap-2">
-                            <div className="p-1.5 bg-destructive/10 rounded-lg">
-                                <AlertCircle className="h-3.5 w-3.5 text-destructive" />
-                            </div>
-                            <span className="text-[10px] font-bold tracking-tight text-on-surface-variant/40 uppercase">Total Errors (7d)</span>
+                <DeveloperMetricCard
+                    icon={
+                        <div className="p-1.5 bg-destructive/10 rounded-lg">
+                            <AlertCircle className="h-3.5 w-3.5 text-destructive" />
                         </div>
-                        <p className={`text-xl font-bold tracking-tight tabular-nums ${totalErrors > 0 ? 'text-destructive' : 'text-on-surface'}`}>
-                            {loading ? '—' : totalErrors.toLocaleString()}
-                        </p>
-                    </GlassCardContent>
-                </GlassCard>
+                    }
+                    title="Total Errors (7d)"
+                    value={totalErrors.toLocaleString()}
+                    valueClassName={totalErrors > 0 ? 'text-destructive' : 'text-on-surface'}
+                    loading={loading}
+                />
             </div>
 
             {/* Traffic Chart */}

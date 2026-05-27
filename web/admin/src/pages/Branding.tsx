@@ -9,13 +9,14 @@ import { Loader2, Save, Palette, RefreshCw, LayoutTemplate } from 'lucide-react'
 import { Separator } from '@/components/ui/separator';
 
 import { Badge } from '@/components/ui/badge';
-import { PageHeader, GlassCard, GlassCardHeader, GlassCardTitle, GlassCardContent, GlassCardDescription } from '@/components/layout';
+import { PageHeader, GlassCard, GlassCardHeader, GlassCardTitle, GlassCardContent, GlassCardDescription, PageLayout
+} from '@/components/layout';
 
 const Branding: React.FC = () => {
     const [config, setConfig] = useState<BrandingConfig>({
         tenant_id: '',
         logo_url: '/wardseal.svg', // Default
-        primary_color: '#0e1c3a', // Default Navy
+        primary_color: '#05ffa3', // Default Mint
         background_color: '#F4F7FB', // Default Light Gray
         css_override: '',
         config: {}
@@ -67,6 +68,7 @@ const Branding: React.FC = () => {
     if (loading) return <div className="h-[400px] flex items-center justify-center"><Loader2 className="h-10 w-10 animate-spin text-primary opacity-20" /></div>;
 
     return (
+        <PageLayout>
         <div className="space-y-12 animate-in fade-in duration-700">
             <PageHeader
                 icon={<Palette className="w-8 h-8 text-primary" />}
@@ -89,7 +91,7 @@ const Branding: React.FC = () => {
                     <GlassCard className="shadow-on-surface/10 rounded-xl">
                         <GlassCardHeader className="py-5 px-6 border-b border-on-surface/5 bg-surface-container/10">
                             <div className="flex items-center gap-6">
-                                <div className="p-2.5 bg-primary rounded-xl text-white shadow-lg shadow-primary/20">
+                                <div className="p-2.5 bg-primary rounded-xl text-primary-foreground shadow-lg shadow-primary/20">
                                     <LayoutTemplate className="w-5 h-5" />
                                 </div>
                                 <div>
@@ -161,7 +163,7 @@ const Branding: React.FC = () => {
                                 </div>
 
                                 <div className="space-y-2">
-                                     <Label htmlFor="css" className="text-[10px] font-bold tracking-tight text-on-surface-variant/40 ml-1">Custom CSS</Label>
+                                    <Label htmlFor="css" className="text-[10px] font-bold tracking-tight text-on-surface-variant/40 ml-1">Custom CSS</Label>
                                     <Textarea
                                         id="css"
                                         value={config.css_override}
@@ -174,7 +176,7 @@ const Branding: React.FC = () => {
                                 </div>
 
                                 <div className="pt-6">
-                                     {error && (
+                                    {error && (
                                         <div className="flex items-center gap-3 text-[11px] font-bold text-destructive bg-destructive/10 p-4 rounded-xl border border-destructive/20 mb-4 animate-in slide-in-from-top-2">
                                             <div className="h-1.5 w-1.5 bg-destructive rounded-full animate-pulse" />
                                             Error: {error}
@@ -286,6 +288,7 @@ const Branding: React.FC = () => {
                 </div>
             </div>
         </div >
+        </PageLayout>
     );
 };
 

@@ -116,7 +116,7 @@ const PortalProfile = () => {
                     <GlassCard className="border-none shadow-sm shadow-on-surface/5 overflow-hidden rounded-lg bg-card">
                         <GlassCardHeader className="bg-surface-container/50 border-b border-on-surface/5 py-5 px-6">
                             <div className="flex items-center gap-4">
-                                <div className="p-2 bg-primary rounded-lg text-white shadow-sm shadow-primary/20">
+                                <div className="p-2 bg-primary rounded-lg text-primary-foreground shadow-sm shadow-primary/20">
                                     <User className="w-5 h-5" />
                                 </div>
                                 <div>
@@ -171,7 +171,7 @@ const PortalProfile = () => {
                                     <Lock className="w-5 h-5" />
                                 </div>
                                 <div>
-                                    <GlassCardTitle className="text-lg font-bold tracking-tight text-white leading-none">Security Stack</GlassCardTitle>
+                                    <GlassCardTitle className="text-lg font-bold tracking-tight text-on-inverse leading-none">Security Stack</GlassCardTitle>
                                     <p className="text-primary font-bold tracking-tight text-[10px] mt-2 opacity-80 leading-none uppercase">Protection Protocol Management</p>
                                 </div>
                             </div>

@@ -22,7 +22,7 @@ import {
     GlassCardHeader, 
     GlassCardTitle, 
     GlassCardContent,
-    GlassCardDescription
+    GlassCardDescription, PageLayout
 } from '@/components/layout';
 import { askAI, getAuditLogs } from '@/api';
 import { cn } from '@/lib/utils';
@@ -109,6 +109,7 @@ const CopilotPage: React.FC = () => {
   };
 
   return (
+    <PageLayout>
     <div className="space-y-10 animate-in fade-in duration-700 h-[calc(100vh-160px)] flex flex-col">
       <PageHeader 
         icon={<Sparkles className="w-8 h-8 text-primary shadow-sm" />}
@@ -271,6 +272,7 @@ const CopilotPage: React.FC = () => {
         </div>
       </div>
     </div>
+    </PageLayout>
   );
 };
 

@@ -34,19 +34,19 @@ services:
       - traefik.http.routers.authsvc.entrypoints=web
       - traefik.http.services.authsvc.loadbalancer.server.port=8080
       # id.wardseal.local — auth API paths proxied through idui nginx (SPA catch-all handled by idui)
-      - traefik.http.routers.authsvc-id.rule=Host(`id.wardseal.local`) && (PathPrefix(`/t/`) || PathPrefix(`/oauth2`) || PathPrefix(`/.well-known`) || PathPrefix(`/social/login`) || PathPrefix(`/login/lookup`) || PathPrefix(`/saml`) || PathPrefix(`/api/v1/mfa`) || PathPrefix(`/api/v1/user`) || PathPrefix(`/api/v1/users`) || PathPrefix(`/api/v1/roles`) || PathPrefix(`/api/v1/permissions`) || PathPrefix(`/api/v1/devices`) || PathPrefix(`/api/v1/branding`) || PathPrefix(`/api/v1/signup`) || PathPrefix(`/api/v1/setup`) || PathPrefix(`/api/v1/webauthn`))
+      - traefik.http.routers.authsvc-id.rule=Host(`id.wardseal.local`) && (PathPrefix(`/t/`) || PathPrefix(`/oauth2`) || PathPrefix(`/.well-known`) || PathPrefix(`/social/login`) || PathPrefix(`/login/lookup`) || PathPrefix(`/saml`) || PathPrefix(`/api/v1/mfa`) || PathPrefix(`/api/v1/user`) || PathPrefix(`/api/v1/users`) || PathPrefix(`/api/v1/roles`) || PathPrefix(`/api/v1/permissions`) || PathPrefix(`/api/v1/devices`) || PathPrefix(`/api/v1/branding`) || PathPrefix(`/api/v1/signup`) || PathPrefix(`/api/v1/setup`) || PathPrefix(`/api/v1/webauthn`) || PathPrefix(`/logout`) || PathPrefix(`/api/v1/logout`))
       - traefik.http.routers.authsvc-id.entrypoints=web
       - traefik.http.routers.authsvc-id.service=authsvc
       # admin.wardseal.local — auth API paths
-      - traefik.http.routers.authsvc-admin.rule=Host(`admin.wardseal.local`) && (PathPrefix(`/t/`) || PathPrefix(`/oauth2`) || PathPrefix(`/.well-known`) || PathPrefix(`/api/v1/apps`) || PathPrefix(`/api/v1/api-keys`) || PathPrefix(`/api/v1/mfa`) || PathPrefix(`/api/v1/user`) || PathPrefix(`/api/v1/users`) || PathPrefix(`/api/v1/roles`) || PathPrefix(`/api/v1/permissions`) || PathPrefix(`/api/v1/devices`) || PathPrefix(`/api/v1/branding`) || PathPrefix(`/api/v1/setup`) || PathPrefix(`/api/v1/developer`) || PathPrefix(`/api/v1/webauthn`))
+      - traefik.http.routers.authsvc-admin.rule=Host(`admin.wardseal.local`) && (PathPrefix(`/t/`) || PathPrefix(`/oauth2`) || PathPrefix(`/.well-known`) || PathPrefix(`/api/v1/apps`) || PathPrefix(`/api/v1/api-keys`) || PathPrefix(`/api/v1/mfa`) || PathPrefix(`/api/v1/user`) || PathPrefix(`/api/v1/users`) || PathPrefix(`/api/v1/roles`) || PathPrefix(`/api/v1/permissions`) || PathPrefix(`/api/v1/devices`) || PathPrefix(`/api/v1/branding`) || PathPrefix(`/api/v1/setup`) || PathPrefix(`/api/v1/developer`) || PathPrefix(`/api/v1/webauthn`) || PathPrefix(`/logout`) || PathPrefix(`/api/v1/logout`))
       - traefik.http.routers.authsvc-admin.entrypoints=web
       - traefik.http.routers.authsvc-admin.service=authsvc
       # app.wardseal.local — user self-service auth API
-      - traefik.http.routers.authsvc-app.rule=Host(`app.wardseal.local`) && (PathPrefix(`/api/v1/user`) || PathPrefix(`/api/v1/users`) || PathPrefix(`/api/v1/roles`) || PathPrefix(`/api/v1/permissions`) || PathPrefix(`/api/v1/devices`) || PathPrefix(`/api/v1/mfa`) || PathPrefix(`/api/v1/webauthn`) || PathPrefix(`/api/v1/apps`))
+      - traefik.http.routers.authsvc-app.rule=Host(`app.wardseal.local`) && (PathPrefix(`/api/v1/user`) || PathPrefix(`/api/v1/users`) || PathPrefix(`/api/v1/roles`) || PathPrefix(`/api/v1/permissions`) || PathPrefix(`/api/v1/devices`) || PathPrefix(`/api/v1/mfa`) || PathPrefix(`/api/v1/webauthn`) || PathPrefix(`/api/v1/apps`) || PathPrefix(`/t/`) || PathPrefix(`/logout`) || PathPrefix(`/api/v1/logout`))
       - traefik.http.routers.authsvc-app.entrypoints=web
       - traefik.http.routers.authsvc-app.service=authsvc
       # developer.wardseal.local — developer API keys and apps
-      - traefik.http.routers.authsvc-dev.rule=Host(`developer.wardseal.local`) && (PathPrefix(`/api/v1/apps`) || PathPrefix(`/api/v1/api-keys`) || PathPrefix(`/api/v1/developer`) || PathPrefix(`/api/v1/users`) || PathPrefix(`/api/v1/roles`))
+      - traefik.http.routers.authsvc-dev.rule=Host(`developer.wardseal.local`) && (PathPrefix(`/api/v1/apps`) || PathPrefix(`/api/v1/api-keys`) || PathPrefix(`/api/v1/developer`) || PathPrefix(`/api/v1/users`) || PathPrefix(`/api/v1/roles`) || PathPrefix(`/t/`) || PathPrefix(`/logout`) || PathPrefix(`/api/v1/logout`))
       - traefik.http.routers.authsvc-dev.entrypoints=web
       - traefik.http.routers.authsvc-dev.service=authsvc
     networks:

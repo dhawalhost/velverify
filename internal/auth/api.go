@@ -54,8 +54,9 @@ func (h *HTTPHandler) clearAuthCookies(c *gin.Context) {
 	if h.svc != nil {
 		domain = h.svc.CookieDomain()
 	}
-	c.SetCookie(AccessTokenCookie, "", -1, "/", domain, false, true)
-	c.SetCookie(RefreshTokenCookie, "", -1, "/oauth2/token", domain, false, true)
+	secure := os.Getenv("ENVIRONMENT") == "production"
+	c.SetCookie(AccessTokenCookie, "", -1, "/", domain, secure, true)
+	c.SetCookie(RefreshTokenCookie, "", -1, "/oauth2/token", domain, secure, true)
 }
 
 // getTokenFromCookieOrHeader tries to get token from cookie first, then header

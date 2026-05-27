@@ -6,7 +6,8 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Loader2, Plus, Plug, Trash2, Check, X, Settings, ArrowLeft, RotateCcw, Link2, ExternalLink, ShieldCheck, Terminal, Fingerprint, Database } from 'lucide-react';
-import { PageHeader, GlassCard, GlassCardHeader, GlassCardTitle, GlassCardContent, GlassCardDescription } from '@/components/layout';
+import { PageHeader, GlassCard, GlassCardHeader, GlassCardTitle, GlassCardContent, GlassCardDescription, PageLayout
+} from '@/components/layout';
 
 interface ConnectorConfig {
     id: string;
@@ -126,7 +127,7 @@ export default function Connectors() {
                     <GlassCard className="w-full max-w-4xl border-none shadow-xl shadow-on-surface/10 bg-card overflow-hidden rounded-xl">
                         <GlassCardHeader className="py-6 px-6 border-b border-on-surface/5 bg-surface-container/10">
                             <div className="flex items-center gap-4">
-                                <div className="p-3 bg-primary rounded-xl text-white shadow-lg shadow-primary/20">
+                                <div className="p-3 bg-primary rounded-xl text-primary-foreground shadow-lg shadow-primary/20">
                                     <ExternalLink className="w-5 h-5" />
                                 </div>
                                 <div>
@@ -365,6 +366,7 @@ export default function Connectors() {
     }
 
     return (
+        <PageLayout>
         <div className="space-y-12 animate-in fade-in duration-700">
             <PageHeader
                 icon={<Plug className="w-8 h-8 text-primary" />}
@@ -514,5 +516,6 @@ export default function Connectors() {
                 </GlassCard>
             </div>
         </div>
+        </PageLayout>
     );
 }

@@ -22,7 +22,8 @@ import {
     RefreshCcw,
     Share2
 } from 'lucide-react';
-import { PageHeader, GlassCard, GlassCardHeader, GlassCardTitle, GlassCardContent, GlassTable, GlassTableHeader, GlassTableHead, GlassTableRow } from '@/components/layout';
+import { PageHeader, GlassCard, GlassCardHeader, GlassCardTitle, GlassCardContent, GlassTable, GlassTableHeader, GlassTableHead, GlassTableRow, PageLayout
+} from '@/components/layout';
 
 const GraphExplorer: React.FC = () => {
     const [subjectID, setSubjectID] = useState('');
@@ -65,6 +66,7 @@ const GraphExplorer: React.FC = () => {
     }, []);
 
     return (
+        <PageLayout>
         <div className="space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-700">
             <PageHeader
                 icon={<Share2 className="w-10 h-10 text-primary" />}
@@ -244,6 +246,7 @@ const GraphExplorer: React.FC = () => {
                 </div>
             </div>
         </div>
+        </PageLayout>
     );
 };
 

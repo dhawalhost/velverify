@@ -25,6 +25,7 @@
     "@types/node": "^25.0.3",
     "@types/uuid": "^10.0.0",
     "axios": "^1.13.2",
+    "boring-avatars": "^2.0.4",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^0.562.0",

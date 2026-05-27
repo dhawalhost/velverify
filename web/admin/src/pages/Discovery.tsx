@@ -26,7 +26,8 @@ import {
     Eye,
     Fingerprint
 } from 'lucide-react';
-import { PageHeader, GlassCard, GlassCardHeader, GlassCardTitle, GlassCardContent, GlassTable, GlassTableHeader, GlassTableHead, GlassTableRow } from '@/components/layout';
+import { PageHeader, GlassCard, GlassCardHeader, GlassCardTitle, GlassCardContent, GlassTable, GlassTableHeader, GlassTableHead, GlassTableRow, PageLayout
+} from '@/components/layout';
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const Discovery: React.FC = () => {
@@ -124,6 +125,7 @@ const Discovery: React.FC = () => {
     if (loading && resources.length === 0) return <div className="h-[400px] flex items-center justify-center"><Loader2 className="h-10 w-10 animate-spin text-primary opacity-20" /></div>;
 
     return (
+        <PageLayout>
         <div className="space-y-12 animate-in fade-in duration-700">
             <PageHeader
                 icon={<Search className="w-8 h-8 text-primary" />}
@@ -325,6 +327,7 @@ const Discovery: React.FC = () => {
                 </GlassCard>
             </div>
         </div>
+        </PageLayout>
     );
 };
 

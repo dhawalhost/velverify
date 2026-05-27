@@ -33,6 +33,7 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import BoringAvatar from 'boring-avatars';
 import { Separator } from '@/components/ui/separator';
 import { ModeToggle } from '@/components/mode-toggle';
 import { Toaster } from '@/components/ui/toaster';
@@ -170,8 +171,12 @@ const AdminShell: React.FC = () => {
                 <div className="p-6 border-t bg-surface-container-low/30">
                     <div className="flex items-center gap-3 group cursor-pointer" onClick={handleLogout}>
                         <Avatar className="h-10 w-10 border shadow-sm transition-transform group-hover:scale-105">
-                            <AvatarImage src={`https://avatar.vercel.sh/${userId}`} />
-                            <AvatarFallback className="bg-primary/10 text-primary text-xs font-bold">{userInitials}</AvatarFallback>
+                            <BoringAvatar
+                                size={40}
+                                name={userId}
+                                variant="marble"
+                                colors={["#00FF9E", "#17171C", "#8B5CF6", "#06B6D4", "#10B981"]}
+                            />
                         </Avatar>
                         <div className="flex-1 min-w-0">
                             <p className="text-sm font-semibold text-on-surface truncate group-hover:text-primary transition-colors">

@@ -61,6 +61,9 @@ import {
     GlassCardDescription
 } from '@/components/layout';
 import { TableBody, TableCell } from '@/components/ui/table';
+import { OAuthAppCard } from '../components/OAuthAppCard';
+import { APIKeyRow } from '../components/APIKeyRow';
+import { SAMLProviderRow } from '../components/SAMLProviderRow';
 
 interface DeveloperApp {
     id: string;
@@ -711,70 +714,16 @@ const DeveloperApps: React.FC = () => {
                     {/* APPS GRID: MODERNIST CARDS */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {apps.map(app => (
-                            <GlassCard key={app.id} className="group border-none shadow-xl shadow-on-surface/5 hover:shadow-2xl hover:shadow-primary/5 transition-all overflow-hidden rounded-xl bg-card ring-1 ring-on-surface/5">
-                                <GlassCardHeader className="bg-surface-container/30 p-5 relative overflow-hidden border-b border-on-surface/5">
-                                    <div className="absolute top-0 right-0 p-4 opacity-[0.03] transition-transform group-hover:scale-125">
-                                        <Box className="w-20 h-20" />
-                                    </div>
-                                    <div className="relative z-10 flex justify-between items-start">
-                                        <div className="space-y-3">
-                                            <div className="flex items-center gap-3">
-                                                <Badge className="rounded-lg bg-primary/10 text-primary font-bold text-[9px] tracking-tight px-2 border-none h-5 uppercase">{app.app_type}</Badge>
-                                                <span className="text-[9px] font-bold tracking-tight text-on-surface-variant/40 uppercase">ID: {app.client_id}</span>
-                                            </div>
-                                            <GlassCardTitle className="text-lg font-bold tracking-tight text-on-surface transition-colors uppercase leading-none">{app.name}</GlassCardTitle>
-                                            <p className="text-[10px] font-medium text-on-surface-variant/40 line-clamp-1">{app.description || "Default application configuration."}</p>
-                                        </div>
-                                        <div className="flex items-center gap-1.5">
-                                            <Button size="icon" variant="ghost" className="h-8 w-8 text-on-surface-variant/40 hover:bg-card hover:text-primary rounded-lg" onClick={() => handleOpenEditApp(app)}>
-                                                <Pencil className="h-4 w-4" />
-                                            </Button>
-                                            <Button size="icon" variant="ghost" className="h-8 w-8 text-on-surface-variant/40 hover:bg-destructive/10 hover:text-destructive rounded-lg" onClick={() => handleDeleteApp(app.id)}>
-                                                <Trash2 className="h-4 w-4" />
-                                            </Button>
-                                        </div>
-                                    </div>
-                                </GlassCardHeader>
-                                <GlassCardContent className="p-4 space-y-4 bg-card">
-                                    <div className="grid grid-cols-2 gap-4 pb-4 border-b border-on-surface/5">
-                                        <div>
-                                            <span className="text-[10px] font-bold tracking-tight text-on-surface-variant/40 uppercase">Permissions</span>
-                                            <div className="flex flex-wrap gap-1.5 mt-2.5">
-                                                {(app.scopes && app.scopes.length > 0 ? app.scopes : ['openid', 'profile', 'email']).map(scope => (
-                                                    <span key={scope} className="text-[9px] font-bold tracking-tight px-2 py-1 bg-surface-container/50 text-on-surface-variant/60 rounded-md ring-1 ring-on-surface/5 uppercase">{scope}</span>
-                                                ))}
-                                            </div>
-                                        </div>
-                                        <div>
-                                            <span className="text-[10px] font-bold tracking-tight text-on-surface-variant/40 uppercase">Login Flows</span>
-                                            <div className="flex flex-wrap gap-1.5 mt-2.5">
-                                                {(app.grant_types && app.grant_types.length > 0 ? app.grant_types : ['authorization_code', 'refresh_token']).map(grantType => (
-                                                    <span key={grantType} className="text-[9px] font-bold tracking-tight px-2 py-1 bg-primary/5 text-primary rounded-md ring-1 ring-primary/10 uppercase">{grantType.replace('_', ' ')}</span>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
-                                        <Button variant="ghost" className="h-9 rounded-lg bg-surface-container/30 hover:bg-primary hover:text-primary-foreground transition-all p-0 flex flex-col justify-center gap-0.5 group/btn" onClick={() => handleRotateSecret(app.id)}>
-                                            <RefreshCw className="h-2.5 w-2.5 text-on-surface-variant/40 group-hover/btn:text-white transition-colors" />
-                                            <span className="text-[8px] font-bold tracking-tight uppercase">Rotate</span>
-                                        </Button>
-                                        <Button variant="ghost" className="h-9 rounded-lg bg-surface-container/30 hover:bg-primary hover:text-primary-foreground transition-all p-0 flex flex-col justify-center gap-0.5 group/btn" onClick={() => handleManageAssignments(app)}>
-                                            <Users className="h-2.5 w-2.5 text-on-surface-variant/40 group-hover/btn:text-white transition-colors" />
-                                            <span className="text-[8px] font-bold tracking-tight uppercase">Access</span>
-                                        </Button>
-                                        <Button variant="ghost" className="h-9 rounded-lg bg-surface-container/30 hover:bg-primary hover:text-primary-foreground transition-all p-0 flex flex-col justify-center gap-0.5 group/btn" onClick={() => setQuickstartApp(app)}>
-                                            <Terminal className="h-2.5 w-2.5 text-on-surface-variant/40 group-hover/btn:text-white transition-colors" />
-                                            <span className="text-[8px] font-bold tracking-tight uppercase">Snippet</span>
-                                        </Button>
-                                        <Button variant="ghost" className="h-9 rounded-lg bg-surface-container/30 hover:bg-success hover:text-white transition-all p-0 flex flex-col justify-center gap-0.5 group/btn" onClick={() => handleViewLogs(app.id, app.name, 'app')}>
-                                            <Activity className="h-2.5 w-2.5 text-on-surface-variant/40 group-hover/btn:text-white transition-colors" />
-                                            <span className="text-[8px] font-bold tracking-tight uppercase">Audits</span>
-                                        </Button>
-                                    </div>
-                                </GlassCardContent>
-                            </GlassCard>
+                            <OAuthAppCard
+                                key={app.id}
+                                app={app}
+                                handleOpenEditApp={handleOpenEditApp}
+                                handleDeleteApp={handleDeleteApp}
+                                handleRotateSecret={handleRotateSecret}
+                                handleManageAssignments={handleManageAssignments}
+                                setQuickstartApp={setQuickstartApp}
+                                handleViewLogs={handleViewLogs}
+                            />
                         ))}
                     </div>
                 </TabsContent>
@@ -834,28 +783,12 @@ const DeveloperApps: React.FC = () => {
                             ) : (
                                 <div className="divide-y divide-on-surface/5">
                                     {apiKeys.map(key => (
-                                        <div key={key.id} className="flex items-center justify-between p-4 hover:bg-surface-container/20 transition-all group">
-                                            <div className="flex items-center gap-4">
-                                                <div className="p-2 rounded-lg bg-surface-container/50 ring-1 ring-on-surface/5 group-hover:bg-primary/10 group-hover:ring-primary/20 transition-all">
-                                                    <Fingerprint className="h-4 w-4 text-on-surface-variant/40 group-hover:text-primary transition-colors" />
-                                                </div>
-                                                <div className="space-y-0.5">
-                                                    <div className="text-[13px] font-bold tracking-tight text-on-surface group-hover:text-primary transition-colors leading-none uppercase">{key.name}</div>
-                                                    <div className="flex items-center gap-3 text-[10px] font-bold tracking-tight text-on-surface-variant/40 uppercase">
-                                                        <span className="font-mono bg-surface-container px-1.5 py-0.5 rounded text-[9px]">{key.key_prefix}...</span>
-                                                        <span>• {new Date(key.created_at).toLocaleDateString()}</span>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <div className="flex gap-2">
-                                                <Button variant="ghost" className="h-7 rounded-lg bg-surface-container/50 font-bold text-[9px] tracking-tight hover:bg-primary hover:text-primary-foreground px-3 transition-all uppercase" onClick={() => handleViewLogs(key.id, key.name, 'key')}>
-                                                    Logs
-                                                </Button>
-                                                <Button variant="ghost" className="h-7 rounded-lg bg-surface-container/50 font-bold text-[9px] tracking-tight hover:bg-destructive/100 hover:text-white px-3 text-destructive transition-all uppercase" onClick={() => handleRevokeKey(key.id)}>
-                                                    Revoke
-                                                </Button>
-                                            </div>
-                                        </div>
+                                        <APIKeyRow
+                                            key={key.id}
+                                            apiKey={key}
+                                            handleViewLogs={handleViewLogs}
+                                            handleRevokeKey={handleRevokeKey}
+                                        />
                                     ))}
                                 </div>
                             )}
@@ -1026,23 +959,11 @@ const DeveloperApps: React.FC = () => {
                             ) : (
                                 <div className="divide-y divide-on-surface/5">
                                     {samlProviders.map(sp => (
-                                        <div key={sp.entity_id} className="flex flex-col md:flex-row items-center justify-between p-5 hover:bg-surface-container/20 transition-all group">
-                                            <div className="flex-1 min-w-0 pr-6 space-y-2">
-                                                <div className="flex items-center gap-3">
-                                                    <Badge className="bg-on-surface/5 text-on-surface-variant/60 rounded-lg font-bold text-[9px] tracking-tight px-2 border-none">Provider</Badge>
-                                                    <div className="h-px w-6 bg-on-surface/5" />
-                                                </div>
-                                                <div className="text-lg font-bold tracking-tight text-on-surface truncate leading-none group-hover:text-primary transition-colors">{sp.entity_id}</div>
-                                                <div className="font-mono text-[9px] text-on-surface-variant/40 truncate">{sp.acs_url}</div>
-                                                <div className="flex gap-2 pt-1">
-                                                    <Badge className={`rounded-md font-bold text-[8px] tracking-tight px-1.5 py-0.5 border-none ${sp.sign_assertions ? 'bg-success-subtle text-success' : 'bg-surface-container text-on-surface-variant/20'}`}>Signed</Badge>
-                                                    <Badge className={`rounded-md font-bold text-[8px] tracking-tight px-1.5 py-0.5 border-none ${sp.encrypt_assertions ? 'bg-success-subtle text-success' : 'bg-surface-container text-on-surface-variant/20'}`}>Encrypted</Badge>
-                                                </div>
-                                            </div>
-                                            <Button variant="ghost" size="icon" className="h-10 w-10 rounded-xl hover:bg-destructive/10 hover:text-destructive transition-all" onClick={() => handleDeleteSAMLProvider(sp.entity_id)}>
-                                                <Trash2 className="h-4 w-4" />
-                                            </Button>
-                                        </div>
+                                        <SAMLProviderRow
+                                            key={sp.entity_id}
+                                            sp={sp}
+                                            handleDeleteSAMLProvider={handleDeleteSAMLProvider}
+                                        />
                                     ))}
                                 </div>
                             )}

@@ -21,6 +21,8 @@ export default defineConfig({
       '/login': 'http://localhost:8080',
       '/api/v1/signup': 'http://localhost:8080',
       '/logout': 'http://localhost:8080',
+      '/api/v1/logout': 'http://localhost:8080',
+      '/t': 'http://localhost:8080',
       '/oauth2': 'http://localhost:8080',
       '/.well-known': 'http://localhost:8080',
       '/api/v1/mfa': 'http://localhost:8080',      // TOTP, WebAuthn MFA endpoints

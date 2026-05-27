@@ -5,7 +5,7 @@ import {
     GlassCardHeader,
     GlassCardTitle,
     GlassCardContent,
-    GlassCardDescription
+    GlassCardDescription, PageLayout
 } from '@/components/layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -114,6 +114,7 @@ const MFASetup: React.FC = () => {
     );
 
     return (
+        <PageLayout>
         <div className="max-w-4xl mx-auto space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-700 py-12">
             <PageHeader
                 icon={<Smartphone className="w-10 h-10 text-primary" />}
@@ -328,6 +329,7 @@ const MFASetup: React.FC = () => {
                 </div>
             </div>
         </div>
+        </PageLayout>
     );
 };
 

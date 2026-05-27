@@ -3,7 +3,8 @@ import { getDeveloperAnalytics } from '../api';
 import { Activity, BarChart2, Clock, Terminal, AlertCircle, RefreshCw, Loader2, Zap } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Button } from '@/components/ui/button';
-import { PageHeader, GlassCard, GlassCardHeader, GlassCardTitle, GlassCardContent } from '@/components/layout';
+import { PageHeader, GlassCard, GlassCardHeader, GlassCardTitle, GlassCardContent, PageLayout
+} from '@/components/layout';
 
 interface AnalyticPoint {
     date: string;
@@ -46,6 +47,7 @@ export function DeveloperAnalytics() {
     };
 
     return (
+        <PageLayout>
         <div className="space-y-10 animate-in fade-in duration-700">
             <PageHeader
                 icon={<BarChart2 className="w-10 h-10 text-primary" />}
@@ -173,6 +175,7 @@ export function DeveloperAnalytics() {
                 </GlassCardContent>
             </GlassCard>
         </div>
+        </PageLayout>
     );
 }
 

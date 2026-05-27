@@ -24,7 +24,8 @@ import {
     ChevronRight,
     Command
 } from 'lucide-react';
-import { PageHeader, GlassCard, GlassCardHeader, GlassCardTitle, GlassCardContent, GlassTable, GlassTableHeader, GlassTableHead, GlassTableRow } from '@/components/layout';
+import { PageHeader, GlassCard, GlassCardHeader, GlassCardTitle, GlassCardContent, GlassTable, GlassTableHeader, GlassTableHead, GlassTableRow, PageLayout
+} from '@/components/layout';
 import { Label } from '@/components/ui/label';
 import {
     Select,
@@ -189,6 +190,7 @@ export default function Campaigns() {
     if (loading && campaigns.length === 0) return <div className="h-[400px] flex items-center justify-center"><Loader2 className="h-10 w-10 animate-spin text-primary opacity-20" /></div>;
 
     return (
+        <PageLayout>
         <div className="space-y-10 animate-in fade-in duration-700">
             <PageHeader
                 icon={<Award className="w-8 h-8 text-primary" />}
@@ -221,10 +223,10 @@ export default function Campaigns() {
                     <>
                         <div className="md:col-span-4 space-y-10">
                             <GlassCard className="border-none shadow-xl shadow-on-surface/5 bg-card overflow-hidden rounded-[24px]">
-                                <GlassCardHeader className="bg-primary p-8 text-white">
+                                <GlassCardHeader className="bg-primary p-8 text-primary-foreground">
                                      <div className="flex items-center gap-4">
-                                        <div className="p-2.5 bg-card/20 rounded-xl backdrop-blur-md">
-                                            <Plus className="w-5 h-5 text-white" />
+                                        <div className="p-2.5 bg-black/10 rounded-xl backdrop-blur-md">
+                                            <Plus className="w-5 h-5 text-primary-foreground" />
                                         </div>
                                         <GlassCardTitle className="text-xl font-bold tracking-tight">New Campaign</GlassCardTitle>
                                     </div>
@@ -308,7 +310,7 @@ export default function Campaigns() {
                                                 </div>
                                                  <div className="flex items-center gap-3 mt-1.5">
                                                     <Badge className={`rounded-xl font-bold text-[10px] px-2.5 py-0.5 border-none shadow-sm transition-all ${campaign.status === 'active' ? 'bg-success-subtle text-success' :
-                                                        campaign.status === 'completed' ? 'bg-blue-50 text-blue-600' :
+                                                        campaign.status === 'completed' ? 'bg-emerald-950 text-emerald-400' :
                                                             'bg-amber-50 text-amber-600'
                                                         }`}>
                                                         {campaign.status}
@@ -497,14 +499,14 @@ export default function Campaigns() {
                 ) : (
                     <div className="col-span-full max-w-6xl mx-auto w-full space-y-12 py-10">
                         <GlassCard className="border-none shadow-2xl shadow-on-surface/5 bg-card overflow-hidden rounded-[40px]">
-                            <GlassCardHeader className="bg-primary p-16 text-white text-center">
+                            <GlassCardHeader className="bg-primary p-16 text-primary-foreground text-center">
                                 <div className="flex flex-col items-center gap-8">
-                                    <div className="p-6 bg-card/20 rounded-[32px] backdrop-blur-xl">
-                                        <Terminal className="w-12 h-12 text-white" />
+                                    <div className="p-6 bg-black/10 rounded-[32px] backdrop-blur-xl">
+                                        <Terminal className="w-12 h-12 text-primary-foreground" />
                                     </div>
                                      <div className="space-y-4">
                                         <GlassCardTitle className="text-5xl font-bold tracking-tighter">Access Review Portal</GlassCardTitle>
-                                        <p className="text-on-inverse/60 font-bold text-[12px] italic">Review and certify access for users assigned to you.</p>
+                                        <p className="text-primary-foreground/60 font-bold text-[12px] italic">Review and certify access for users assigned to you.</p>
                                     </div>
                                 </div>
                             </GlassCardHeader>
@@ -583,5 +585,6 @@ export default function Campaigns() {
                 )}
             </div>
         </div>
+        </PageLayout>
     );
 }

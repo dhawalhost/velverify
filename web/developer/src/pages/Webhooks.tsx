@@ -3,25 +3,21 @@ import { getWebhooks, createWebhook, deleteWebhook } from '../api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { TableBody, TableCell } from '@/components/ui/table';
+import { TableBody } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import {
     Loader2,
     Plus,
-    Trash2,
     Webhook as WebhookIcon,
     Check,
     Activity,
     Globe,
     ShieldCheck,
-    Terminal,
-    ExternalLink,
-    Fingerprint,
-    Link2,
-    Binary,
-    Lock
+    Lock,
+    Binary
 } from 'lucide-react';
 import { PageHeader, GlassCard, GlassCardHeader, GlassCardTitle, GlassCardContent, GlassTable, GlassTableHeader, GlassTableHead, GlassTableRow } from '@/components/layout';
+import { WebhookTableRow } from '../components/WebhookTableRow';
 
 interface Webhook {
     id: string;
@@ -118,7 +114,7 @@ const Webhooks: React.FC = () => {
                     <GlassCard className="border-none shadow-2xl shadow-on-surface/10 bg-card overflow-hidden rounded-xl">
                         <GlassCardHeader className="bg-surface-container/10 border-b border-on-surface/5 py-3 px-4">
                             <div className="flex items-center gap-3">
-                                <div className="p-2 bg-primary rounded-lg text-white shadow-lg shadow-primary/20">
+                                <div className="p-2 bg-primary rounded-lg text-primary-foreground shadow-lg shadow-primary/20">
                                     <Activity className="w-4 h-4" />
                                 </div>
                                 <GlassCardTitle className="text-base font-bold tracking-tight text-on-surface">Provision Tunnel</GlassCardTitle>
@@ -148,7 +144,7 @@ const Webhooks: React.FC = () => {
                                             <div
                                                 className={`w-4 h-4 rounded border flex items-center justify-center transition-all ${selectedEvents.includes(ev) ? 'bg-primary border-primary' : 'border-on-surface/10 bg-card group-hover:border-primary/50'}`}
                                             >
-                                                {selectedEvents.includes(ev) && <Check className="h-2.5 w-2.5 text-white" />}
+                                                {selectedEvents.includes(ev) && <Check className="h-2.5 w-2.5 text-primary-foreground" />}
                                             </div>
                                             <span className={`text-[11px] font-bold tracking-tight transition-colors uppercase ${selectedEvents.includes(ev) ? 'text-on-surface' : 'text-on-surface-variant/40'}`}>{ev.replace('.', ' ')}</span>
                                         </div>
@@ -188,89 +184,54 @@ const Webhooks: React.FC = () => {
                         </div>
                     </div>
                 </div>
-            </div>
 
-            <div className="lg:col-span-8 space-y-4">
-                <GlassCard className="border-none shadow-2xl shadow-on-surface/5 bg-card overflow-hidden rounded-xl">
-                    <GlassCardHeader className="py-4 px-6 border-b border-on-surface/5">
-                        <div className="flex items-center gap-4">
-                            <div className="p-2.5 bg-primary/5 rounded-xl">
-                                <ShieldCheck className="w-5 h-5 text-primary" />
-                            </div>
-                            <div>
-                                <GlassCardTitle className="text-base font-bold tracking-tight text-on-surface uppercase">Tunnel Registry</GlassCardTitle>
-                                <p className="text-on-surface-variant/40 font-bold text-[10px] mt-0.5 tracking-tight uppercase">Active orchestration pipelines ({webhooks.length})</p>
-                            </div>
-                        </div>
-                    </GlassCardHeader>
-                    <GlassCardContent className="p-0">
-                        {webhooks.length === 0 ? (
-                            <div className="py-32 text-center text-on-surface-variant/30 flex flex-col items-center gap-6 italic">
-                                <div className="w-20 h-20 rounded-3xl bg-surface-container/50 flex items-center justify-center">
-                                    <WebhookIcon className="h-10 w-10 opacity-20" />
+                <div className="lg:col-span-8 space-y-4">
+                    <GlassCard className="border-none shadow-2xl shadow-on-surface/5 bg-card overflow-hidden rounded-xl">
+                        <GlassCardHeader className="py-4 px-6 border-b border-on-surface/5">
+                            <div className="flex items-center gap-4">
+                                <div className="p-2.5 bg-primary/5 rounded-xl">
+                                    <ShieldCheck className="w-5 h-5 text-primary" />
                                 </div>
-                                <span className="max-w-xs font-bold text-[11px] tracking-tight leading-relaxed opacity-60">System silence // Zero communication vectors established.</span>
+                                <div>
+                                    <GlassCardTitle className="text-base font-bold tracking-tight text-on-surface uppercase">Tunnel Registry</GlassCardTitle>
+                                    <p className="text-on-surface-variant/40 font-bold text-[10px] mt-0.5 tracking-tight uppercase">Active orchestration pipelines ({webhooks.length})</p>
+                                </div>
                             </div>
-                        ) : (
-                            <div className="overflow-x-auto">
-                                <GlassTable>
-                                    <GlassTableHeader>
-                                        <GlassTableRow className="hover:bg-transparent border-b border-on-surface/5">
-                                            <GlassTableHead className="py-3 pl-5 text-[10px] uppercase">Identity</GlassTableHead>
-                                            <GlassTableHead className="text-[10px] uppercase">Subscription</GlassTableHead>
-                                            <GlassTableHead className="text-[10px] uppercase">Status</GlassTableHead>
-                                            <GlassTableHead className="text-right pr-5 text-[10px] uppercase">Actions</GlassTableHead>
-                                        </GlassTableRow>
-                                    </GlassTableHeader>
-                                    <TableBody>
-                                        {webhooks.map(wh => (
-                                            <GlassTableRow key={wh.id} className="hover:bg-surface-container/10 transition-all border-b border-on-surface/5 last:border-0 group">
-                                                <TableCell className="py-2 pl-5">
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="w-7 h-7 rounded-lg bg-surface-container/50 text-on-surface-variant/40 flex items-center justify-center transition-all group-hover:bg-primary group-hover:text-primary-foreground">
-                                                            <ExternalLink className="h-3.5 w-3.5" />
-                                                        </div>
-                                                        <div className="flex flex-col">
-                                                            <span className="text-xs font-bold tracking-tight text-on-surface group-hover:text-primary transition-colors truncate max-w-[180px]">{wh.url}</span>
-                                                            <span className="text-[8px] font-bold font-mono tracking-tight text-on-surface-variant/20 uppercase">id // {wh.id?.substring(0, 8)}</span>
-                                                        </div>
-                                                    </div>
-                                                </TableCell>
-                                                <TableCell className="py-3">
-                                                    <div className="flex flex-wrap gap-1.5">
-                                                        {wh.events.map(ev => (
-                                                            <Badge key={ev} className="bg-surface-container/50 text-on-surface-variant/60 border-none rounded-md font-bold text-[9px] tracking-tight px-2 py-0.5 group-hover:bg-primary/5 group-hover:text-primary transition-all uppercase">
-                                                                {ev.split('.')[1]}
-                                                            </Badge>
-                                                        ))}
-                                                    </div>
-                                                </TableCell>
-                                                <TableCell className="py-3">
-                                                    <div className="flex items-center gap-2">
-                                                        <div className={`h-1.5 w-1.5 rounded-full transition-all ${wh.active ? 'bg-success' : 'bg-on-surface/20'}`} />
-                                                        <span className={`text-[10px] font-bold tracking-tight uppercase transition-all ${wh.active ? 'text-success' : 'text-on-surface-variant/40'}`}>
-                                                            {wh.active ? 'Active' : 'Dormant'}
-                                                        </span>
-                                                    </div>
-                                                </TableCell>
-                                                <TableCell className="py-3 text-right pr-6">
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        className="h-8 w-8 rounded-lg text-on-surface-variant/40 hover:text-destructive hover:bg-destructive/10 transition-all"
-                                                        onClick={() => handleDelete(wh.id)}
-                                                    >
-                                                        <Trash2 className="w-4 h-4" />
-                                                    </Button>
-                                                </TableCell>
+                        </GlassCardHeader>
+                        <GlassCardContent className="p-0">
+                            {webhooks.length === 0 ? (
+                                <div className="py-32 text-center text-on-surface-variant/30 flex flex-col items-center gap-6 italic">
+                                    <div className="w-20 h-20 rounded-3xl bg-surface-container/50 flex items-center justify-center">
+                                        <WebhookIcon className="h-10 w-10 opacity-20" />
+                                    </div>
+                                    <span className="max-w-xs font-bold text-[11px] tracking-tight leading-relaxed opacity-60">System silence // Zero communication vectors established.</span>
+                                </div>
+                            ) : (
+                                <div className="overflow-x-auto">
+                                    <GlassTable>
+                                        <GlassTableHeader>
+                                            <GlassTableRow className="hover:bg-transparent border-b border-on-surface/5">
+                                                <GlassTableHead className="py-3 pl-5 text-[10px] uppercase">Identity</GlassTableHead>
+                                                <GlassTableHead className="text-[10px] uppercase">Subscription</GlassTableHead>
+                                                <GlassTableHead className="text-[10px] uppercase">Status</GlassTableHead>
+                                                <GlassTableHead className="text-right pr-5 text-[10px] uppercase">Actions</GlassTableHead>
                                             </GlassTableRow>
-                                        ))}
-                                    </TableBody>
-                                </GlassTable>
-                            </div>
-                        )}
-                    </GlassCardContent>
-                </GlassCard>
+                                        </GlassTableHeader>
+                                        <TableBody>
+                                            {webhooks.map(wh => (
+                                                <WebhookTableRow
+                                                    key={wh.id}
+                                                    webhook={wh}
+                                                    handleDelete={handleDelete}
+                                                />
+                                            ))}
+                                        </TableBody>
+                                    </GlassTable>
+                                </div>
+                            )}
+                        </GlassCardContent>
+                    </GlassCard>
+                </div>
             </div>
         </div>
     );

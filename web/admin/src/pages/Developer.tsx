@@ -6,11 +6,12 @@ import {
     GlassCard, 
     GlassCardHeader, 
     GlassCardTitle, 
-    GlassCardContent 
+    GlassCardContent, PageLayout
 } from '@/components/layout';
 
 const Developer: React.FC = () => {
     return (
+        <PageLayout>
         <div className="space-y-12 animate-in fade-in duration-700">
             <PageHeader 
                 icon={<BookOpen className="w-8 h-8 text-primary" />}
@@ -77,6 +78,7 @@ const Developer: React.FC = () => {
                 .sc-fzoLag { font-family: inherit !important; }
             `}</style>
         </div>
+        </PageLayout>
     );
 };
 

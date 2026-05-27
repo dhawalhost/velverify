@@ -9,7 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Loader2, Send, GitPullRequest, ShieldCheck, Clock, MessageSquare, Info } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { PageHeader, GlassCard, GlassCardHeader, GlassCardTitle, GlassCardContent, GlassCardDescription } from '@/components/layout';
+import { PageHeader, GlassCard, GlassCardHeader, GlassCardTitle, GlassCardContent, GlassCardDescription, PageLayout
+} from '@/components/layout';
 
 const RequestAccess: React.FC = () => {
     const [resourceType, setResourceType] = useState('group');
@@ -35,6 +36,7 @@ const RequestAccess: React.FC = () => {
     };
 
     return (
+        <PageLayout>
         <div className="max-w-3xl mx-auto space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-700 py-12">
             <PageHeader
                 icon={<GitPullRequest className="w-10 h-10 text-primary" />}
@@ -159,6 +161,7 @@ const RequestAccess: React.FC = () => {
                 </GlassCard>
             </div>
         </div>
+        </PageLayout>
     );
 };
 

@@ -66,7 +66,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
     const confirmButtonClass = {
         danger:  "bg-destructive hover:bg-red-700 text-white shadow-lg shadow-destructive/20",
         warning: "bg-amber-500 hover:bg-amber-600 text-white shadow-lg shadow-amber-500/20",
-        default: "bg-primary hover:bg-primary/90 text-white shadow-lg shadow-primary/20",
+        default: "bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20",
     }[variant];
 
     const iconColor = {

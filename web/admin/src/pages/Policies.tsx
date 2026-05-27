@@ -27,7 +27,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { PageHeader, GlassCard, GlassCardHeader, GlassCardTitle, GlassCardContent, GlassTable, GlassTableHeader, GlassTableHead, GlassTableRow, GlassCardDescription, GlassCardFooter } from '@/components/layout';
+import { PageHeader, GlassCard, GlassCardHeader, GlassCardTitle, GlassCardContent, GlassTable, GlassTableHeader, GlassTableHead, GlassTableRow, GlassCardDescription, GlassCardFooter, PageLayout
+} from '@/components/layout';
 import { TableBody, TableCell } from '@/components/ui/table';
 
 const Policies: React.FC = () => {
@@ -94,6 +95,7 @@ const Policies: React.FC = () => {
     if (loading && policies.length === 0) return <div className="h-[400px] flex items-center justify-center"><Loader2 className="h-12 w-12 animate-spin text-primary opacity-20" /></div>;
 
     return (
+        <PageLayout>
         <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700 py-6">
             <PageHeader
                 icon={<ShieldCheck className="w-8 h-8 text-primary" />}
@@ -296,6 +298,7 @@ const Policies: React.FC = () => {
                 </div>
             </div>
         </div>
+        </PageLayout>
     );
 };
 

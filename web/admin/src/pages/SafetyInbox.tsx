@@ -5,7 +5,8 @@ import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Check, X, ShieldAlert, History, Activity } from 'lucide-react';
-import { PageHeader, GlassCard, GlassCardHeader, GlassCardTitle, GlassCardContent, GlassTable, GlassTableHeader, GlassTableHead, GlassTableRow } from '@/components/layout';
+import { PageHeader, GlassCard, GlassCardHeader, GlassCardTitle, GlassCardContent, GlassTable, GlassTableHeader, GlassTableHead, GlassTableRow, PageLayout
+} from '@/components/layout';
 
 const SafetyInbox: React.FC = () => {
     const [actions, setActions] = useState<any[]>([]);
@@ -50,6 +51,7 @@ const SafetyInbox: React.FC = () => {
     if (loading) return <div className="p-8 text-center text-muted-foreground">Loading security alerts...</div>;
 
     return (
+        <PageLayout>
         <div className="space-y-12 animate-in fade-in duration-700">
             <PageHeader
                 icon={<ShieldAlert className="w-10 h-10 text-destructive" />}
@@ -163,6 +165,7 @@ const SafetyInbox: React.FC = () => {
                 </GlassCard>
             </div>
         </div>
+        </PageLayout>
     );
 };
 

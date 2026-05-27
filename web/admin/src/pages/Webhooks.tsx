@@ -21,7 +21,10 @@ import {
     Binary,
     Lock
 } from 'lucide-react';
-import { PageHeader, GlassCard, GlassCardHeader, GlassCardTitle, GlassCardContent, GlassTable, GlassTableHeader, GlassTableHead, GlassTableRow } from '@/components/layout';
+import { PageHeader, GlassCard, GlassCardHeader, GlassCardTitle, GlassCardContent, GlassTable, GlassTableHeader, GlassTableHead, GlassTableRow, PageLayout
+} from '@/components/layout';
+import { WebhookTableRow } from '../components/WebhookTableRow';
+
 
 interface Webhook {
     id: string;
@@ -106,6 +109,7 @@ const Webhooks: React.FC = () => {
     if (loading && webhooks.length === 0) return <div className="h-[400px] flex items-center justify-center"><Loader2 className="h-10 w-10 animate-spin text-primary opacity-20" /></div>;
 
     return (
+        <PageLayout>
         <div className="space-y-12 animate-in fade-in duration-700">
             <PageHeader
                 icon={<WebhookIcon className="w-10 h-10 text-primary" />}
@@ -118,7 +122,7 @@ const Webhooks: React.FC = () => {
                     <GlassCard className="border-none shadow-2xl shadow-on-surface/10 bg-card overflow-hidden rounded-[32px]">
                         <GlassCardHeader className="bg-surface-container/10 border-b border-on-surface/5 py-8 px-8">
                             <div className="flex items-center gap-4">
-                                <div className="p-3 bg-primary rounded-xl text-white shadow-lg shadow-primary/20">
+                                <div className="p-3 bg-primary rounded-xl text-primary-foreground shadow-lg shadow-primary/20">
                                     <Activity className="w-5 h-5" />
                                 </div>
                                 <GlassCardTitle className="text-xl font-bold tracking-tight text-on-surface">Provision tunnel</GlassCardTitle>
@@ -148,7 +152,7 @@ const Webhooks: React.FC = () => {
                                             <div
                                                 className={`w-5 h-5 rounded-lg border-2 flex items-center justify-center transition-all ${selectedEvents.includes(ev) ? 'bg-primary border-primary' : 'border-on-surface/10 bg-card group-hover:border-primary/50'}`}
                                             >
-                                                {selectedEvents.includes(ev) && <Check className="h-3 w-3 text-white" />}
+                                                {selectedEvents.includes(ev) && <Check className="h-3 w-3 text-primary-foreground" />}
                                             </div>
                                             <span className={`text-[12px] font-bold tracking-tight transition-colors ${selectedEvents.includes(ev) ? 'text-on-surface' : 'text-on-surface-variant/40'}`}>{ev.replace('.', ' ')}</span>
                                         </div>
@@ -228,46 +232,11 @@ const Webhooks: React.FC = () => {
                                         </GlassTableHeader>
                                         <TableBody>
                                             {webhooks.map(wh => (
-                                                <GlassTableRow key={wh.id} className="hover:bg-surface-container/10 transition-all border-b border-on-surface/5 last:border-0 group">
-                                                    <TableCell className="py-8 pl-10">
-                                                        <div className="flex items-center gap-6">
-                                                            <div className="w-12 h-12 rounded-xl bg-surface-container/50 text-on-surface-variant/40 flex items-center justify-center transition-all group-hover:bg-primary group-hover:text-primary-foreground">
-                                                                <ExternalLink className="h-5 w-5" />
-                                                            </div>
-                                                            <div className="flex flex-col gap-1.5">
-                                                                <span className="text-base font-bold tracking-tight text-on-surface group-hover:text-primary transition-colors truncate max-w-[280px]">{wh.url}</span>
-                                                                <span className="text-[10px] font-bold font-mono tracking-tight text-on-surface-variant/20 italic">id // {wh.id?.substring(0, 8).toLowerCase() || 'external'}</span>
-                                                            </div>
-                                                        </div>
-                                                    </TableCell>
-                                                    <TableCell className="py-8">
-                                                        <div className="flex flex-wrap gap-2">
-                                                            {wh.events.map(ev => (
-                                                                <Badge key={ev} className="bg-surface-container/50 text-on-surface-variant/60 border-none rounded-lg font-bold text-[10px] tracking-tight px-3 py-1 group-hover:bg-primary/5 group-hover:text-primary transition-all">
-                                                                    {ev.split('.')[1]}
-                                                                </Badge>
-                                                            ))}
-                                                        </div>
-                                                    </TableCell>
-                                                    <TableCell className="py-8">
-                                                        <div className="flex items-center gap-3">
-                                                            <div className={`h-2 w-2 rounded-full transition-all ${wh.active ? 'bg-success' : 'bg-on-surface/20'}`} />
-                                                            <span className={`text-[11px] font-bold tracking-tight transition-all ${wh.active ? 'text-success' : 'text-on-surface-variant/40'}`}>
-                                                                {wh.active ? 'Active' : 'Dormant'}
-                                                            </span>
-                                                        </div>
-                                                    </TableCell>
-                                                    <TableCell className="py-8 text-right pr-10">
-                                                        <Button 
-                                                            variant="ghost" 
-                                                            size="icon" 
-                                                            className="h-11 w-11 rounded-xl text-on-surface-variant/40 hover:text-destructive hover:bg-destructive/10 transition-all"
-                                                            onClick={() => handleDelete(wh.id)}
-                                                        >
-                                                            <Trash2 className="w-5 h-5" />
-                                                        </Button>
-                                                    </TableCell>
-                                                </GlassTableRow>
+                                                <WebhookTableRow 
+                                                    key={wh.id} 
+                                                    webhook={wh} 
+                                                    handleDelete={handleDelete} 
+                                                />
                                             ))}
                                         </TableBody>
                                     </GlassTable>
@@ -278,6 +247,7 @@ const Webhooks: React.FC = () => {
                 </div>
             </div>
         </div>
+        </PageLayout>
     );
 };
 

@@ -9,43 +9,62 @@ import {
     GlassCardContent 
 } from '@/components/layout';
 
+interface SidebarLinkProps {
+    label: string;
+    icon: React.ReactNode;
+    onClick?: () => void;
+}
+
+const SidebarLink: React.FC<SidebarLinkProps> = ({ label, icon, onClick }) => {
+    return (
+        <button 
+            onClick={onClick}
+            className="w-full text-left p-2 rounded-lg hover:bg-surface-container/40 transition-all flex items-center gap-2 group"
+        >
+            <div className="text-on-surface-variant/40 group-hover:text-primary transition-colors">
+                {icon}
+            </div>
+            <span className="text-caption font-bold text-on-surface group-hover:translate-x-1 transition-transform">
+                {label}
+            </span>
+        </button>
+    );
+};
+
 const Developer: React.FC = () => {
     return (
-        <div className="space-y-4 animate-in fade-in duration-700">
+        <div className="space-y-page animate-in fade-in duration-700">
             <PageHeader 
-                icon={<BookOpen className="w-5 h-5 text-primary" />}
+                icon={<BookOpen className="w-5 h-5" />}
                 title="API Documentation"
                 description="Explore our API documentation and integration guides."
             />
 
-            <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
-                <div className="lg:col-span-1 space-y-4">
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-card">
+                <div className="lg:col-span-1 space-y-card">
                     <div className="space-y-2">
-                        <p className="text-[9px] font-bold text-on-surface-variant/40 uppercase tracking-[0.2em] ml-1">Resources</p>
+                        <p className="text-label text-on-surface-variant/40 uppercase tracking-widest ml-1">Resources</p>
                         <div className="space-y-1">
                             {[
-                                { label: 'Go SDK Client', icon: <Cpu className="w-3.5 h-3.5" /> },
-                                { label: 'CLI Reference', icon: <Terminal className="w-3.5 h-3.5" /> },
-                                { label: 'OpenAPI Spec', icon: <Code2 className="w-3.5 h-3.5" /> },
+                                { label: 'Go SDK Client', icon: <Cpu className="w-4 h-4" /> },
+                                { label: 'CLI Reference', icon: <Terminal className="w-4 h-4" /> },
+                                { label: 'OpenAPI Spec', icon: <Code2 className="w-4 h-4" /> },
                             ].map(link => (
-                                <button key={link.label} className="w-full text-left p-2 rounded-lg hover:bg-surface-container/40 transition-all flex items-center gap-2 group">
-                                    <div className="text-on-surface-variant/40 group-hover:text-primary transition-colors">{link.icon}</div>
-                                    <span className="text-[12px] font-bold text-on-surface group-hover:translate-x-1 transition-transform">{link.label}</span>
-                                </button>
+                                <SidebarLink key={link.label} label={link.label} icon={link.icon} />
                             ))}
                         </div>
                     </div>
 
-                    <GlassCard className="bg-primary text-primary-foreground border-none shadow-xl shadow-primary/20 overflow-hidden relative rounded-xl">
+                    <GlassCard className="bg-primary text-primary-foreground border-none shadow-xl shadow-primary/20 overflow-hidden relative rounded-xl hover:translate-y-[-2px] transition-all duration-300">
                         <div className="absolute top-0 right-0 p-3 opacity-10">
                             <Terminal className="w-12 h-12 rotate-12" />
                         </div>
-                        <GlassCardContent className="p-3 space-y-3 relative z-10">
+                        <GlassCardContent className="p-card space-y-3 relative z-10">
                             <div className="space-y-0.5">
-                                <p className="text-[8px] font-black uppercase tracking-[0.3em] opacity-60">Distribution</p>
-                                <h4 className="text-md font-black italic tracking-tighter uppercase">WardSeal Go</h4>
+                                <p className="text-detail font-bold uppercase tracking-widest opacity-60">Distribution</p>
+                                <h4 className="text-heading font-black italic tracking-tighter uppercase text-white">WardSeal Go</h4>
                             </div>
-                            <div className="bg-black/20 p-2 rounded-lg font-mono text-[9px] border border-on-inverse/10 backdrop-blur-sm">
+                            <div className="bg-black/20 p-2 rounded-lg font-mono text-detail border border-on-inverse/10 backdrop-blur-sm">
                                 <code>go get github.com/...</code>
                             </div>
                         </GlassCardContent>
@@ -54,10 +73,10 @@ const Developer: React.FC = () => {
 
                 <div className="lg:col-span-3">
                     <GlassCard className="overflow-hidden border-none shadow-xl shadow-on-surface/5 bg-card min-h-[600px] rounded-xl">
-                        <GlassCardHeader className="py-3 px-5 border-b border-on-surface/5">
+                        <GlassCardHeader className="py-card px-card border-b border-on-surface/5">
                             <div className="flex items-center gap-2.5">
                                 <Code2 className="w-4 h-4 text-primary" />
-                                <GlassCardTitle className="text-sm font-bold tracking-tight">API Reference</GlassCardTitle>
+                                <GlassCardTitle className="text-body font-bold tracking-tight">API Reference</GlassCardTitle>
                             </div>
                         </GlassCardHeader>
                         <GlassCardContent className="p-0">

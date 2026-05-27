@@ -106,7 +106,7 @@ export const logout = async () => {
     const tenantID = localStorage.getItem('tenantID');
     const tenantSlug = localStorage.getItem('tenantSlug');
     const tenantPath = tenantSlug || tenantID;
-    const path = tenantPath ? `/t/${tenantPath}/logout` : '/logout';
+    const path = tenantPath ? `/t/${tenantPath}/logout` : '/api/v1/logout';
     await api.post(path);
 };
 export const getSetupStatus = async () => {

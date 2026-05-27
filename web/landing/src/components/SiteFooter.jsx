@@ -9,10 +9,15 @@ export default function SiteFooter() {
       <div className="container">
         <div className="footer-grid">
           <div>
-            <Link className="logo-dot" to="/">
-              <img src="/wardseal.svg" alt="WardSeal Logo" className="logo-img" />
+            <Link className="logo" to="/" style={{ marginBottom: '24px' }}>
+              <div className="logo-container">
+                <img src="/wardseal.svg" alt="WardSeal Logo" className="logo-img" />
+              </div>
+              <span className="logo-text">WardSeal</span>
             </Link>
-            <div className="footer-tagline">Open-source Identity &amp; Access Management for the modern cloud.</div>
+            <div className="footer-tagline" style={{ color: 'var(--text-muted)', fontSize: '1.05rem', lineHeight: '1.6', maxWidth: '300px' }}>
+              Next-generation AI Identity &amp; Access Management for modern enterprises.
+            </div>
           </div>
           <div className="footer-col">
             <h4>Product</h4>

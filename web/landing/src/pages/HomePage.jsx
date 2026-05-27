@@ -1,289 +1,212 @@
-import { useMemo, useState, useEffect } from 'react'
-import { 
-  ShieldCheck, 
-  Users, 
-  Key, 
-  Target, 
-  Settings, 
-  Building2, 
-  Zap, 
-  Star,
-  Lock,
-  RotateCw,
-  Fingerprint,
-  Layers,
-  Activity,
-  ArrowRight
+import { useEffect } from 'react'
+import {
+  ShieldCheck, Lock, Terminal,
+  ArrowRight, Github, Activity, Shield, Network,
+  Server, Key, Command
 } from 'lucide-react'
 import siteConfig from '../siteConfig'
 
 const { consoleBaseUrl } = siteConfig
 
-const pricing = {
-  monthly: { pro: 29, team: 99 },
-  yearly: { pro: 23, team: 79 },
-}
-
-const faqItems = [
+const archFeatures = [
   {
-    q: 'How can I participate in the Public Beta?',
-    a: 'Simply create an account via our Cloud Managed portal. During the beta period, you can test all platform features including SSO, MFA, and Identity Governance at no cost.',
+    icon: <Terminal size={24} />,
+    title: 'API-First Design',
+    desc: 'Integrate authorization natively into your microservices via gRPC or REST. Headless by default, UI optional.',
+    details: [
+      { icon: <Command size={14} />, text: 'CLI & Terraform Provider' },
+      { icon: <Activity size={14} />, text: '<10ms p99 latency' }
+    ]
   },
   {
-    q: 'How does MAU pricing work?',
-    a: 'A Monthly Active User (MAU) is any unique end-user who authenticates at least once in a month. Internal admin accounts don\'t count.',
+    icon: <Lock size={24} />,
+    title: 'Granular Access Management',
+    desc: 'Define context-aware, attribute-based policies (ABAC) and fine-grained RBAC that evaluate at the edge.',
+    details: [
+      { icon: <Key size={14} />, text: 'Dynamic policy evaluation' },
+      { icon: <Shield size={14} />, text: 'Risk-based step-up MFA' }
+    ]
   },
   {
-    q: 'Do you support enterprise SSO?',
-    a: 'Yes. WardSeal supports any standards-compliant OIDC or SAML 2.0 provider, including Okta, Azure AD, Google Workspace, and more.',
-  },
+    icon: <Network size={24} />,
+    title: 'Zero-Trust Security',
+    desc: 'Verify explicitly. Deny by default. Every internal and external request is authenticated and authorized.',
+    details: [
+      { icon: <ShieldCheck size={14} />, text: 'Continuous Access Evaluation' },
+      { icon: <Server size={14} />, text: 'Stateless JWT/PASETO validation' }
+    ]
+  }
 ]
 
-const features = [
-  { icon: <Lock className="w-8 h-8 text-blue-400" />, title: 'Enterprise SSO', desc: 'Secure OIDC & SAML 2.0 federation with any IdP — Okta, Azure AD, Google Workspace, and more.' },
-  { icon: <ShieldCheck className="w-8 h-8 text-green-400" />, title: 'Adaptive MFA', desc: 'TOTP, WebAuthn passkeys, and risk-based step-up auth.' },
-  { icon: <Building2 className="w-8 h-8 text-cyan-400" />, title: 'B2B Multi-tenancy', desc: 'Isolated namespaces, branding, and SSO for each of your customer organizations from one deployment.' },
-  { icon: <Users className="w-8 h-8 text-purple-400" />, title: 'Directory & SCIM', desc: 'Full user lifecycle management with SCIM 2.0 provisioning.' },
-  { icon: <Target className="w-8 h-8 text-red-400" />, title: 'Identity Governance', desc: 'Automated access reviews and certification campaigns.' },
-  { icon: <Settings className="w-8 h-8 text-orange-400" />, title: 'Fine-grained RBAC', desc: 'Roles, policies, and resource-level permissions managed through API.' },
+const integrations = [
+  'Okta', 'Azure AD', 'Google Workspace', 'Keycloak', 'Ping Identity', 'Auth0', 'AWS IAM', 'HashiCorp Vault'
 ]
-
-
-
-
 
 export default function HomePage() {
-  const [activeStep, setActiveStep] = useState(1);
-  const [openFaq, setOpenFaq] = useState(0)
-
-  const codeSnippets = {
-    1: {
-      comment: "// Initialize Cloud Tenant",
-      commands: [
-        { cmd: "wardseal", text: "login --domain cloud.wardseal.com" },
-        { cmd: "wardseal", text: 'tenant create --name "HighGrowth Inc"' }
-      ]
-    },
-    2: {
-      comment: "// Register OIDC Application",
-      commands: [
-        { cmd: "wardseal", text: 'apps create --name "Production App" \\' },
-        { cmd: "", text: '  --type "oidc" --redirect-uri "https://app.com/callback"' }
-      ]
-    },
-    3: {
-      comment: "// Configuration & Discovery",
-      commands: [
-        { cmd: "curl", text: "https://cloud.wardseal.com/auth/.well-known/openid-configuration" },
-        { cmd: "wardseal", text: "policies create --file prod-security.yaml" }
-      ]
-    }
-  };
-
   useEffect(() => {
-    const observer = new IntersectionObserver((entries) => {
-      entries.forEach(e => { 
-        if (e.isIntersecting) { 
-          e.target.classList.add('fade-up'); 
-          observer.unobserve(e.target); 
-        } 
-      });
-    }, { threshold: 0.1 });
-
-    document.querySelectorAll('.animate-on-scroll').forEach(el => observer.observe(el));
-    return () => observer.disconnect();
-  }, []);
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((e) => {
+          if (e.isIntersecting) {
+            e.target.classList.add('in-view')
+            observer.unobserve(e.target)
+          }
+        })
+      },
+      { threshold: 0.1 }
+    )
+    document.querySelectorAll('.reveal').forEach((el) => observer.observe(el))
+    return () => observer.disconnect()
+  }, [])
 
   return (
     <main>
+      {/* ── HERO ── */}
       <section className="hero">
         <div className="container hero-content">
-          <div className="hero-text fade-up">
-            <span className="tag"><Zap size={14} /> Unified Identity for the Modern Stack</span>
+          <div className="hero-text reveal">
+            <div className="tag">
+              <Lock size={14} /> Zero-Trust Access Control
+            </div>
             <h1>
-              Trusted infrastructure <br/>
-              for <span className="gradient-text">security teams</span>
+              Trust Nothing.<br />
+              Verify Everything.
             </h1>
-            <p>
-              The enterprise standard for AuthN, AuthZ, and Identity Governance. 
-              Built for performance, auditability, and scale.
+            <p className="hero-subtitle">
+              Open-source identity governance with zero-trust access control, API-first architecture, and granular authorization — built for engineers who ship secure infrastructure.
             </p>
             <div className="hero-cta">
-              <a className="btn btn-primary btn-lg btn-glow" href={`${consoleBaseUrl}/signup`}>
-                Start Building Free <ArrowRight size={18} />
+              <a className="btn btn-accent btn-lg" href={`${consoleBaseUrl}/signup`}>
+                Deploy Now <ArrowRight size={18} />
               </a>
               <a className="btn btn-outline btn-lg" href="https://github.com/dhawalhost/wardseal">
-                Documentation
+                <Github size={18} /> View on GitHub
               </a>
             </div>
-            
-            <div className="hero-badges">
-              <div className="badge-item">
-                <Lock size={14} />
-                <span>OIDC & SAML 2.0</span>
-              </div>
-              <div className="badge-divider" />
-              <div className="badge-item">
-                <ShieldCheck size={14} />
-                <span>Adaptive MFA</span>
-              </div>
-              <div className="badge-divider" />
-              <div className="badge-item">
-                <Fingerprint size={14} />
-                <span>Passkeys</span>
-              </div>
+            <div className="hero-trust">
+              <div className="trust-indicator"><ShieldCheck size={16} /> SOC 2 Type II</div>
+              <div className="trust-dot" />
+              <div className="trust-indicator"><Lock size={16} /> AES-256-GCM</div>
+              <div className="trust-dot" />
+              <div className="trust-indicator"><Network size={16} /> SCIM 2.0</div>
             </div>
           </div>
 
-          <div className="hero-mockup fade-up" style={{ animationDelay: '0.2s' }}>
-            <div className="mockup-container">
-               <img src="/console-preview.png" alt="WardSeal Console Preview" className="mockup-img" />
+          <div className="hero-visual reveal" style={{ transitionDelay: '150ms' }}>
+            <div className="hero-image-wrapper">
+              <img src="/hero-monolith.png" alt="WardSeal Zero Trust Architecture" className="hero-img" />
             </div>
           </div>
         </div>
       </section>
 
+      {/* ── INTEGRATIONS MARQUEE ── */}
+      <section className="integrations-bar">
+        <div className="integrations-label">Native Identity Federation</div>
+        <div className="marquee-track">
+          {[...integrations, ...integrations, ...integrations].map((name, i) => (
+            <div className="integration-item" key={i}>
+              <Network size={16} /> {name}
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ── ARCHITECTURE GRID ── */}
       <section className="section" id="features">
         <div className="container">
-          <div className="section-header align-center animate-on-scroll">
-            <span className="tag">Platform</span>
-            <h2>Enterprise security, simplified</h2>
-            <p>One platform for users, machines, and compliance.</p>
+          <div className="section-header align-center reveal">
+            <h2>Built for Modern Infrastructure</h2>
+            <p>Seamlessly integrate enterprise-grade security without compromising on developer velocity or system latency.</p>
           </div>
-          <div className="features-grid">
-            {features.map((f, i) => (
-              <article className="feature-card animate-on-scroll" key={i} style={{ animationDelay: `${i * 0.1}s` }}>
-                <div className="feature-icon">{f.icon}</div>
+          <div className="arch-grid">
+            {archFeatures.map((f, i) => (
+              <article
+                className="arch-card reveal"
+                key={i}
+                style={{ transitionDelay: `${i * 100}ms` }}
+              >
+                <div className="arch-icon">{f.icon}</div>
                 <h3>{f.title}</h3>
                 <p>{f.desc}</p>
+                <div className="arch-details">
+                  {f.details.map((d, j) => (
+                    <div className="arch-detail" key={j}>
+                      {d.icon} {d.text}
+                    </div>
+                  ))}
+                </div>
               </article>
             ))}
           </div>
         </div>
       </section>
 
+      {/* ── CODE PREVIEW ── */}
       <section className="section section-muted">
         <div className="container">
-          <div className="how-grid">
-            <div className="how-text">
-              <span className="tag" style={{ marginBottom: '16px' }}>Quick Start</span>
-              <h2>Up and running in minutes</h2>
-              <div className="steps">
-                {[
-                  { n: 1, t: 'Create your account', d: 'Sign up for free. Your tenant is provisioned instantly.' },
-                  { n: 2, t: 'Connect your app', d: 'Register an OIDC/OAuth app. Copy the client ID.' },
-                  { n: 3, t: 'Configure SSO & MFA', d: 'Enable social login or passkeys in a few clicks.' }
-                ].map(s => (
-                  <div 
-                    className={`step ${activeStep === s.n ? 'active' : ''}`} 
-                    key={s.n}
-                    onMouseEnter={() => setActiveStep(s.n)}
-                    style={{ cursor: 'pointer' }}
-                  >
-                    <div className="step-num">{s.n}</div>
-                    <div className="step-content">
-                      <h3 style={{ color: activeStep === s.n ? 'var(--primary)' : 'inherit' }}>{s.t}</h3>
-                      {activeStep === s.n && <p style={{ fontSize: '1rem', marginTop: '8px' }}>{s.d}</p>}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div className="code-box animate-on-scroll" style={{ minHeight: '320px' }}>
-              <div className="code-content" key={activeStep}>
-                <span className="comment">{codeSnippets[activeStep].comment}</span><br />
-                {codeSnippets[activeStep].commands.map((c, i) => (
-                  <div key={i} style={{ marginTop: '12px' }}>
-                    <span className="cmd" style={{ fontSize: '0.8rem', opacity: 0.7 }}>$</span> <span className="cmd">{c.cmd}</span> {c.text}
-                  </div>
-                ))}
-                <div style={{ marginTop: '40px', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '20px' }}>
-                  <div className="ok" style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.875rem' }}>
-                    <ShieldCheck size={14} /> Step {activeStep} validated
-                  </div>
-                  <div className="ok" style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.875rem', marginTop: '4px', opacity: 0.8 }}>
-                    <Zap size={14} /> Environment ready
-                  </div>
+          <div className="code-section">
+            <div className="code-text reveal">
+              <div className="tag"><Terminal size={14} /> Developer First</div>
+              <h2>Drop-in Authorization Middleware</h2>
+              <p>Secure your Go microservices in minutes. WardSeal evaluates policies at the edge with sub-millisecond overhead, entirely stateless.</p>
+              <div className="code-highlights">
+                <div className="code-highlight">
+                  <ShieldCheck size={18} />
+                  <span>Automatically verifies incoming JWT or PASETO tokens against the WardSeal JWKS endpoint.</span>
+                </div>
+                <div className="code-highlight">
+                  <Lock size={18} />
+                  <span>Evaluates contextual ABAC policies before the request reaches your core business logic.</span>
                 </div>
               </div>
             </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="section" id="pricing">
-        <div className="container">
-          <div className="section-header align-center animate-on-scroll">
-            <span className="tag">Public Beta</span>
-            <h2>Simple, transparent pricing</h2>
-            <p>During our public beta, all cloud features are free to use.</p>
-          </div>
-
-          <div className="pricing-grid">
-            <article className="plan-card popular animate-on-scroll">
-              <span className="plan-badge">Public Beta</span>
-              <h3>Cloud Beta</h3>
-              <p>Fully managed by WardSeal</p>
-              <div className="plan-price"><span className="plan-amount">Free</span><span className="plan-per">/ during beta</span></div>
-              <ul className="plan-features">
-                <li className="plan-feature"><ShieldCheck size={18} className="check" /> Full SaaS Platform Access</li>
-                <li className="plan-feature"><ShieldCheck size={18} className="check" /> Automated Backups & HA</li>
-                <li className="plan-feature"><ShieldCheck size={18} className="check" /> Unlimited System-Admins</li>
-                <li className="plan-feature"><ShieldCheck size={18} className="check" /> No limits during testing</li>
-              </ul>
-              <a className="btn btn-primary w-full" href={`${consoleBaseUrl}/signup`}>Get Started for Free</a>
-            </article>
-
-            <article className="plan-card animate-on-scroll" style={{ animationDelay: '0.1s' }}>
-              <h3>Enterprise</h3>
-              <p>For large-scale platforms</p>
-              <div className="plan-price"><span className="plan-amount">Custom</span></div>
-              <ul className="plan-features">
-                <li className="plan-feature"><ShieldCheck size={18} className="check" /> Managed VPC Deployment</li>
-                <li className="plan-feature"><ShieldCheck size={18} className="check" /> Custom SLAs & 24/7 Support</li>
-                <li className="plan-feature"><ShieldCheck size={18} className="check" /> Advanced Governance</li>
-                <li className="plan-feature"><ShieldCheck size={18} className="check" /> On-prem / Hybrid Options</li>
-              </ul>
-              <a className="btn btn-outline w-full" href="mailto:sales@wardseal.com">Contact Sales</a>
-            </article>
-          </div>
-        </div>
-      </section>
-
-      <section className="section section-muted">
-        <div className="container faq">
-          <div className="section-header align-center animate-on-scroll">
-            <span className="tag">FAQ</span>
-            <h2>Common Questions</h2>
-          </div>
-          <div className="faq-list">
-            {faqItems.map((item, idx) => (
-              <div className={`faq-item ${openFaq === idx ? 'open' : ''}`} key={item.q}>
-                <button className="faq-q" onClick={() => setOpenFaq(openFaq === idx ? -1 : idx)}>
-                  {item.q}
-                  <span className="faq-icon" style={{ transform: openFaq === idx ? 'rotate(45deg)' : 'none', transition: 'transform 0.3s' }}>+</span>
-                </button>
-                <div className="faq-a">
-                  <div style={{ paddingBottom: '24px' }}>{item.a}</div>
-                </div>
+            
+            <div className="code-block reveal" style={{ transitionDelay: '150ms' }}>
+              <div className="code-block-header">
+                <div className="code-block-dots"><span /><span /><span /></div>
+                <div className="code-block-filename">middleware/authz.go</div>
               </div>
-            ))}
+              <div className="code-block-body">
+<pre><code><span className="tok-keyword">func</span> <span className="tok-func">AuthzMiddleware</span>(<span className="tok-param">policy</span> <span className="tok-type">wardseal.Policy</span>) <span className="tok-keyword">func</span>(<span className="tok-type">http.Handler</span>) <span className="tok-type">http.Handler</span> {'{'}
+    <span className="tok-keyword">return</span> <span className="tok-keyword">func</span>(<span className="tok-param">next</span> <span className="tok-type">http.Handler</span>) <span className="tok-type">http.Handler</span> {'{'}
+        <span className="tok-keyword">return</span> <span className="tok-type">http.HandlerFunc</span>(<span className="tok-keyword">func</span>(<span className="tok-param">w</span> <span className="tok-type">http.ResponseWriter</span>, <span className="tok-param">r</span> *<span className="tok-type">http.Request</span>) {'{'}
+            <span className="tok-comment">// 1. Validate Token</span>
+            <span className="tok-var">claims</span>, <span className="tok-var">err</span> := <span className="tok-builtin">wardseal</span>.<span className="tok-method">VerifyToken</span>(<span className="tok-var">r</span>)
+            <span className="tok-keyword">if</span> <span className="tok-var">err</span> != <span className="tok-nil">nil</span> {'{'}
+                <span className="tok-builtin">http</span>.<span className="tok-method">Error</span>(<span className="tok-var">w</span>, <span className="tok-string">"unauthorized"</span>, <span className="tok-builtin">http</span>.<span className="tok-var">StatusUnauthorized</span>)
+                <span className="tok-keyword">return</span>
+            {'}'}
+
+            <span className="tok-comment">// 2. Evaluate Policy</span>
+            <span className="tok-keyword">if</span> !<span className="tok-var">policy</span>.<span className="tok-method">Evaluate</span>(<span className="tok-var">claims</span>, <span className="tok-var">r</span>) {'{'}
+                <span className="tok-builtin">http</span>.<span className="tok-method">Error</span>(<span className="tok-var">w</span>, <span className="tok-string">"forbidden"</span>, <span className="tok-builtin">http</span>.<span className="tok-var">StatusForbidden</span>)
+                <span className="tok-keyword">return</span>
+            {'}'}
+
+            <span className="tok-comment">// 3. Proceed</span>
+            <span className="tok-var">next</span>.<span className="tok-method">ServeHTTP</span>(<span className="tok-var">w</span>, <span className="tok-var">r</span>)
+        {'}'})
+    {'}'}
+{'}'}</code></pre>
+              </div>
+            </div>
           </div>
         </div>
       </section>
 
+      {/* ── CTA BANNER ── */}
       <section className="section">
         <div className="container">
-          <div className="cta-glass fade-up">
-            <span className="tag" style={{ marginBottom: '24px' }}>Get Started</span>
-            <h2 style={{ marginBottom: '16px' }}>Secure your application today</h2>
-            <p style={{ marginBottom: '32px', opacity: 0.9 }}>Join the managed cloud beta today. No credit card. No complications.</p>
-            <div className="hero-cta" style={{ justifyContent: 'center' }}>
-              <a className="btn btn-outline btn-lg" style={{ background: 'white', color: 'var(--primary)' }} href={`${consoleBaseUrl}/signup`}>
-                Create Free Account
+          <div className="cta-banner reveal">
+            <h2>Ready to secure your infrastructure?</h2>
+            <p>Join the open-source community or deploy the enterprise platform in your environment.</p>
+            <div className="cta-actions">
+              <a className="btn btn-accent btn-lg" href={`${consoleBaseUrl}/signup`}>
+                Start Building <ArrowRight size={18} />
               </a>
-              <a className="btn btn-lg" style={{ border: '1px solid rgba(255,255,255,0.3)', color: 'white' }} href="https://github.com/dhawalhost/wardseal">
-                Read Documentation
+              <a className="btn btn-outline btn-lg" href="https://github.com/dhawalhost/wardseal">
+                Read the Docs
               </a>
             </div>
           </div>

@@ -27,7 +27,8 @@ import {
     X,
     Layout
 } from 'lucide-react';
-import { PageHeader, GlassCard, GlassCardHeader, GlassCardTitle, GlassCardContent, GlassCardFooter, GlassCardDescription } from '@/components/layout';
+import { PageHeader, GlassCard, GlassCardHeader, GlassCardTitle, GlassCardContent, GlassCardFooter, GlassCardDescription, PageLayout
+} from '@/components/layout';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
 const SlackIntegration: React.FC = () => {
@@ -108,6 +109,7 @@ const SlackIntegration: React.FC = () => {
     const isConfigured = status?.status === 'ready';
 
     return (
+        <PageLayout>
         <div className="max-w-6xl mx-auto space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-700 py-12">
             <PageHeader
                 icon={<Slack className="w-10 h-10 text-[#4A154B]" />}
@@ -367,6 +369,7 @@ const SlackIntegration: React.FC = () => {
                 </div>
             </GlassCard>
         </div>
+        </PageLayout>
     );
 };
 

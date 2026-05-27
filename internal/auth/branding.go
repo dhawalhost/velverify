@@ -54,7 +54,7 @@ func (s *sqlBrandingRepository) Get(ctx context.Context, tenantID string) (Brand
 func (s *sqlBrandingRepository) Upsert(ctx context.Context, config BrandingConfig) error {
 	query := `
 		INSERT INTO tenant_branding (tenant_id, logo_url, primary_color, background_color, css_override, config, updated_at)
-		VALUES (:tenant_id, :logo_url, :primary_color, :background_color, :css_override, :config::jsonb, NOW())
+		VALUES (:tenant_id, :logo_url, :primary_color, :background_color, :css_override, CAST(:config AS jsonb), NOW())
 		ON CONFLICT (tenant_id) DO UPDATE SET
 			logo_url = EXCLUDED.logo_url,
 			primary_color = EXCLUDED.primary_color,

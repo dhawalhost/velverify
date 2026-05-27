@@ -29,7 +29,8 @@ import {
     Layout,
     KeyRound
 } from 'lucide-react';
-import { PageHeader, GlassCard, GlassCardHeader, GlassCardTitle, GlassCardContent, GlassCardDescription } from '@/components/layout';
+import { PageHeader, GlassCard, GlassCardHeader, GlassCardTitle, GlassCardContent, GlassCardDescription, PageLayout
+} from '@/components/layout';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 
@@ -180,6 +181,7 @@ export default function UserForm() {
     if (loading) return <div className="h-[400px] flex items-center justify-center"><Loader2 className="h-10 w-10 animate-spin text-primary opacity-20" /></div>;
 
     return (
+        <PageLayout>
         <div className="max-w-5xl mx-auto space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-700 py-12">
             <PageHeader
                 icon={<User className="w-8 h-8 text-primary" />}
@@ -458,7 +460,7 @@ export default function UserForm() {
                                                     <span className="text-[9px] font-medium text-on-surface-variant/40 tracking-tight mt-0.5">{group.members?.length || 0} members</span>
                                                 </div>
                                                 <div className={`w-5 h-5 rounded border flex items-center justify-center transition-all ${formData.groups.includes(group.id) 
-                                                    ? 'bg-primary border-primary text-white' 
+                                                    ? 'bg-primary border-primary text-primary-foreground' 
                                                     : 'bg-card border-on-surface/10 group-hover:border-primary/30'}`}>
                                                     {formData.groups.includes(group.id) && <CheckCircle2 className="w-3.5 h-3.5" />}
                                                 </div>
@@ -494,5 +496,6 @@ export default function UserForm() {
                 </div>
             </form>
         </div>
+        </PageLayout>
     );
 }

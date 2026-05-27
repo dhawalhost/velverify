@@ -93,10 +93,14 @@ func (h *HTTPHandler) getUserProfile(c *gin.Context) {
 		return
 	}
 
+	tenantSlug, _ := h.svc.GetTenantSlug(c.Request.Context(), tenantID)
+
 	c.JSON(http.StatusOK, gin.H{
-		"id":    profile.ID,
-		"email": profile.Email,
-		"name":  profile.Name,
+		"id":          profile.ID,
+		"email":       profile.Email,
+		"name":        profile.Name,
+		"tenant_id":   tenantID,
+		"tenant_slug": tenantSlug,
 	})
 }
 

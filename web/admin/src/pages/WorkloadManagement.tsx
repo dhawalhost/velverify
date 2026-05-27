@@ -30,7 +30,7 @@ import {
     GlassTableHeader,
     GlassTableHead,
     GlassTableRow,
-    GlassCardDescription
+    GlassCardDescription, PageLayout
 } from '@/components/layout';
 import {
     TableBody,
@@ -105,6 +105,7 @@ const WorkloadManagement: React.FC = () => {
     if (loading && workloads.length === 0) return <div className="h-[400px] flex items-center justify-center"><Loader2 className="h-10 w-10 animate-spin text-primary opacity-20" /></div>;
 
     return (
+        <PageLayout>
         <div className="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
             <PageHeader
                 icon={<Database className="w-10 h-10 text-primary" />}
@@ -247,7 +248,7 @@ const WorkloadManagement: React.FC = () => {
                 <DialogContent className="sm:max-w-[550px] rounded-[32px] border-none p-0 overflow-hidden shadow-2xl shadow-on-surface/20">
                     <DialogHeader className="bg-surface-container/10 p-10 border-b border-on-surface/5">
                         <div className="flex items-center gap-5">
-                            <div className="p-3.5 bg-primary rounded-2xl text-white shadow-lg shadow-primary/20">
+                            <div className="p-3.5 bg-primary rounded-2xl text-primary-foreground shadow-lg shadow-primary/20">
                                 <Plus className="w-7 h-7" />
                             </div>
                             <div>
@@ -302,6 +303,7 @@ const WorkloadManagement: React.FC = () => {
                 </DialogContent>
             </Dialog>
         </div>
+        </PageLayout>
     );
 };
 

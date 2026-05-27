@@ -27,7 +27,7 @@ export const colors = {
     // Chart palette (8 harmonious hues)
     chart: [
         "hsl(var(--primary))",   // primary indigo
-        "hsl(217 91% 55%)",      // vibrant blue
+        "hsl(158 100% 51%)",      // vibrant electric green
         "hsl(152 69% 40%)",      // emerald
         "hsl(37 91% 50%)",       // amber
         "hsl(271 76% 53%)",      // violet

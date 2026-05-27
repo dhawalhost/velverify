@@ -21,52 +21,67 @@
 
   const STYLES = `
     .vv-widget {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
       max-width: 360px;
       margin: 0 auto;
       padding: 2rem;
-      background: #fff;
+      background: #09090b;
       border-radius: 12px;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+      color: #fafafa;
     }
     .vv-widget h2 {
       margin: 0 0 1.5rem;
       text-align: center;
-      color: #333;
+      color: #fafafa;
       font-size: 1.5rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
     }
     .vv-widget input {
       width: 100%;
       padding: 0.75rem 1rem;
       margin-bottom: 1rem;
-      border: 1px solid #ddd;
+      background: rgba(24, 24, 27, 0.7);
+      border: 1px solid rgba(255, 255, 255, 0.12);
       border-radius: 8px;
+      color: #fafafa;
       font-size: 1rem;
       box-sizing: border-box;
     }
     .vv-widget input:focus {
       outline: none;
-      border-color: #007bff;
-      box-shadow: 0 0 0 3px rgba(0,123,255,0.1);
+      border-color: #06ffa5;
+      box-shadow: 0 0 0 3px rgba(6,255,165,0.25);
     }
     .vv-widget button {
       width: 100%;
       padding: 0.85rem;
-      background: #007bff;
-      color: white;
-      border: none;
+      background: #06ffa5;
+      color: #09090b;
+      border: 1px solid #06ffa5;
       border-radius: 8px;
       font-size: 1rem;
-      font-weight: 600;
+      font-weight: 700;
       cursor: pointer;
-      transition: background 0.2s;
+      transition: background 0.2s, box-shadow 0.2s;
     }
-    .vv-widget button:hover { background: #0056b3; }
-    .vv-widget button:disabled { background: #ccc; cursor: not-allowed; }
+    .vv-widget button:hover { 
+      background: #00e896; 
+      box-shadow: 0 0 20px rgba(6,255,165,0.25);
+    }
+    .vv-widget button:disabled { 
+      background: #18181b; 
+      color: #71717a;
+      border-color: #27272a;
+      cursor: not-allowed; 
+      box-shadow: none;
+    }
     .vv-widget .vv-error {
       padding: 0.75rem;
-      background: #ffe6e6;
-      color: #d32f2f;
+      background: rgba(239, 68, 68, 0.1);
+      color: #ef4444;
+      border: 1px solid rgba(239, 68, 68, 0.2);
       border-radius: 8px;
       margin-bottom: 1rem;
       font-size: 0.9rem;
@@ -74,7 +89,7 @@
     .vv-widget .vv-divider {
       text-align: center;
       margin: 1rem 0;
-      color: #999;
+      color: #71717a;
       font-size: 0.85rem;
     }
     .vv-widget .vv-social {
@@ -86,9 +101,16 @@
       flex: 1;
       padding: 0.6rem;
       font-size: 0.9rem;
+      background: rgba(255,255,255,0.04);
+      color: #fafafa;
+      border: 1px solid rgba(255,255,255,0.12);
     }
-    .vv-widget .vv-google { background: #DB4437; }
-    .vv-widget .vv-github { background: #333; }
+    .vv-widget .vv-social button:hover {
+      background: rgba(255,255,255,0.08);
+      box-shadow: none;
+    }
+    .vv-widget .vv-google { }
+    .vv-widget .vv-github { }
     .vv-widget .vv-mfa {
       margin-top: 1rem;
     }
@@ -101,7 +123,7 @@
       text-align: center;
       margin-top: 1.5rem;
       font-size: 0.75rem;
-      color: #999;
+      color: #71717a;
     }
   `;
 
@@ -115,7 +137,7 @@
         redirectUri: '',
         onSuccess: () => {},
         onError: () => {},
-        branding: { primaryColor: '#007bff', logoUrl: null },
+        branding: { primaryColor: '#06ffa5', logoUrl: null },
         ...options
       };
       this.state = { mfaRequired: false, pendingToken: '', userId: '', loading: false, error: '' };
@@ -188,7 +210,7 @@
               ${this.state.loading ? 'Verifying...' : 'Verify'}
             </button>
           </form>
-          <button onclick="WardSeal.cancelMFA()" style="margin-top:1rem;background:#6c757d;">Back to Login</button>
+          <button onclick="WardSeal.cancelMFA()" style="margin-top:1rem;background:transparent;border:1px solid rgba(255,255,255,0.12);color:#fafafa;">Back to Login</button>
         </div>
       `;
       

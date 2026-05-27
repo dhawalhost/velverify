@@ -65,17 +65,17 @@ const Passkeys: React.FC = () => {
             />
 
             <GlassCard className="border-none shadow-2xl shadow-on-surface/5 overflow-hidden rounded-[32px] bg-card">
-                <GlassCardHeader className="bg-primary py-14 px-10 text-white relative overflow-hidden">
+                <GlassCardHeader className="bg-primary py-14 px-10 text-primary-foreground relative overflow-hidden">
                     <div className="absolute top-0 right-0 opacity-10 p-8">
                         <Fingerprint className="w-40 h-40 -mr-10 -mt-10" />
                     </div>
                     <div className="relative z-10 flex flex-col items-center text-center gap-6">
                         <div className="w-20 h-20 bg-card/20 rounded-3xl flex items-center justify-center backdrop-blur-md shadow-inner">
-                            <Fingerprint className="w-10 h-10 text-white" />
+                            <Fingerprint className="w-10 h-10 text-primary-foreground" />
                         </div>
                         <div>
-                            <GlassCardTitle className="text-3xl font-bold tracking-tight text-white">Register a Passkey</GlassCardTitle>
-                            <GlassCardDescription className="text-on-inverse/60 font-medium text-sm mt-3 max-w-sm mx-auto leading-relaxed">
+                            <GlassCardTitle className="text-3xl font-bold tracking-tight text-primary-foreground">Register a Passkey</GlassCardTitle>
+                            <GlassCardDescription className="text-primary-foreground/60 font-medium text-sm mt-3 max-w-sm mx-auto leading-relaxed">
                                 Use TouchID, FaceID, or a hardware security key (YubiKey) to sign in faster and more securely.
                             </GlassCardDescription>
                         </div>
